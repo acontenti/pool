@@ -14,6 +14,6 @@ pub extern fn generate_json_ast(file: *const c_char) -> *const c_char {
 	let mut pool = Pool::new(c_str.to_str().expect("Invalid input"));
 	let root = pool.parse().expect("parse error");
 	let serialized = serde_json::to_string_pretty(&root).unwrap();
-	println!("{}", serialized);
-	return CString::new(serialized + "\0").unwrap().into_raw();
+	let result = CString::new(serialized.to_owned()).unwrap();
+	return result.into_raw();
 }

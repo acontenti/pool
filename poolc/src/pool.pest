@@ -12,23 +12,23 @@ expression = _{ call | term }
 
 call = { term ~ identifier ~ term }
 
-term = { tuple | array | par | block | num | string | bool | identifier }
+term = { num | bool | string | tuple | array | par | block | identifier }
 
-par = { "(" ~ expression ~ ")" }
+par = { "(" ~ expression? ~ ")" }
 
 block = { "{" ~ (statement*) ~ "}" }
 
-tuple = { "(" ~ expression? ~ ("," + ~ expression)* ~ ")" }
+tuple = { "(" ~ (expression ~ ",")+ ~ expression? ~ ")" }
 
 array = { "[" ~ expression? ~ ("," + ~ expression)* ~ "]" }
 
-num = { integer | decimal }
+num = { decimal | integer }
 
 bool = @{ "true" | "false" }
 
-integer = @{ "-"? ~ ASCII_DIGIT+ }
+decimal = @{ "-"? ~ ((ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT*) | (ASCII_DIGIT* ~ "." ~ ASCII_DIGIT+)) }
 
-decimal = @{ "-"? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* }
+integer = @{ "-"? ~ ASCII_DIGIT+ }
 
 string = ${ "\"" ~ inner ~ "\"" }
 
