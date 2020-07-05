@@ -1,0 +1,51 @@
+//
+// Created by intellij-pest on 2020-07-02
+// pool
+// Author: Alessandro
+//
+
+pool = _{ SOI ~ statement* ~ EOI  }
+
+statement = _{ call ~ ";" }
+
+expression = _{ call | term }
+
+call = { term ~ identifier ~ term }
+
+term = { tuple | array | par | block | num | string | bool | identifier }
+
+par = { "(" ~ expression ~ ")" }
+
+block = { "{" ~ (statement*) ~ "}" }
+
+tuple = { "(" ~ expression? ~ ("," + ~ expression)* ~ ")" }
+
+array = { "[" ~ expression? ~ ("," + ~ expression)* ~ "]" }
+
+num = { integer | decimal }
+
+bool = @{ "true" | "false" }
+
+integer = @{ "-"? ~ ASCII_DIGIT+ }
+
+decimal = @{ "-"? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* }
+
+string = ${ "\"" ~ inner ~ "\"" }
+
+inner = @{ char* }
+
+char = @{
+    !("\"" | "\\") ~ ANY
+    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+identifier = @{ IDENT_START ~ IDENT_PART* }
+
+IDENT_START = @{ ASCII_ALPHA | "_" | "!" | "$" | "%" | "&" | "*" | "+" | "-" | "/" | "<" | ">" | "=" | "^" | "|" | "~" }
+
+IDENT_PART = @{ ASCII_ALPHANUMERIC | "_" | "!" | "$" | "%" | "&" | "*" | "+" | "-" | "/" | "<" | ">" | "=" | "^" | "|" | "~" }
+
+WHITESPACE = _{ " " | "\t" | NEWLINE }
+
+COMMENT = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" }

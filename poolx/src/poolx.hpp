@@ -1,0 +1,4 @@
+#ifndef POOL_POOLX_HPP
+#define POOL_POOLX_HPP
+
+#endif //POOL_POOLX_HPP
