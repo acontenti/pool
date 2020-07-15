@@ -4,5 +4,5 @@ fun = (x) : {
 	a = test;
 	stdout println (a + x);
 };
-stdout println a;
+stdout println a; /*prints null*/
 fun -> (1);

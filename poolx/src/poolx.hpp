@@ -40,10 +40,24 @@ class poolx {
 
 	struct Empty : public Object {
 		TYPER(Empty);
+
+		Empty() {
+			addMethod("toString", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
+				static auto toString = make_shared<String>("void");
+				return toString;
+			});
+		}
 	};
 
 	struct Nothing : public Object {
 		TYPER(Nothing);
+
+		Nothing() {
+			addMethod("toString", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
+				static auto toString = make_shared<String>("null");
+				return toString;
+			});
+		}
 	};
 
 	struct Bool : public Object {
@@ -51,7 +65,12 @@ class poolx {
 
 		TYPER(Bool);
 
-		explicit Bool(bool value) : value(value) {}
+		explicit Bool(bool value) : value(value) {
+			addMethod("toString", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
+				static auto toString = make_shared<String>(this->value ? "true" : "false");
+				return toString;
+			});
+		}
 	};
 
 	struct Integer : public Object {
@@ -72,6 +91,10 @@ class poolx {
 				} else if (var->getType() == "String") {
 					return make_shared<String>(to_string(this->value) + reinterpret_pointer_cast<String>(var)->value);
 				} else return Null;
+			});
+			addMethod("toString", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
+				static auto toString = make_shared<String>(to_string(this->value));
+				return toString;
 			});
 		}
 	};
@@ -94,6 +117,10 @@ class poolx {
 				} else if (var->getType() == "String") {
 					return make_shared<String>(to_string(this->value) + reinterpret_pointer_cast<String>(var)->value);
 				} else return Null;
+			});
+			addMethod("toString", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
+				static auto toString = make_shared<String>(to_string(this->value));
+				return toString;
 			});
 		}
 	};
@@ -149,13 +176,13 @@ class poolx {
 		Call(shared_ptr<Object> caller, string method, shared_ptr<Object> callee)
 				: caller(std::move(caller)), method(std::move(method)), callee(std::move(callee)) {}
 
-		shared_ptr<Object> invoke(const vector<shared_ptr<Object>> &args) {
+		shared_ptr<Object> invoke() {
 			auto first = caller, second = callee;
 			if (caller->getType() == "Call") {
-				first = reinterpret_pointer_cast<Call>(caller)->invoke(args);
+				first = reinterpret_pointer_cast<Call>(caller)->invoke();
 			}
 			if (callee->getType() == "Call") {
-				second = reinterpret_pointer_cast<Call>(callee)->invoke(args);
+				second = reinterpret_pointer_cast<Call>(callee)->invoke();
 			}
 			auto function = first->findMethod(method);
 			if (function) {
@@ -214,8 +241,20 @@ class poolx {
 			} else return nullptr;
 		}
 
-		void add(const string& name, const shared_ptr<Variable>& var) {
+		void add(const string &name, const shared_ptr<Variable> &var) {
 			heap.emplace(name, var);
+		}
+
+		void associate(const vector<string> &params, const vector<shared_ptr<Object>> &args) {
+			for (int i = 0; i < params.size(); ++i) {
+				auto name = params[i];
+				auto value = args[i];
+				if (const auto &var = find(name)) {
+					var->value = value;
+				} else {
+					add(name, make_shared<Variable>(name, value));
+				}
+			}
 		}
 	};
 
@@ -226,12 +265,14 @@ class poolx {
 
 		TYPER(Block);
 
-		explicit Block(vector<shared_ptr<Call>> calls) : calls(move(calls)) {}
+		Block(shared_ptr<Context> context, vector<shared_ptr<Call>> calls)
+				: context(std::move(context)), calls(move(calls)) {}
 
-		shared_ptr<Object> execute(const vector<shared_ptr<Object>> &args) {
+		shared_ptr<Object> execute(const vector<string> &params, const vector<shared_ptr<Object>> &args) {
 			shared_ptr<Object> returnValue = Void;
+			context->associate(params, args);
 			for (auto &call: calls) {
-				returnValue = call->invoke(args);
+				returnValue = call->invoke();
 			}
 			return returnValue;
 		}
@@ -255,7 +296,7 @@ class poolx {
 					args.push_back(other);
 				}
 				if (this->params.size() == args.size()) {
-					return this->block->execute(args);
+					return this->block->execute(this->params, args);
 				} else return Null;
 			});
 		}
@@ -281,7 +322,7 @@ class poolx {
 
 	explicit poolx(const json &jsonAST);
 
-	void execute();
+	void execute(const vector<string> &args);
 
 	shared_ptr<poolx::Object> parseTerm(const json &ast, const shared_ptr<Context> &context);
 
@@ -310,5 +351,5 @@ class poolx {
 	void initNatives();
 
 public:
-	static void execute(const string &file);
+	static void execute(const string &file, const vector<string> &args);
 };
