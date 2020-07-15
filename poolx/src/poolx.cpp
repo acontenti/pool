@@ -2,8 +2,10 @@
 #include "../../include/libpool.h"
 #include "poolx.hpp"
 
-const shared_ptr<poolx::Object> poolx::Null = make_shared<poolx::Empty>();
+const shared_ptr<poolx::Object> poolx::Void = make_shared<poolx::Empty>();
 unordered_map<string, shared_ptr<poolx::Variable>> poolx::heap;
+const shared_ptr<poolx::Tuple> poolx::Tuple::Empty = make_shared<poolx::Tuple>(vector<shared_ptr<Object>>());
+long poolx::Object::ID_COUNTER = 0;
 
 void poolx::execute(const string &file) {
 	string jsonAstString = libpool::generate_json_ast(file.c_str());
@@ -18,7 +20,7 @@ poolx::poolx(json jsonAST) : jsonAST(move(jsonAST)) {
 }
 
 void poolx::execute() {
-	const shared_ptr<Block> &main = static_pointer_cast<Block>(parseTerm(jsonAST));
+	const shared_ptr<Block> &main = reinterpret_pointer_cast<Block>(parseTerm(jsonAST));
 	main->execute();
 }
 
@@ -40,7 +42,7 @@ shared_ptr<poolx::Object> poolx::parseTerm(const json &ast) {
 	if ("Bool" == key) {
 		return parseBool(value);
 	}
-	if ("String" == key) {
+	if ("Str" == key) {
 		return parseString(value);
 	}
 	if ("Ident" == key) {
@@ -110,7 +112,9 @@ shared_ptr<poolx::Object> poolx::parseIdent(const json &ast) {
 	if (iterator != heap.end()) {
 		return iterator->second;
 	} else {
-		return make_shared<Undefined>(id);
+		auto var = make_shared<Variable>(id);
+		heap.emplace(id, var);
+		return var;
 	}
 }
 
@@ -134,19 +138,28 @@ shared_ptr<poolx::Array> poolx::parseArray(const json &ast) {
 
 void poolx::initNatives() {
 	auto IO = make_shared<Class>("IO");
-	IO->methods().emplace("println", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
-		const auto &integer = static_pointer_cast<Integer>(other);
-		const auto &var = static_pointer_cast<Variable>(other);
-		if (var) {
-			const auto &integer = static_pointer_cast<Integer>(var->value);
-			if (integer) {
-				cout << integer->value << endl;
+	IO->addMethod("println", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		shared_ptr<Object> var = other;
+		if (other->getType() == "Variable") {
+			var = reinterpret_pointer_cast<Variable>(other)->value;
+		}
+		if (var->getType() == "Integer") {
+			cout << reinterpret_pointer_cast<Integer>(var)->value << endl;
+		} else if (var->getType() == "Decimal") {
+			cout << reinterpret_pointer_cast<Decimal>(var)->value << endl;
+		} else if (var->getType() == "String") {
+			cout << reinterpret_pointer_cast<String>(var)->value << endl;
+		} else if (auto method = var->findMethod("toString")) {
+			auto result = (*method)(Tuple::Empty);
+			if (result->getType() == "String") {
+				cout << reinterpret_pointer_cast<String>(result)->value << endl;
+			} else {
+				cout << var->getType() << "@" << var->getID() << endl;
 			}
+		} else {
+			cout << var->getType() << "@" << var->getID() << endl;
 		}
-		if (integer) {
-			cout << integer->value << endl;
-		}
-		return make_shared<Empty>();
+		return Void;
 	});
 	heap.emplace("stdout", make_shared<Variable>("stdout", IO));
 }

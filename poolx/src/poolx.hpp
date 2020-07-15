@@ -9,21 +9,31 @@ using json = nlohmann::json;
 using namespace std;
 
 class poolx {
-#define TYPER(TYPE) string getType() override{\
+#define TYPER(TYPE) string_view getType() const override{\
         return #TYPE;\
     }
 
-	struct Object {
+	struct Object : enable_shared_from_this<Object> {
 		typedef function<shared_ptr<Object>(const shared_ptr<Object> &)> method_t;
-		typedef unordered_map<string, method_t> methods_map;
 	private:
-		methods_map methodsMap;
+		static long ID_COUNTER;
+		unordered_map<string, method_t> methodsMap;
+		const long id = ID_COUNTER++;
 	public:
-		virtual string getType() = 0;
+		virtual string_view getType() const = 0;
 
-		virtual method_t findMethod(const string &name) {
-			return methodsMap.at(name);
+		virtual const method_t *findMethod(const string &name) const {
+			auto iterator = methodsMap.find(name);
+			return iterator != methodsMap.end() ? &iterator->second : nullptr;
 		};
+
+		void addMethod(const string &name, const method_t &method) {
+			methodsMap.emplace(name, method);
+		};
+
+		long getID() const {
+			return id;
+		}
 	};
 
 	struct Empty : public Object {
@@ -44,11 +54,18 @@ class poolx {
 		TYPER(Integer);
 
 		explicit Integer(int64_t value) : value(value) {
-			methods().emplace("+", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
-				const auto &integer = static_pointer_cast<Integer>(other);
-				if (integer) {
-					return make_shared<Integer>(this->value + integer->value);
-				} else return Null;
+			addMethod("+", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
+				shared_ptr<Object> var = other;
+				if (other->getType() == "Variable") {
+					var = reinterpret_pointer_cast<Variable>(other)->value;
+				}
+				if (var->getType() == "Integer") {
+					return make_shared<Integer>(this->value + reinterpret_pointer_cast<Integer>(var)->value);
+				} else if (var->getType() == "Decimal") {
+					return make_shared<Decimal>(this->value + reinterpret_pointer_cast<Decimal>(var)->value);
+				} else if (var->getType() == "String") {
+					return make_shared<String>(to_string(this->value) + reinterpret_pointer_cast<String>(var)->value);
+				} else return Void;
 			});
 		}
 	};
@@ -59,11 +76,18 @@ class poolx {
 		TYPER(Decimal);
 
 		explicit Decimal(double value) : value(value) {
-			methods().emplace("+", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
-				const auto &integer = static_pointer_cast<Decimal>(other);
-				if (integer) {
-					return make_shared<Integer>(this->value + integer->value);
-				} else return Null;
+			addMethod("+", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
+				shared_ptr<Object> var = other;
+				if (other->getType() == "Variable") {
+					var = reinterpret_pointer_cast<Variable>(other)->value;
+				}
+				if (var->getType() == "Integer") {
+					return make_shared<Decimal>(this->value + reinterpret_pointer_cast<Integer>(var)->value);
+				} else if (var->getType() == "Decimal") {
+					return make_shared<Decimal>(this->value + reinterpret_pointer_cast<Decimal>(var)->value);
+				} else if (var->getType() == "String") {
+					return make_shared<String>(to_string(this->value) + reinterpret_pointer_cast<String>(var)->value);
+				} else return Void;
 			});
 		}
 	};
@@ -73,11 +97,26 @@ class poolx {
 
 		TYPER(String);
 
-		explicit String(string value) : value(move(value)) {}
+		explicit String(string value) : value(move(value)) {
+			addMethod("+", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
+				shared_ptr<Object> var = other;
+				if (other->getType() == "Variable") {
+					var = reinterpret_pointer_cast<Variable>(other)->value;
+				}
+				if (var->getType() == "Integer") {
+					return make_shared<String>(this->value + to_string(reinterpret_pointer_cast<Integer>(var)->value));
+				} else if (var->getType() == "Decimal") {
+					return make_shared<String>(this->value + to_string(reinterpret_pointer_cast<Decimal>(var)->value));
+				} else if (var->getType() == "String") {
+					return make_shared<String>(this->value + reinterpret_pointer_cast<String>(var)->value);
+				} else return Void;
+			});
+		}
 	};
 
 	struct Tuple : public Object {
 		vector<shared_ptr<Object>> values;
+		static const shared_ptr<Tuple> Empty;
 
 		TYPER(Tuple);
 
@@ -100,12 +139,19 @@ class poolx {
 		TYPER(Call);
 
 		Call(shared_ptr<Object> caller, string method, shared_ptr<Object> callee)
-				: caller(move(caller)), method(move(method)), callee(move(callee)) {}
+				: caller(std::move(caller)), method(std::move(method)), callee(std::move(callee)) {}
 
 		shared_ptr<Object> invoke() {
-			auto iterator = caller->methods().find(method);
-			if (iterator != caller->methods().end()) {
-				return iterator->second(callee);
+			auto first = caller, second = callee;
+			if (caller->getType() == "Call") {
+				first = reinterpret_pointer_cast<Call>(caller)->invoke();
+			}
+			if (callee->getType() == "Call") {
+				second = reinterpret_pointer_cast<Call>(callee)->invoke();
+			}
+			auto function = first->findMethod(method);
+			if (function) {
+				return (*function)(second);
 			} else throw runtime_error("method " + method + " not found");
 		}
 	};
@@ -145,33 +191,23 @@ class poolx {
 
 		TYPER(Variable);
 
-		methods_map findMethod(string name) override {
-			return Object::methods() + value->methods();
+		const method_t *findMethod(const string &name) const override {
+			return Object::findMethod(name) ?: value->findMethod(name);
 		}
 
-		explicit Variable(string name, shared_ptr<Object> value) : Named(move(name)), value(move(value)) {
-			Object::methods().emplace("=", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		explicit Variable(const string &name) : Variable(name, Void) {};
+
+		Variable(const string &name, shared_ptr<Object> value) : Named(name), value(std::move(value)) {
+			addMethod("=", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
 				this->value = other;
-				return shared_ptr<Variable>(this);
+				return shared_from_this();
 			});
 		};
 	};
 
-	struct Undefined : public Named {
-		TYPER(Undefined);
-
-		explicit Undefined(string name) : Named(move(name)) {
-			methods().emplace("=", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
-				const shared_ptr<Variable> &var = make_shared<Variable>(this->name, other);
-				heap.emplace(this->name, var);
-				return var;
-			});
-		}
-	};
-
 	json jsonAST;
 	static unordered_map<string, shared_ptr<Variable>> heap;
-	const static shared_ptr<Object> Null;
+	const static shared_ptr<Object> Void;
 
 	explicit poolx(json jsonAST);
 
