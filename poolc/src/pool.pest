@@ -6,25 +6,31 @@
 
 pool = _{ SOI ~ statement* ~ EOI  }
 
-statement = _{ call ~ ";" }
+statement = { call? ~ ";" }
 
 expression = _{ call | term }
 
 call = { term ~ identifier ~ term }
 
-term = { num | bool | string | tuple | array | par | block | identifier }
+term = { null | num | bool | string | fun | tuple | array | par | block | identifier }
 
 par = { "(" ~ expression? ~ ")" }
 
-block = { "{" ~ (statement*) ~ "}" }
+block = { "{" ~ (statement)* ~ "}" }
 
 tuple = { "(" ~ (expression ~ ",")+ ~ expression? ~ ")" }
 
 array = { "[" ~ expression? ~ ("," + ~ expression)* ~ "]" }
 
+fun = { args ~ ":" ~ block }
+
+args = { "(" ~ identifier? ~ ("," ~ identifier)* ~ ")" }
+
 num = { decimal | integer }
 
 bool = @{ "true" | "false" }
+
+null = @{ "null" }
 
 decimal = @{ "-"? ~ ((ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT*) | (ASCII_DIGIT* ~ "." ~ ASCII_DIGIT+)) }
 

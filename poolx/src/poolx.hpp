@@ -20,7 +20,9 @@ class poolx {
 		unordered_map<string, method_t> methodsMap;
 		const long id = ID_COUNTER++;
 	public:
-		virtual string_view getType() const = 0;
+		virtual string_view getType() const {
+			return "Object";
+		};
 
 		virtual const method_t *findMethod(const string &name) const {
 			auto iterator = methodsMap.find(name);
@@ -38,6 +40,10 @@ class poolx {
 
 	struct Empty : public Object {
 		TYPER(Empty);
+	};
+
+	struct Nothing : public Object {
+		TYPER(Nothing);
 	};
 
 	struct Bool : public Object {
@@ -65,7 +71,7 @@ class poolx {
 					return make_shared<Decimal>(this->value + reinterpret_pointer_cast<Decimal>(var)->value);
 				} else if (var->getType() == "String") {
 					return make_shared<String>(to_string(this->value) + reinterpret_pointer_cast<String>(var)->value);
-				} else return Void;
+				} else return Null;
 			});
 		}
 	};
@@ -87,7 +93,7 @@ class poolx {
 					return make_shared<Decimal>(this->value + reinterpret_pointer_cast<Decimal>(var)->value);
 				} else if (var->getType() == "String") {
 					return make_shared<String>(to_string(this->value) + reinterpret_pointer_cast<String>(var)->value);
-				} else return Void;
+				} else return Null;
 			});
 		}
 	};
@@ -109,7 +115,7 @@ class poolx {
 					return make_shared<String>(this->value + to_string(reinterpret_pointer_cast<Decimal>(var)->value));
 				} else if (var->getType() == "String") {
 					return make_shared<String>(this->value + reinterpret_pointer_cast<String>(var)->value);
-				} else return Void;
+				} else return Null;
 			});
 		}
 	};
@@ -136,18 +142,20 @@ class poolx {
 		string method;
 		shared_ptr<Object> callee;
 
+		static const shared_ptr<Call> Empty;
+
 		TYPER(Call);
 
 		Call(shared_ptr<Object> caller, string method, shared_ptr<Object> callee)
 				: caller(std::move(caller)), method(std::move(method)), callee(std::move(callee)) {}
 
-		shared_ptr<Object> invoke() {
+		shared_ptr<Object> invoke(const vector<shared_ptr<Object>> &args) {
 			auto first = caller, second = callee;
 			if (caller->getType() == "Call") {
-				first = reinterpret_pointer_cast<Call>(caller)->invoke();
+				first = reinterpret_pointer_cast<Call>(caller)->invoke(args);
 			}
 			if (callee->getType() == "Call") {
-				second = reinterpret_pointer_cast<Call>(callee)->invoke();
+				second = reinterpret_pointer_cast<Call>(callee)->invoke(args);
 			}
 			auto function = first->findMethod(method);
 			if (function) {
@@ -156,34 +164,10 @@ class poolx {
 		}
 	};
 
-	struct Block : public Object {
-		vector<shared_ptr<Call>> calls;
-
-		TYPER(Block);
-
-		explicit Block(vector<shared_ptr<Call>> calls) : calls(move(calls)) {}
-
-		void execute() {
-			for (auto &call: calls) {
-				call->invoke();
-			}
-		}
-	};
-
 	struct Named : public Object {
 		string name;
 
 		explicit Named(string name) : name(move(name)) {};
-	};
-
-	struct Class : public Named {
-		shared_ptr<Class> super = nullptr;
-
-		TYPER(Class);
-
-		explicit Class(string name) : Named(move(name)) {};
-
-		explicit Class(string name, shared_ptr<Class> super) : Named(move(name)), super(std::move(super)) {};
 	};
 
 	struct Variable : public Named {
@@ -195,29 +179,119 @@ class poolx {
 			return Object::findMethod(name) ?: value->findMethod(name);
 		}
 
-		explicit Variable(const string &name) : Variable(name, Void) {};
+		explicit Variable(const string &name) : Variable(name, Null) {};
 
 		Variable(const string &name, shared_ptr<Object> value) : Named(name), value(std::move(value)) {
 			addMethod("=", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
-				this->value = other;
+				shared_ptr<Object> var = other;
+				if (other->getType() == "Variable") {
+					var = reinterpret_pointer_cast<Variable>(other)->value;
+				}
+				this->value = var;
 				return shared_from_this();
 			});
 		};
 	};
 
-	json jsonAST;
-	static unordered_map<string, shared_ptr<Variable>> heap;
-	const static shared_ptr<Object> Void;
+	struct Context {
+	private:
+		unordered_map<string, shared_ptr<Variable>> heap;
+		const shared_ptr<Context> parent;
 
-	explicit poolx(json jsonAST);
+		Context() : Context(nullptr) {}
+
+	public:
+		static shared_ptr<Context> global;
+
+		explicit Context(shared_ptr<Context> parent) : parent(std::move(parent)) {}
+
+		shared_ptr<Variable> find(const string &name) const {
+			auto iterator = heap.find(name);
+			if (iterator != heap.end()) {
+				return iterator->second;
+			} else if (parent) {
+				return parent->find(name);
+			} else return nullptr;
+		}
+
+		void add(const string& name, const shared_ptr<Variable>& var) {
+			heap.emplace(name, var);
+		}
+	};
+
+	struct Block : public Object {
+		vector<shared_ptr<Call>> calls;
+		shared_ptr<Context> context;
+		static const shared_ptr<Block> Empty;
+
+		TYPER(Block);
+
+		explicit Block(vector<shared_ptr<Call>> calls) : calls(move(calls)) {}
+
+		shared_ptr<Object> execute(const vector<shared_ptr<Object>> &args) {
+			shared_ptr<Object> returnValue = Void;
+			for (auto &call: calls) {
+				returnValue = call->invoke(args);
+			}
+			return returnValue;
+		}
+	};
+
+	struct Fun : public Object {
+		vector<string> params;
+		shared_ptr<Block> block;
+
+		static const shared_ptr<Fun> Empty;
+
+		TYPER(Fun);
+
+		Fun(vector<string> params, shared_ptr<Block> block) : params(std::move(params)), block(std::move(block)) {
+			addMethod("->", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
+				vector<shared_ptr<Object>> args;
+				if (other->getType() == "Empty");
+				else if (other->getType() == "Tuple") {
+					args = reinterpret_pointer_cast<Tuple>(other)->values;
+				} else {
+					args.push_back(other);
+				}
+				if (this->params.size() == args.size()) {
+					return this->block->execute(args);
+				} else return Null;
+			});
+		}
+	};
+
+	struct Class : public Object {
+		shared_ptr<Class> super;
+		shared_ptr<Fun> body;
+
+		TYPER(Class);
+
+		explicit Class(shared_ptr<Fun> body) : body(std::move(body)) {
+			addMethod("extend", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
+				//todo
+				return shared_from_this();
+			});
+		};
+	};
+
+	const static shared_ptr<Empty> Void;
+	const static shared_ptr<Nothing> Null;
+	shared_ptr<Block> main;
+
+	explicit poolx(const json &jsonAST);
 
 	void execute();
 
-	shared_ptr<poolx::Object> parseTerm(const json &ast);
+	shared_ptr<poolx::Object> parseTerm(const json &ast, const shared_ptr<Context> &context);
 
-	shared_ptr<Call> parseCall(const json &ast);
+	shared_ptr<Call> parseCall(const json &ast, const shared_ptr<Context> &context);
 
-	shared_ptr<poolx::Block> parseBlock(const json &ast);
+	vector<string> parseArgs(const json &ast);
+
+	shared_ptr<Fun> parseFun(const json &ast, const shared_ptr<Context> &context);
+
+	shared_ptr<poolx::Block> parseBlock(const json &ast, const shared_ptr<Context> &parent = nullptr);
 
 	shared_ptr<Decimal> parseDecimal(const json &ast);
 
@@ -227,11 +301,11 @@ class poolx {
 
 	shared_ptr<String> parseString(const json &ast);
 
-	shared_ptr<Tuple> parseTuple(const json &ast);
+	shared_ptr<Tuple> parseTuple(const json &ast, const shared_ptr<Context> &context);
 
-	shared_ptr<Array> parseArray(const json &ast);
+	shared_ptr<Array> parseArray(const json &ast, const shared_ptr<Context> &context);
 
-	shared_ptr<Object> parseIdent(const json &ast);
+	shared_ptr<Object> parseIdent(const json &ast, const shared_ptr<Context> &context);
 
 	void initNatives();
 
