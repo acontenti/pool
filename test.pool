@@ -1,8 +1,9 @@
-test = (1 + 1.0);
-stdout println ("Number " + (2 + (": " + test)));
-fun = (x) : {
-	a = test;
-	stdout println (a + x);
+fun = (x, y) : {
+	{
+		a = (x + y);
+	};
 };
-stdout println a; /*prints null*/
-fun -> (1);
+res = (fun -> (100, 100));
+stdout println res.a;
+/*stdout println z;
+stdout println (fun -> (100, 100));*/

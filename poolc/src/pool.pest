@@ -6,13 +6,15 @@
 
 pool = _{ SOI ~ statement* ~ EOI  }
 
-statement = { call? ~ ";" }
+statement = { expression? ~ ";" }
 
 expression = _{ call | term }
 
 call = { term ~ identifier ~ term }
 
-term = { null | num | bool | string | fun | tuple | array | par | block | identifier }
+term = { null | num | bool | string | fun | tuple | array | par | block | variable }
+
+variable = { identifier ~ ("." ~ identifier)? }
 
 par = { "(" ~ expression? ~ ")" }
 
