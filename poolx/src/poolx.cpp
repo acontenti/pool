@@ -1,6 +1,8 @@
 #include <iostream>
-#include "../../include/libpool.h"
+#include "../../include/poolparser.h"
 #include "poolx.hpp"
+
+using namespace pool;
 
 const shared_ptr<poolx::Empty> poolx::Void = make_shared<poolx::Empty>();
 const shared_ptr<poolx::Nothing> poolx::Null = make_shared<poolx::Nothing>();
@@ -11,7 +13,7 @@ const shared_ptr<poolx::Call> poolx::Call::Empty = make_shared<poolx::Call>(pool
 const shared_ptr<poolx::Context> poolx::Context::global = shared_ptr<poolx::Context>(new Context);
 
 shared_ptr<poolx> poolx::load(const string &file, bool debug) {
-	string jsonAstString = libpool::generate_json_ast(file.c_str());
+	string jsonAstString = parser::generate_json_ast(file.c_str());
 	auto jsonAst = json::parse(jsonAstString);
 	if (debug) {
 		cout << jsonAst.dump(4) << endl;

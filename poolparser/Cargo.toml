@@ -1,11 +1,11 @@
 [package]
-name = "poolc"
+name = "poolparser"
 version = "0.1.0"
 authors = ["Alessandro Contenti <a.contenti@gmail.com>"]
 edition = "2018"
 
 [lib]
-name = "libpool"
+name = "poolparser"
 crate-type = ["staticlib"]
 
 [profile.dev]

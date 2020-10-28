@@ -15,7 +15,7 @@ int main(int argc, char **argv) {
 			for (int i = 1; i < result.pos.size(); ++i) {
 				args.emplace_back(result.pos[i]);
 			}
-			const shared_ptr<poolx> &app = poolx::load(file, result["debug"]);
+			const auto &app = pool::poolx::load(file, result["debug"]);
 			app->execute(args);
 		}
 	} catch (const std::exception &e) {

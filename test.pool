@@ -1,8 +1,14 @@
 fun = (x, y) : {
 	b = (x + y);
+	c = {
+		d = 2;
+	};
 };
 z = {
-	b = 300;;
+	b = 300;
+	c = {
+		d = 2;
+	};;
 };
 stdout println fun;
 stdout println (fun.b);
@@ -15,5 +21,9 @@ stdout println (z.b);
 res = (z -> ());
 stdout println z;
 stdout println (z.b);
-stdout println res;
+stdout println ((z.c).d);
 stdout println $0;
+stdout println z;
+(z.c) = 5;
+stdout println (z.c);
+stdout println z;
