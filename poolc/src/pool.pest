@@ -8,13 +8,13 @@ pool = _{ SOI ~ statement* ~ EOI  }
 
 statement = { expression? ~ ";" }
 
-expression = _{ call | term }
+expression = _{ call | access | term }
 
 call = { term ~ identifier ~ term }
 
-term = { null | num | bool | string | fun | tuple | array | par | block | variable }
+term = { null | num | bool | string | fun | tuple | array | par | block | identifier }
 
-variable = { identifier ~ ("." ~ identifier)? }
+access = { term ~ "." ~ identifier }
 
 par = { "(" ~ expression? ~ ")" }
 

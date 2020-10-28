@@ -10,7 +10,7 @@ add_subdirectory(poolc)
 
 file(GLOB_RECURSE POOLX_SRC poolx/src/*.cpp)
 add_executable(poolx ${POOLX_SRC})
-target_compile_features(poolx PUBLIC cxx_std_17)
+set_property(TARGET poolx PROPERTY CXX_STANDARD 17)
 if(WIN32)
 	target_link_libraries(poolx libpool ws2_32 userenv)
 else()

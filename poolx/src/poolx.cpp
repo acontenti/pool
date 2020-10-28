@@ -6,32 +6,34 @@ const shared_ptr<poolx::Empty> poolx::Void = make_shared<poolx::Empty>();
 const shared_ptr<poolx::Nothing> poolx::Null = make_shared<poolx::Nothing>();
 const shared_ptr<poolx::Tuple> poolx::Tuple::Empty = make_shared<poolx::Tuple>(vector<shared_ptr<Object>>(), Context::global);
 long poolx::Object::ID_COUNTER = 0;
-const shared_ptr<poolx::Block> poolx::Block::Empty = make_shared<poolx::Block>(vector<shared_ptr<poolx::Call>>(), Context::global);
-const shared_ptr<poolx::Fun> poolx::Fun::Empty = make_shared<poolx::Fun>(vector<string>(), poolx::Block::Empty, Context::global);
-const shared_ptr<poolx::Call> poolx::Call::Empty = make_shared<poolx::Call>(poolx::Fun::Empty, "->", poolx::Void, Context::global);
-shared_ptr<poolx::Context> poolx::Context::global = shared_ptr<poolx::Context>(new Context);
+const shared_ptr<poolx::Block> poolx::Block::Empty = make_shared<poolx::Block>(vector<string>(), vector<shared_ptr<poolx::Call>>(), Context::global);
+const shared_ptr<poolx::Call> poolx::Call::Empty = make_shared<poolx::Call>(poolx::Block::Empty, "->", poolx::Void, Context::global);
+const shared_ptr<poolx::Context> poolx::Context::global = shared_ptr<poolx::Context>(new Context);
 
-void poolx::execute(const string &file, const vector<string> &args) {
+shared_ptr<poolx> poolx::load(const string &file, bool debug) {
 	string jsonAstString = libpool::generate_json_ast(file.c_str());
 	auto jsonAst = json::parse(jsonAstString);
-	cout << jsonAst.dump(4) << endl;
-	unique_ptr<poolx> plx(new poolx(jsonAst, args));
-	plx->execute(args);
+	if (debug) {
+		cout << jsonAst.dump(4) << endl;
+	}
+	struct make_shared_enabler : public poolx {
+		explicit make_shared_enabler(const json &jsonAst) : poolx(jsonAst) {}
+	};
+	return make_shared<make_shared_enabler>(jsonAst);
 }
 
-poolx::poolx(const json &jsonAST, const vector<string> &args) {
-	initNatives(args);
+poolx::poolx(const json &jsonAST) {
+	initNatives();
 	main = parseBlock(jsonAST.begin().value());
 }
 
 void poolx::execute(const vector<string> &args) {
-	vector<string> params;
 	vector<shared_ptr<Object>> transformedArgs;
 	for (int i = 0; i < args.size(); ++i) {
-		params.emplace_back("$" + to_string(i));
+		main->params.emplace_back("$" + to_string(i));
 		transformedArgs.push_back(make_shared<String>(args[i], Context::global));
 	}
-	main->execute(params, transformedArgs);
+	main->execute(transformedArgs);
 }
 
 shared_ptr<poolx::Object> poolx::parseTerm(const json &ast, const shared_ptr<Context> &context) {
@@ -41,8 +43,6 @@ shared_ptr<poolx::Object> poolx::parseTerm(const json &ast, const shared_ptr<Con
 		return parseBlock(value, context);
 	} else if ("Call" == key) {
 		return parseCall(value, context);
-	} else if ("Fun" == key) {
-		return parseFun(value, context);
 	} else if ("Decimal" == key) {
 		return parseDecimal(value, context);
 	} else if ("Integer" == key) {
@@ -51,8 +51,8 @@ shared_ptr<poolx::Object> poolx::parseTerm(const json &ast, const shared_ptr<Con
 		return parseBool(value, context);
 	} else if ("Str" == key) {
 		return parseString(value, context);
-	} else if ("Var" == key) {
-		return parseVariable(value, context);
+	} else if ("Identifier" == key) {
+		return parseIdent(value, context);
 	} else if ("Tuple" == key) {
 		return parseTuple(value, context);
 	} else if ("Array" == key) {
@@ -67,19 +67,27 @@ shared_ptr<poolx::Object> poolx::parseTerm(const json &ast, const shared_ptr<Con
 }
 
 shared_ptr<poolx::Block> poolx::parseBlock(const json &ast, const shared_ptr<Context> &parent) {
-	vector<shared_ptr<Call>> calls;
 	auto context = parent ? make_shared<Context>(parent) : Context::global;
-	for (auto &callAst : ast) {
-		auto term = parseTerm(callAst, context);
-		if (term->getType() == "Call") {
-			calls.push_back(reinterpret_pointer_cast<Call>(term));
-		} else if (term->getType() == "Empty") {
-			calls.push_back(Call::Empty);
-		} else {
-			calls.push_back(Call::Identity(term, context));
+	if (ast.is_object()) {
+		vector<string> params;
+		vector<shared_ptr<Call>> calls;
+		auto paramsAst = ast["params"];
+		for (auto &item : paramsAst) {
+			params.push_back(item.get<string>());
 		}
-	}
-	return make_shared<Block>(calls, context);
+		auto callsAst = ast["calls"];
+		for (auto &callAst : callsAst) {
+			auto term = parseTerm(callAst, context);
+			if (term->getType() == "Call") {
+				calls.push_back(reinterpret_pointer_cast<Call>(term));
+			} else if (term->getType() == "Empty") {
+				calls.push_back(Call::Empty);
+			} else {
+				calls.push_back(Call::Identity(term, context));
+			}
+		}
+		return make_shared<Block>(params, calls, context);
+	} else throw runtime_error("invalid block: " + ast.dump());
 }
 
 shared_ptr<poolx::Call> poolx::parseCall(const json &ast, const shared_ptr<Context> &context) {
@@ -92,31 +100,6 @@ shared_ptr<poolx::Call> poolx::parseCall(const json &ast, const shared_ptr<Conte
 		const shared_ptr<poolx::Object> &callee = parseTerm(calleeAst, context);
 		return make_shared<Call>(caller, method, callee, context);
 	} else throw runtime_error("invalid call: " + ast.dump());
-}
-
-vector<string> poolx::parseArgs(const json &ast) {
-	vector<string> result;
-	for (auto &item : ast) {
-		if (item.is_object()) {
-			auto[key, value] = *(item.get<json::object_t>().begin());
-			if (key == "Ident")
-				result.push_back(value.get<string>());
-		}
-	}
-	return result;
-}
-
-shared_ptr<poolx::Fun> poolx::parseFun(const json &ast, const shared_ptr<Context> &context) {
-	if (ast.is_object()) {
-		auto argsAst = ast["args"].begin().value();
-		auto blockAst = ast["block"].begin().value();
-		const vector<string> &args = parseArgs(argsAst);
-		for (auto &arg : args) {
-			context->add(arg, make_shared<Variable>(arg, context));
-		}
-		const shared_ptr<poolx::Block> &block = parseBlock(blockAst, context);
-		return make_shared<Fun>(args, block, context);
-	} else throw runtime_error("invalid function: " + ast.dump());
 }
 
 shared_ptr<poolx::Decimal> poolx::parseDecimal(const json &ast, const shared_ptr<Context> &context) {
@@ -194,13 +177,9 @@ shared_ptr<poolx::Array> poolx::parseArray(const json &ast, const shared_ptr<Con
 	return make_shared<Array>(terms, context);
 }
 
-void poolx::initNatives(const vector<string> &args) {
-	for (int i = 0; i < args.size(); ++i) {
-		auto name = "$" + to_string(i);
-		Context::global->add(name, make_shared<Variable>(name, Context::global));
-	}
+void poolx::initNatives() {
 	auto IO = make_shared<Object>(Context::global);
-	IO->addMethod("println", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
+	IO->addMethod("println", [](const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		shared_ptr<Object> var = other;
 		if (other->getType() == "Variable") {
 			var = reinterpret_pointer_cast<Variable>(other)->value;
@@ -213,12 +192,6 @@ void poolx::initNatives(const vector<string> &args) {
 		}
 		return Void;
 	});
-	auto ClassClass = make_shared<Object>(Context::global);
-	ClassClass->addMethod("new", [this](const shared_ptr<Object> &other) -> shared_ptr<Object> {
-		if (other->getType() == "Fun")
-			return make_shared<Class>(reinterpret_pointer_cast<Fun>(other), Context::global);
-		else return Null;
-	});
 	Context::global->add("stdout", make_shared<Variable>("stdout", IO, Context::global));
-	Context::global->add("Class", make_shared<Variable>("Class", ClassClass, Context::global));
+	Context::global->add("Object", make_shared<Variable>("Object", make_shared<Object>(Context::global), Context::global));
 }
