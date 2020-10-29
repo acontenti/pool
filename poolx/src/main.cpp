@@ -17,9 +17,11 @@ int main(int argc, char **argv) {
 			}
 			const auto &app = pool::poolx::load(file, result["debug"]);
 			app->execute(args);
+		} else {
+			std::cout << "poolx " << pool::poolx::VERSION << std::endl;
 		}
 	} catch (const std::exception &e) {
-		std::cerr << e.what() << '\n';
+		std::cerr << e.what() << std::endl;
 		return EXIT_FAILURE;
 	}
 }

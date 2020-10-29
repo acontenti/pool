@@ -25,4 +25,4 @@ install(TARGETS poolx CONFIGURATIONS Release DESTINATION .)
 
 # TEST
 enable_testing()
-add_test(NAME basic_test COMMAND poolx ../test.pool)
+add_test(NAME basic_test COMMAND poolx ${CMAKE_SOURCE_DIR}/test.pool)
