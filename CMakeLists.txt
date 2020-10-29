@@ -20,8 +20,7 @@ endif ()
 configure_file(test.pool ${CMAKE_BINARY_DIR}/test.pool COPYONLY)
 
 # INSTALL
-set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/dist)
-install(TARGETS poolx CONFIGURATIONS Release DESTINATION .)
+install(TARGETS poolx CONFIGURATIONS Release DESTINATION ${CMAKE_SOURCE_DIR}/dist)
 
 # TEST
 enable_testing()
