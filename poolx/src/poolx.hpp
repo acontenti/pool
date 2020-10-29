@@ -244,7 +244,8 @@ namespace pool {
 			TYPER(Variable);
 
 			const method_t *findMethod(const string &methodName) const override {
-				return Object::findMethod(methodName) ?: value->findMethod(methodName);
+				const method_t *method = Object::findMethod(methodName);
+				return method ? method : value->findMethod(methodName);
 			}
 
 			Variable(string name, shared_ptr<Object> value, const shared_ptr<Context> &context)
@@ -263,7 +264,7 @@ namespace pool {
 						if (this->value->getType() == "Block") {
 							const shared_ptr<Block> &block = reinterpret_pointer_cast<Block>(this->value);
 							const shared_ptr<Object> &result = block->context->find(id);
-							return result ?: Null;
+							return result ? result : Null;
 						} else return Null;
 					} else throw execution_error(__FILE__, __LINE__, "Invalid value for . call");
 				});
@@ -441,6 +442,8 @@ namespace pool {
 		explicit poolx(const json &jsonAST);
 
 	public:
+		[[maybe_unused]] constexpr static const std::string_view VERSION = POOL_VERSION;
+
 		static shared_ptr<poolx> load(const string &file, bool debug);
 
 		void execute(const vector<string> &args);
