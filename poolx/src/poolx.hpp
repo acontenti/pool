@@ -13,11 +13,14 @@ namespace pool {
 	class poolx {
 		struct Context;
 		struct Class;
+		struct Variable;
 
 		struct Object : enable_shared_from_this<Object> {
+			typedef function<shared_ptr<Object>(const shared_ptr<Object> &, const shared_ptr<Object> &)> method_t;
 		private:
 			static long ID_COUNTER;
 			const long id = ID_COUNTER++;
+
 		public:
 			static const shared_ptr<Class> ObjectClass;
 			const shared_ptr<Class> cls;
@@ -26,17 +29,11 @@ namespace pool {
 			Object(shared_ptr<Context> context, shared_ptr<Class> cls) : context(move(context)), cls(move(cls)) {
 			}
 
-			inline shared_ptr<Class> getClass() const {
-				return cls;
-			}
-
-			virtual ~Object() = default;
-
-			inline string_view getType() const {
+			virtual string_view getType() const {
 				return cls->name;
 			};
 
-			string toString() const {
+			inline string toString() const {
 				return string(getType()) + "@" + to_string(getID());
 			};
 
@@ -45,13 +42,22 @@ namespace pool {
 			}
 
 			template<class T>
-			inline shared_ptr<T> as() {
+			shared_ptr<T> as() {
+				if (isVariable())
+					return reinterpret_pointer_cast<Variable>(shared_from_this())->value->as<T>();
 				return reinterpret_pointer_cast<T>(shared_from_this());
+			}
+
+			virtual const method_t *findMethod(const string &methodName) const {
+				return cls->findMethod(methodName);
+			}
+
+			virtual bool isVariable() const {
+				return false;
 			}
 		};
 
 		struct Class : public Object {
-			typedef function<shared_ptr<Object>(const shared_ptr<Object> &, const shared_ptr<Object> &)> method_t;
 			string name;
 			shared_ptr<Class> super;
 			unordered_map<string, method_t> methodsMap;
@@ -61,37 +67,17 @@ namespace pool {
 					: Object(move(context), ClassClass), name(move(name)), super(move(super)) {
 			}
 
-			virtual const method_t *findMethod(const string &methodName) const {
+			const method_t *findMethod(const string &methodName) const override {
 				auto iterator = methodsMap.find(methodName);
 				if (iterator != methodsMap.end()) {
 					return &iterator->second;
 				} else if (super) {
 					return super->findMethod(methodName);
 				} else return nullptr;
-			};
+			}
 
 			void addMethod(const string &methodName, const method_t &method) {
 				methodsMap[methodName] = method;
-			};
-		};
-
-		struct Callable : Object {
-			Callable(shared_ptr<Context> context, shared_ptr<Class> cls) : Object(move(context), move(cls)) {};
-
-			virtual shared_ptr<Object> invoke() = 0;
-		};
-
-		struct Empty : public Object {
-			static const shared_ptr<Class> EmptyClass;
-
-			Empty() : Object(Context::global, EmptyClass) {
-			}
-		};
-
-		struct Nothing : public Object {
-			static const shared_ptr<Class> NothingClass;
-
-			Nothing() : Object(Context::global, NothingClass) {
 			}
 		};
 
@@ -147,8 +133,9 @@ namespace pool {
 					: Object(context, ArrayClass), values(move(values)) {}
 		};
 
-		struct Call : public Callable {
+		struct Call : public Object {
 			static const shared_ptr<Class> CallClass;
+			static const shared_ptr<Class> IdentityClass;
 			shared_ptr<Object> caller;
 			string method;
 			shared_ptr<Object> callee;
@@ -156,7 +143,6 @@ namespace pool {
 			static const shared_ptr<Call> Empty;
 
 			struct Identity : public Object {
-				static const shared_ptr<Class> IdentityClass;
 				shared_ptr<Object> result;
 
 				Identity(shared_ptr<Object> result, const shared_ptr<Context> &context)
@@ -165,17 +151,17 @@ namespace pool {
 			};
 
 			Call(shared_ptr<Object> caller, string method, shared_ptr<Object> callee, const shared_ptr<Context> &context)
-					: Callable(context, CallClass), caller(move(caller)), method(move(method)), callee(move(callee)) {}
+					: Object(context, CallClass), caller(move(caller)), method(move(method)), callee(move(callee)) {}
 
-			shared_ptr<Object> invoke() override {
+			shared_ptr<Object> invoke() const {
 				auto first = caller, second = callee;
-				if (auto callable = dynamic_pointer_cast<Callable>(caller)) {
-					first = callable->invoke();
+				if (auto call = dynamic_pointer_cast<Call>(caller)) {
+					first = call->invoke();
 				}
-				if (auto callable = dynamic_pointer_cast<Callable>(callee)) {
-					second = callable->invoke();
+				if (auto call = dynamic_pointer_cast<Call>(callee)) {
+					second = call->invoke();
 				}
-				auto function = first->cls->findMethod(method);
+				auto function = first->findMethod(method);
 				if (function) {
 					return (*function)(first, second);
 				} else throw execution_error(__FILE__, __LINE__, "method " + method + " not found");
@@ -187,49 +173,30 @@ namespace pool {
 		};
 
 		struct Variable : public Object {
+			static const shared_ptr<Class> VariableClass;
 			string name;
 			shared_ptr<Object> value;
 
-			struct VariableClass : public Class {
-				shared_ptr<Object> value;
-
-				VariableClass(shared_ptr<Object> value, const shared_ptr<Context> &context)
-						: Class("Variable", Object::ObjectClass, context), value(move(value)) {
-					addMethod("=", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
-						shared_ptr<Object> var = other;
-						if (other->getType() == "Variable") {
-							var = other->as<Variable>()->value;
-						}
-						self->as<Variable>()->value = var;
-						self->as<Variable>()->cls->as<VariableClass>()->value = var;
-						return self->shared_from_this();
-					});
-					addMethod(".", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
-						if (other->getType() == "Variable") {
-							auto id = other->as<Variable>()->name;
-							auto &value = self->as<Variable>()->value;
-							if (value->getType() == "Block") {
-								const shared_ptr<Object> &result = value->as<Block>()->context->find(id);
-								return result ? result : Null;
-							} else return Null;
-						} else throw execution_error(__FILE__, __LINE__, "Invalid value for . call");
-					});
+			const method_t *findMethod(const string &methodName) const override {
+				const method_t *method = value->findMethod(methodName);
+				if (method) {
+					return method;
+				} else {
+					return Object::findMethod(methodName);
 				}
-
-				const method_t *findMethod(const string &methodName) const override {
-					const method_t *method = Class::findMethod(methodName);
-					if (method) {
-						return method;
-					} else {
-						return value->cls->findMethod(methodName);
-					}
-				}
-			};
+			}
 
 			Variable(string name, shared_ptr<Object> value, const shared_ptr<Context> &context)
-					: Object(context, make_shared<VariableClass>(value, context)), name(move(name)),
-					  value(move(value)) {
-			};
+					: Object(context, VariableClass), name(move(name)), value(move(value)) {
+			}
+
+			string_view getType() const override {
+				return value->getType();
+			}
+
+			bool isVariable() const override {
+				return true;
+			}
 
 			explicit Variable(const string &name, const shared_ptr<Context> &context) : Variable(name, Null, context) {}
 		};
@@ -288,24 +255,20 @@ namespace pool {
 			}
 		};
 
-		struct Block : public Callable {
+		struct Block : public Object {
 			static const shared_ptr<Class> BlockClass;
 			vector<string> params;
 			vector<shared_ptr<Call>> calls;
 			static const shared_ptr<Block> Empty;
 
 			Block(vector<string> params, vector<shared_ptr<Call>> calls, const shared_ptr<Context> &context)
-					: Callable(context, BlockClass), params(move(params)), calls(move(calls)) {
+					: Object(context, BlockClass), params(move(params)), calls(move(calls)) {
 				for (auto &param : params) {
 					context->add(param, make_shared<Variable>(param, context));
 				}
 				if (this->params.empty() && this->context != Context::global) {
 					execute({});
 				}
-			}
-
-			shared_ptr<Object> invoke() override {
-				return shared_from_this();
 			}
 
 			shared_ptr<Object> execute(const vector<shared_ptr<Object>> &args) {
@@ -318,8 +281,10 @@ namespace pool {
 			}
 		};
 
-		const static shared_ptr<Empty> Void;
-		const static shared_ptr<Nothing> Null;
+		static const shared_ptr<Class> VoidClass;
+		static const shared_ptr<Class> NothingClass;
+		const static shared_ptr<Object> Void;
+		const static shared_ptr<Object> Null;
 		shared_ptr<Block> main;
 
 		shared_ptr<Object> parseTerm(const json &ast, const shared_ptr<Context> &context);

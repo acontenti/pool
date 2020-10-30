@@ -9,7 +9,7 @@ z = {
 	c = {
 		d = 2;
 	};;
-};/*
+};
 stdout println fun;
 stdout println (fun.b);
 res = (fun -> (100, 100));
@@ -26,7 +26,7 @@ stdout println $0;
 stdout println z;
 (z.c) = 5;
 stdout println (z.c);
-stdout println z;*/
+stdout println z;
 Test = (Object extend "Test");
 n = (Test new ());
 stdout println n;
