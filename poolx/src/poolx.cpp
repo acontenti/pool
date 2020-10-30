@@ -4,13 +4,26 @@
 
 using namespace pool;
 
+long poolx::Object::ID_COUNTER = 0;
+const shared_ptr<poolx::Context> poolx::Context::global = shared_ptr<poolx::Context>(new Context);
+const shared_ptr<poolx::Class> poolx::Class::ClassClass = make_shared<Class>("Class", ObjectClass);
+const shared_ptr<poolx::Class> poolx::Object::ObjectClass = make_shared<Class>("Object", nullptr);
+const shared_ptr<poolx::Class> poolx::Empty::EmptyClass = make_shared<Class>("Empty", ObjectClass);
+const shared_ptr<poolx::Class> poolx::Nothing::NothingClass = make_shared<Class>("Nothing", ObjectClass);
+const shared_ptr<poolx::Class> poolx::Bool::BoolClass = make_shared<Class>("Bool", ObjectClass);
+const shared_ptr<poolx::Class> poolx::Integer::IntegerClass = make_shared<Class>("Integer", ObjectClass);
+const shared_ptr<poolx::Class> poolx::Decimal::DecimalClass = make_shared<Class>("Decimal", ObjectClass);
+const shared_ptr<poolx::Class> poolx::String::StringClass = make_shared<Class>("String", ObjectClass);
+const shared_ptr<poolx::Class> poolx::Tuple::TupleClass = make_shared<Class>("Tuple", ObjectClass);
+const shared_ptr<poolx::Class> poolx::Array::ArrayClass = make_shared<Class>("Array", ObjectClass);
+const shared_ptr<poolx::Class> poolx::Call::CallClass = make_shared<Class>("Call", ObjectClass);
+const shared_ptr<poolx::Class> poolx::Call::Identity::IdentityClass = make_shared<Class>("Identity", ObjectClass);
+const shared_ptr<poolx::Class> poolx::Block::BlockClass = make_shared<Class>("Block", ObjectClass);
 const shared_ptr<poolx::Empty> poolx::Void = make_shared<poolx::Empty>();
 const shared_ptr<poolx::Nothing> poolx::Null = make_shared<poolx::Nothing>();
 const shared_ptr<poolx::Tuple> poolx::Tuple::Empty = make_shared<poolx::Tuple>(vector<shared_ptr<Object>>(), Context::global);
-long poolx::Object::ID_COUNTER = 0;
 const shared_ptr<poolx::Block> poolx::Block::Empty = make_shared<poolx::Block>(vector<string>(), vector<shared_ptr<poolx::Call>>(), Context::global);
 const shared_ptr<poolx::Call> poolx::Call::Empty = make_shared<poolx::Call>(poolx::Block::Empty, "->", poolx::Void, Context::global);
-const shared_ptr<poolx::Context> poolx::Context::global = shared_ptr<poolx::Context>(new Context);
 
 shared_ptr<poolx> poolx::load(const string &file, bool debug) {
 	string jsonAstString = parser::generate_json_ast(file.c_str());
@@ -81,7 +94,7 @@ shared_ptr<poolx::Block> poolx::parseBlock(const json &ast, const shared_ptr<Con
 		for (auto &callAst : callsAst) {
 			auto term = parseTerm(callAst, context);
 			if (term->getType() == "Call") {
-				calls.push_back(reinterpret_pointer_cast<Call>(term));
+				calls.push_back(static_pointer_cast<Call>(term));
 			} else if (term->getType() == "Empty") {
 				calls.push_back(Call::Empty);
 			} else {
@@ -135,32 +148,6 @@ shared_ptr<poolx::Variable> poolx::parseIdent(const json &ast, const shared_ptr<
 	}
 }
 
-shared_ptr<poolx::Call> poolx::createIdentSearchCall(const json &ast, json::const_reverse_iterator iter, const shared_ptr<Call> &other, const shared_ptr<Context> &context) {
-	if (iter == ast.rend()) return other;
-	else if (distance(iter, ast.rend()) == 1) {
-		return make_shared<Call>(parseIdent(*iter, context), ".", other, context);
-	} else {
-		auto id = iter->get<string>();
-		return createIdentSearchCall(ast, ++iter, make_shared<Call>(make_shared<String>(id, context), ".", other, context), context);
-	}
-}
-
-shared_ptr<poolx::Object> poolx::parseVariable(const json &ast, const shared_ptr<Context> &context) {
-	if (!ast.is_array() || ast.empty()) {
-		throw runtime_error("Invalid variable statement");
-	} else if (ast.size() == 1) {
-		return parseIdent(ast[0], context);
-	} else if (ast.size() == 2) {
-		return make_shared<Call>(parseIdent(ast[0], context), ".", make_shared<String>(ast[1].get<string>(), context), context);
-	} else {
-		throw runtime_error("multiple . calls not yet implemented");
-//		auto iter = ast.rbegin();
-//		auto id = iter->get<string>();
-//		auto id2 = (++iter)->get<string>();
-//		return createIdentSearchCall(ast, ++iter, make_shared<Call>(make_shared<Variable>(id2, context), ".", make_shared<String>(id)), context);
-	}
-}
-
 shared_ptr<poolx::Tuple> poolx::parseTuple(const json &ast, const shared_ptr<Context> &context) {
 	vector<shared_ptr<Object>> terms;
 	for (auto &termAst : ast) {
@@ -180,20 +167,137 @@ shared_ptr<poolx::Array> poolx::parseArray(const json &ast, const shared_ptr<Con
 }
 
 void poolx::initNatives() {
-	auto IO = make_shared<Object>(Context::global);
-	IO->addMethod("println", [](const shared_ptr<Object> &other) -> shared_ptr<Object> {
+	Object::ObjectClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) {
+		return make_shared<String>(self->toString(), self->context);
+	});
+	Object::ObjectClass->addMethod("extend", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		if (other->getType() == "String") {
+			shared_ptr<Object> var = self;
+			if (self->getType() == "Variable") {
+				var = self->as<Variable>()->value;
+			}
+			return make_shared<Class>(other->as<String>()->value, var->as<Class>(), var->context);
+		} else return Null;
+	});
+	Object::ObjectClass->addMethod("new", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		shared_ptr<Object> var = self;
+		if (self->getType() == "Variable") {
+			var = self->as<Variable>()->value;
+		}
+		return make_shared<Object>(var->context, var->as<Class>());
+	});
+	Empty::EmptyClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		return make_shared<String>("void", self->context);
+	});
+	Nothing::NothingClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		return make_shared<String>("null", self->context);
+	});
+	Bool::BoolClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		return make_shared<String>(self->as<Bool>()->value ? "true" : "false", self->context);
+	});
+	Integer::IntegerClass->addMethod("+", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		shared_ptr<Object> var = other;
+		auto value = self->as<Integer>()->value;
+		if (other->getType() == "Variable") {
+			var = other->as<Variable>()->value;
+		}
+		if (var->getType() == "Integer") {
+			return make_shared<Integer>(value + var->as<Integer>()->value, self->context);
+		} else if (var->getType() == "Decimal") {
+			return make_shared<Decimal>(value + var->as<Decimal>()->value, self->context);
+		} else if (var->getType() == "String") {
+			return make_shared<String>(to_string(value) + var->as<String>()->value, self->context);
+		} else return Null;
+	});
+	Integer::IntegerClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		return make_shared<String>(to_string(self->as<Integer>()->value), self->context);
+	});
+	Decimal::DecimalClass->addMethod("+", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		shared_ptr<Object> var = other;
+		auto value = self->as<Decimal>()->value;
+		if (other->getType() == "Variable") {
+			var = other->as<Variable>()->value;
+		}
+		if (var->getType() == "Integer") {
+			return make_shared<Decimal>(value + var->as<Integer>()->value, self->context);
+		} else if (var->getType() == "Decimal") {
+			return make_shared<Decimal>(value + var->as<Decimal>()->value, self->context);
+		} else if (var->getType() == "String") {
+			return make_shared<String>(to_string(value) + var->as<String>()->value, self->context);
+		} else return Null;
+	});
+	Decimal::DecimalClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		return make_shared<String>(to_string(self->as<Decimal>()->value), self->context);
+	});
+	String::StringClass->addMethod("+", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		shared_ptr<Object> var = other;
 		if (other->getType() == "Variable") {
-			var = reinterpret_pointer_cast<Variable>(other)->value;
+			var = other->as<Variable>()->value;
 		}
-		if (auto method = var->findMethod("toString")) {
-			auto result = (*method)(Tuple::Empty);
+		if (auto method = var->cls->findMethod("toString")) {
+			auto result = (*method)(var, Tuple::Empty);
 			if (result->getType() == "String") {
-				cout << reinterpret_pointer_cast<String>(result)->value << endl;
+				return make_shared<String>(self->as<String>()->value + result->as<String>()->value, self->context);
+			}
+		}
+		return Null;
+	});
+	String::StringClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		return self->shared_from_this();
+	});
+	Call::Identity::IdentityClass->addMethod("", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		return self->as<struct Call::Identity>()->result;
+	});
+	Block::BlockClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		stringstream ss;
+		ss << "{";
+		for (auto &item : *self->context) {
+			shared_ptr<Object> var = item.second->value;
+			if (var->getType() == "Variable") {
+				var = other->as<Variable>()->value;
+			}
+			if (auto method = var->cls->findMethod("toString")) {
+				auto result = (*method)(var, Tuple::Empty);
+				ss << item.first << ":";
+				if (result->getType() == "String") {
+					ss << result->as<String>()->value;
+				} else {
+					ss << result;
+				}
+				ss << ",";
+			}
+		}
+		ss.seekp(-1, stringstream::cur); //remove last comma
+		ss << "}";
+		return make_shared<String>(ss.str(), self->context);
+	});
+	Block::BlockClass->addMethod("->", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		vector<shared_ptr<Object>> args;
+		if (other->getType() == "Empty");
+		else if (other->getType() == "Tuple") {
+			args = other->as<Tuple>()->values;
+		} else {
+			args.push_back(other);
+		}
+		if (self->as<Block>()->params.size() == args.size()) {
+			return self->as<Block>()->execute(args);
+		} else return Null;
+	});
+	auto IoClass = make_shared<Class>("Io", Object::ObjectClass);
+	IoClass->addMethod("println", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		shared_ptr<Object> var = other;
+		if (other->getType() == "Variable") {
+			var = other->as<Variable>()->value;
+		}
+		if (auto method = var->cls->findMethod("toString")) {
+			auto result = (*method)(var, Tuple::Empty);
+			if (result->getType() == "String") {
+				cout << result->as<String>()->value << endl;
 			}
 		}
 		return Void;
 	});
-	Context::global->add("stdout", make_shared<Variable>("stdout", IO, Context::global));
-	Context::global->add("Object", make_shared<Variable>("Object", make_shared<Object>(Context::global), Context::global));
+	const shared_ptr<Object> &Io = make_shared<Object>(Context::global, IoClass);
+	Context::global->add("stdout", make_shared<Variable>("stdout", Io, Context::global));
+	Context::global->add("Object", make_shared<Variable>("Object", Object::ObjectClass, Context::global));
 }
