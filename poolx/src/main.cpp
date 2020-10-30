@@ -15,10 +15,10 @@ int main(int argc, char **argv) {
 			for (int i = 1; i < result.pos.size(); ++i) {
 				args.emplace_back(result.pos[i]);
 			}
-			auto app = pool::poolx::load(file, result["debug"]);
+			auto app = pool::PoolX::load(file, result["debug"]);
 			app->execute(args);
 		} else {
-			std::cout << "poolx " << pool::poolx::VERSION << std::endl;
+			std::cout << "poolx " << pool::PoolX::VERSION << std::endl;
 		}
 	} catch (const std::exception &e) {
 		std::cerr << e.what() << std::endl;
