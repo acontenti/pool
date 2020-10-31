@@ -8,9 +8,11 @@ pool = _{ SOI ~ statement* ~ EOI  }
 
 statement = { expression? ~ ";" }
 
-expression = _{ call | access | term }
+expression = _{ invocation | call | access | term }
 
 call = { term ~ identifier ~ term }
+
+invocation = { term ~ args }
 
 term = { null | num | bool | string | fun | tuple | array | par | block | identifier }
 
@@ -24,9 +26,11 @@ tuple = { "(" ~ (expression ~ ",")+ ~ expression? ~ ")" }
 
 array = { "[" ~ expression? ~ ("," + ~ expression)* ~ "]" }
 
-fun = { args ~ ":" ~ block }
+fun = { params ~ ":" ~ block }
 
-args = { "(" ~ identifier? ~ ("," ~ identifier)* ~ ")" }
+params = { "(" ~ identifier? ~ ("," ~ identifier)* ~ ")" }
+
+args = { "(" ~ expression? ~ ("," ~ expression)* ~ ")" }
 
 num = { decimal | integer }
 

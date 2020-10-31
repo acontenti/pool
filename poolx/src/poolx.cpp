@@ -33,6 +33,8 @@ shared_ptr<Object> PoolX::parseTerm(const json &ast, const shared_ptr<Context> &
 		return parseBlock(value, context);
 	} else if ("Call" == key) {
 		return parseCall(value, context);
+	} else if ("Invocation" == key) {
+		return parseInvocation(value, context);
 	} else if ("Decimal" == key) {
 		return parseDecimal(value, context);
 	} else if ("Integer" == key) {
@@ -47,7 +49,7 @@ shared_ptr<Object> PoolX::parseTerm(const json &ast, const shared_ptr<Context> &
 		return parseTuple(value, context);
 	} else if ("Array" == key) {
 		return parseArray(value, context);
-	} else if ("Empty" == key) {
+	} else if ("Void" == key) {
 		return Void;
 	} else if ("Null" == key) {
 		return Null;
@@ -70,7 +72,7 @@ shared_ptr<Block> PoolX::parseBlock(const json &ast, const shared_ptr<Context> &
 			auto term = parseTerm(callAst, context);
 			if (term->getType() == "Call") {
 				calls.push_back(static_pointer_cast<Call>(term));
-			} else if (term->getType() == "Empty") {
+			} else if (term->getType() == "Void") {
 				calls.push_back(Call::Empty);
 			} else {
 				calls.push_back(Call::Identity(term, context));
@@ -90,6 +92,27 @@ shared_ptr<Call> PoolX::parseCall(const json &ast, const shared_ptr<Context> &co
 		const shared_ptr<Object> &callee = parseTerm(calleeAst, context);
 		return make_shared<Call>(caller, method, callee, context);
 	} else throw runtime_error("invalid call: " + ast.dump());
+}
+
+shared_ptr<Call> PoolX::parseInvocation(const json &ast, const shared_ptr<Context> &context) {
+	if (ast.is_object()) {
+		auto callerAst = ast["caller"];
+		auto argsAst = ast["args"];
+		const shared_ptr<Object> &caller = parseTerm(callerAst, context);
+		vector<shared_ptr<Object>> args;
+		for (auto &argAst : argsAst) {
+			args.push_back(parseTerm(argAst, context));
+		}
+		shared_ptr<Object> arg;
+		if (args.empty()) {
+			arg = Void;
+		} else if (args.size() == 1) {
+			arg = args.front();
+		} else {
+			arg = make_shared<Tuple>(args, context);
+		}
+		return make_shared<Call>(caller, "->", arg, context);
+	} else throw runtime_error("invalid invocation: " + ast.dump());
 }
 
 shared_ptr<Decimal> PoolX::parseDecimal(const json &ast, const shared_ptr<Context> &context) {

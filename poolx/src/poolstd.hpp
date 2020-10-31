@@ -8,6 +8,7 @@
 #include <functional>
 #include "util.hpp"
 
+
 using namespace std;
 
 namespace pool {
@@ -16,6 +17,8 @@ namespace pool {
 	class Variable;
 
 	class Object;
+
+	class Block;
 
 	extern const shared_ptr<Class> ClassClass;
 	extern const shared_ptr<Class> ObjectClass;
@@ -113,11 +116,9 @@ namespace pool {
 		shared_ptr<Class> super;
 		unordered_map<string, method_t> methodsMap;
 
-		Class(string name, shared_ptr<Class> super, const shared_ptr<Context> &context = Context::global)
-				: Object(context, ClassClass), name(move(name)), super(move(super)) {
-		}
+		Class(string name, shared_ptr<Class> super, const shared_ptr<Context> &context = Context::global);
 
-		const method_t *findMethod(const string &methodName) const override;
+		const method_t *getMethod(const string &methodName) const;
 
 		inline void addMethod(const string &methodName, const method_t &method) {
 			methodsMap[methodName] = method;
@@ -261,6 +262,8 @@ namespace pool {
 
 		shared_ptr<Object> execute(const vector<shared_ptr<Object>> &args) {
 			shared_ptr<Object> returnValue = Void;
+			if (params.size() != args.size())
+				return Null;
 			context->associate(params, args);
 			for (auto &call: calls) {
 				returnValue = call->invoke();

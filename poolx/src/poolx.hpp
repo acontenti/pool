@@ -14,6 +14,8 @@ namespace pool {
 
 		shared_ptr<Call> parseCall(const json &ast, const shared_ptr<Context> &context);
 
+		shared_ptr<Call> parseInvocation(const json &ast, const shared_ptr<Context> &context);
+
 		shared_ptr<Block> parseBlock(const json &ast, const shared_ptr<Context> &parent = nullptr);
 
 		static shared_ptr<Decimal> parseDecimal(const json &ast, const shared_ptr<Context> &context);

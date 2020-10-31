@@ -5,9 +5,6 @@ using namespace pool;
 
 long Object::ID_COUNTER = 0;
 const shared_ptr<Context> Context::global = shared_ptr<Context>(new Context);
-const shared_ptr<Tuple> Tuple::Empty = make_shared<Tuple>(vector<shared_ptr<Object>>(), Context::global);
-const shared_ptr<Block> Block::Empty = make_shared<Block>(vector<string>(), vector<shared_ptr<Call>>(), Context::global);
-const shared_ptr<Call> Call::Empty = make_shared<Call>(Block::Empty, "->", Void, Context::global);
 const shared_ptr<Class> pool::ClassClass = make_shared<Class>("Class", nullptr); //ObjectClass is null
 const shared_ptr<Class> pool::ObjectClass = make_shared<Class>("Object", nullptr);
 const shared_ptr<Class> pool::BoolClass = make_shared<Class>("Bool", ObjectClass);
@@ -24,6 +21,9 @@ const shared_ptr<Class> pool::VoidClass = make_shared<Class>("Void", ObjectClass
 const shared_ptr<Class> pool::NothingClass = make_shared<Class>("Nothing", ObjectClass);
 const shared_ptr<Object> pool::Void = make_shared<Object>(Context::global, VoidClass);
 const shared_ptr<Object> pool::Null = make_shared<Object>(Context::global, NothingClass);
+const shared_ptr<Tuple> Tuple::Empty = make_shared<Tuple>(vector<shared_ptr<Object>>(), Context::global);
+const shared_ptr<Block> Block::Empty = make_shared<Block>(vector<string>(), vector<shared_ptr<Call>>(), Context::global);
+const shared_ptr<Call> Call::Empty = make_shared<Call>(Block::Empty, "->", Void, Context::global);
 
 template<>
 shared_ptr<Variable> Object::as() {
@@ -56,34 +56,50 @@ string_view Object::getType() const {
 }
 
 const Object::method_t *Object::findMethod(const string &methodName) const {
-	return cls->findMethod(methodName);
+	return cls->getMethod(methodName);
 }
 
 shared_ptr<Object> Object::getVariableValue() {
 	return reinterpret_pointer_cast<Variable>(shared_from_this())->value;
 }
 
-const Object::method_t *Class::findMethod(const string &methodName) const {
+const Object::method_t *Class::getMethod(const string &methodName) const {
 	auto iterator = methodsMap.find(methodName);
 	if (iterator != methodsMap.end()) {
 		return &iterator->second;
 	} else if (super) {
-		return super->findMethod(methodName);
+		return super->getMethod(methodName);
 	} else return nullptr;
 }
 
+Class::Class(string name, shared_ptr<Class> super, const shared_ptr<Context> &context)
+		: Object(context, ClassClass ? ClassClass : shared_ptr<Class>(this)), name(move(name)), super(move(super)) {}
+
 bool pool::initialize() noexcept try {
 	ClassClass->super = ObjectClass;
-	ObjectClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) {
-		return make_shared<String>(self->toString(), self->context);
-	});
-	ObjectClass->addMethod("extend", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+	ClassClass->addMethod("extend", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		if (other->getType() == "String") {
 			return make_shared<Class>(other->as<String>()->value, self->as<Class>(), self->context);
 		} else return Null;
 	});
-	ObjectClass->addMethod("new", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
-		return make_shared<Object>(self->context, self->as<Class>());
+	ClassClass->addMethod("new", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		auto cls = self->as<Class>();
+		auto ptr = make_shared<Object>(self->context, cls);
+		vector<shared_ptr<Object>> args;
+		if (other->getType() == "Void");
+		else if (other->getType() == "Tuple") {
+			args = other->as<Tuple>()->values;
+		} else {
+			args.push_back(other);
+		}
+		auto init = cls->context->find("init");
+		if (init && init->getType() == "Block") {
+			init->as<Block>()->execute(args);
+		}
+		return ptr;
+	});
+	ObjectClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) {
+		return make_shared<String>(self->toString(), self->context);
 	});
 	VoidClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		return make_shared<String>("void", self->context);
@@ -144,10 +160,9 @@ bool pool::initialize() noexcept try {
 		if (other->isVariable()) {
 			auto id = other->as<Variable>()->name;
 			auto &value = self->as<Variable>()->value;
-			if (value->getType() == "Block") {
-				const shared_ptr<Object> &result = value->as<Block>()->context->find(id);
-				return result ? result : Null;
-			} else return Null;
+			auto ctx = value->as<Object>()->context;
+			const shared_ptr<Object> &result = ctx->find(id);
+			return result ? result : make_shared<Variable>(id, ctx);
 		} else throw execution_error(__FILE__, __LINE__, "Invalid value for . call");
 	});
 	BlockClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
@@ -172,15 +187,13 @@ bool pool::initialize() noexcept try {
 	});
 	BlockClass->addMethod("->", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		vector<shared_ptr<Object>> args;
-		if (other->getType() == "Empty");
+		if (other->getType() == "Void");
 		else if (other->getType() == "Tuple") {
 			args = other->as<Tuple>()->values;
 		} else {
 			args.push_back(other);
 		}
-		if (self->as<Block>()->params.size() == args.size()) {
-			return self->as<Block>()->execute(args);
-		} else return Null;
+		return self->as<Block>()->execute(args);
 	});
 	auto IoClass = make_shared<Class>("Io", ObjectClass);
 	IoClass->addMethod("println", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {

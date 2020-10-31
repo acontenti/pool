@@ -27,11 +27,6 @@ stdout println z;
 (z.c) = 5;
 stdout println (z.c);
 stdout println z;
-Test = (Object extend "Test");
-(Test.init) = (who) : {
-	stdout println ("Oh " + (who + "!"));
-};
-n = (Test new "boy");
+Test = (stdout extend "Test");
+n = (Test new ());
 stdout println n;
-(n.init)("god");
-(Test.init)("no");
