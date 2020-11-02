@@ -15,7 +15,7 @@ pub struct Pool {
 	file: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum AstNode {
 	Call {
 		caller: Box<AstNode>,
@@ -32,6 +32,7 @@ pub enum AstNode {
 		params: Vec<String>,
 		calls: Vec<AstNode>,
 	},
+	Op(String),
 	Identifier(String),
 	Str(String),
 	Integer(i64),
@@ -90,8 +91,11 @@ impl Display for AstNode {
 				}
 				write!(f, "}}");
 			}
+			AstNode::Op(op) => {
+				write!(f, "{}", op);
+			}
 			AstNode::Identifier(id) => {
-				writeln!(f, "{}", id);
+				write!(f, "{}", id);
 			}
 			AstNode::Void() => {
 				write!(f, "void");
@@ -146,15 +150,6 @@ impl Pool {
 			Rule::call => {
 				self.parse_call(statement)
 			}
-			Rule::invocation => {
-				self.parse_invocation(statement)
-			}
-			Rule::term => {
-				self.parse_term(statement)
-			}
-			Rule::access => {
-				self.parse_access(statement)
-			}
 			_ => {
 				println!("{}", statement);
 				panic!()
@@ -164,24 +159,39 @@ impl Pool {
 
 	fn parse_call(&mut self, call: Pair<Rule>) -> AstNode {
 		let mut inner = call.into_inner();
-		let caller = self.parse_term(inner.next().unwrap());
-		let method = inner.next().unwrap().as_span().as_str().to_string();
-		let callee = self.parse_term(inner.next().unwrap());
-		AstNode::Call {
+		let pair = inner.next().unwrap();
+		let (caller, method) = if pair.clone().into_inner().next().is_some() {
+			let option = inner.next();
+			if option.is_none() {
+				return self.parse_invocation(pair);
+			}
+			(self.parse_invocation(pair), option.unwrap().as_span().as_str().to_string())
+		} else {
+			(AstNode::Void(), pair.as_span().as_str().to_string())
+		};
+		let option = inner.next();
+		let mut callee = AstNode::Void();
+		if option.is_some() {
+			callee = self.parse_invocation(option.unwrap());
+		}
+		return AstNode::Call {
 			caller: Box::new(caller),
 			method,
 			callee: Box::new(callee),
-		}
+		};
 	}
 
 	fn parse_invocation(&mut self, call: Pair<Rule>) -> AstNode {
 		let mut inner = call.into_inner();
-		let caller = self.parse_term(inner.next().unwrap());
-		let args = self.parse_args(inner.next().unwrap());
-		AstNode::Invocation {
-			caller: Box::new(caller),
-			args,
-		}
+		let caller = self.parse_access(inner.next().unwrap());
+		let option = inner.next();
+		return if option.is_some() {
+			let args = self.parse_args(option.unwrap());
+			AstNode::Invocation {
+				caller: Box::new(caller),
+				args,
+			}
+		} else { caller };
 	}
 
 	fn parse_params(&mut self, pair: Pair<Rule>) -> Vec<String> {
@@ -285,12 +295,27 @@ impl Pool {
 	fn parse_access(&mut self, pair: Pair<Rule>) -> AstNode {
 		let mut inner = pair.into_inner();
 		let caller = self.parse_term(inner.next().unwrap());
-		let callee = self.parse_identifier(inner.next().unwrap());
-		AstNode::Call {
-			caller: Box::new(caller),
-			method: ".".to_string(),
-			callee: Box::new(callee),
+		let mut vec = vec![];
+		for statement in inner {
+			vec.push(self.parse_identifier(statement));
 		}
+		return if vec.is_empty() {
+			caller
+		} else {
+			let mut iter = vec.iter().rev().cloned();
+			let start = iter.next().unwrap();
+			AstNode::Call {
+				caller: Box::new(caller),
+				method: ".".to_string(),
+				callee: Box::new(iter.fold(start, |a, b| {
+					AstNode::Call {
+						caller: Box::new(a),
+						method: ".".to_string(),
+						callee: Box::new(b),
+					}
+				})),
+			}
+		};
 	}
 
 	fn parse_identifier(&mut self, pair: Pair<Rule>) -> AstNode {

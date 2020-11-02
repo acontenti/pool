@@ -37,7 +37,7 @@ namespace pool {
 	extern const shared_ptr<Object> Void;
 	extern const shared_ptr<Object> Null;
 
-	class Context : enable_shared_from_this<Context> {
+	class Context : public enable_shared_from_this<Context> {
 		unordered_map<string, shared_ptr<Variable>> heap;
 		const shared_ptr<Context> parent;
 
@@ -50,9 +50,7 @@ namespace pool {
 
 		shared_ptr<Variable> find(const string &name) const;
 
-		inline void add(const string &name, const shared_ptr<Variable> &var) {
-			heap.emplace(name, var);
-		}
+		void add(const shared_ptr<Variable> &var);
 
 		void associate(const vector<string> &params, const vector<shared_ptr<Object>> &args);
 
@@ -181,6 +179,7 @@ namespace pool {
 		shared_ptr<Object> caller;
 		string method;
 		shared_ptr<Object> callee;
+		bool prefix;
 
 		static const shared_ptr<Call> Empty;
 
@@ -193,8 +192,8 @@ namespace pool {
 			}
 		};
 
-		Call(shared_ptr<Object> caller, string method, shared_ptr<Object> callee, const shared_ptr<Context> &context)
-				: Object(context, CallClass), caller(move(caller)), method(move(method)), callee(move(callee)) {}
+		Call(shared_ptr<Object> caller, string method, shared_ptr<Object> callee, bool prefix, const shared_ptr<Context> &context)
+				: Object(context, CallClass), caller(move(caller)), method(move(method)), callee(move(callee)), prefix(prefix) {}
 
 		shared_ptr<Object> invoke() const {
 			auto first = caller, second = callee;
@@ -211,7 +210,7 @@ namespace pool {
 		}
 
 		static shared_ptr<Call> Identity(const shared_ptr<Object> &result, const shared_ptr<Context> &context) {
-			return make_shared<Call>(make_shared<class Identity>(result, context), "", Void, context);
+			return make_shared<Call>(make_shared<class Identity>(result, context), "", Void, false, context);
 		}
 	};
 
@@ -253,7 +252,7 @@ namespace pool {
 		Block(vector<string> params, vector<shared_ptr<Call>> calls, const shared_ptr<Context> &context)
 				: Object(context, BlockClass), params(move(params)), calls(move(calls)) {
 			for (auto &param : params) {
-				context->add(param, make_shared<Variable>(param, context));
+				context->add(make_shared<Variable>(param, context));
 			}
 			if (this->params.empty() && this->context != Context::global) {
 				execute({});

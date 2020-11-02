@@ -23,7 +23,7 @@ const shared_ptr<Object> pool::Void = make_shared<Object>(Context::global, VoidC
 const shared_ptr<Object> pool::Null = make_shared<Object>(Context::global, NothingClass);
 const shared_ptr<Tuple> Tuple::Empty = make_shared<Tuple>(vector<shared_ptr<Object>>(), Context::global);
 const shared_ptr<Block> Block::Empty = make_shared<Block>(vector<string>(), vector<shared_ptr<Call>>(), Context::global);
-const shared_ptr<Call> Call::Empty = make_shared<Call>(Block::Empty, "->", Void, Context::global);
+const shared_ptr<Call> Call::Empty = make_shared<Call>(Block::Empty, "->", Void, false, Context::global);
 
 template<>
 shared_ptr<Variable> Object::as() {
@@ -46,9 +46,13 @@ void Context::associate(const vector<string> &params, const vector<shared_ptr<Ob
 		if (const auto &var = find(name)) {
 			var->value = value;
 		} else {
-			add(name, make_shared<Variable>(name, value, shared_from_this()));
+			add(make_shared<Variable>(name, value, shared_from_this()));
 		}
 	}
+}
+
+void Context::add(const shared_ptr<Variable> &var) {
+	heap.emplace(var->name, var);
 }
 
 string_view Object::getType() const {
@@ -110,6 +114,9 @@ bool pool::initialize() noexcept try {
 	BoolClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		return make_shared<String>(self->as<Bool>()->value ? "true" : "false", self->context);
 	});
+	BoolClass->addMethod("!", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		return make_shared<Bool>(!self->as<Bool>()->value, self->context);
+	});
 	IntegerClass->addMethod("+", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		auto value = self->as<Integer>()->value;
 		if (other->getType() == "Integer") {
@@ -119,6 +126,10 @@ bool pool::initialize() noexcept try {
 		} else if (other->getType() == "String") {
 			return make_shared<String>(to_string(value) + other->as<String>()->value, self->context);
 		} else return Null;
+	});
+	IntegerClass->addMethod("++", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		self->as<Integer>()->value++;
+		return self;
 	});
 	IntegerClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		return make_shared<String>(to_string(self->as<Integer>()->value), self->context);
@@ -207,8 +218,8 @@ bool pool::initialize() noexcept try {
 		return Void;
 	});
 	const shared_ptr<Object> &Io = make_shared<Object>(Context::global, IoClass);
-	Context::global->add("stdout", make_shared<Variable>("stdout", Io, Context::global));
-	Context::global->add("Object", make_shared<Variable>("Object", ObjectClass, Context::global));
+	Context::global->add(make_shared<Variable>("stdout", Io, Context::global));
+	Context::global->add(make_shared<Variable>("Object", ObjectClass, Context::global));
 	return true;
 } catch (...) {
 	cerr << "Initialization error" << endl;

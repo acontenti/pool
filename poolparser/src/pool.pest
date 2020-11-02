@@ -8,15 +8,15 @@ pool = _{ SOI ~ statement* ~ EOI  }
 
 statement = { expression? ~ ";" }
 
-expression = _{ invocation | call | access | term }
+expression = _{ call }
 
-call = { term ~ identifier ~ term }
+call = { (invocation? ~ operator ~ invocation) | (invocation ~ operator? ~ invocation?) }
 
-invocation = { term ~ args }
+invocation = { access ~ args? }
+
+access = { term ~ ("." ~ identifier)* }
 
 term = { null | num | bool | string | fun | tuple | array | par | block | identifier }
-
-access = { term ~ "." ~ identifier }
 
 par = { "(" ~ expression? ~ ")" }
 
@@ -52,12 +52,16 @@ char = @{
     | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
 
-identifier = @{ IDENT_START ~ IDENT_PART* }
+identifier = @{ "$" ~ IDENT_PART+ }
 
-IDENT_START = @{ ASCII_ALPHA | "_" | "!" | "$" | "%" | "&" | "*" | "+" | "-" | "/" | "<" | ">" | "=" | "^" | "|" | "~" }
+operator = @{ OP_START ~ OP_PART* }
 
-IDENT_PART = @{ ASCII_ALPHANUMERIC | "_" | "!" | "$" | "%" | "&" | "*" | "+" | "-" | "/" | "<" | ">" | "=" | "^" | "|" | "~" }
+IDENT_PART = @{ ASCII_ALPHANUMERIC | "_" }
+
+OP_START = @{ ASCII_ALPHA       | "_" | "!" | "%" | "&" | "*" | "+" | "-" | "/" | "<" | ">" | "=" | "^" | "|" | "~" }
+
+OP_PART = @{ ASCII_ALPHANUMERIC | "_" | "!" | "%" | "&" | "*" | "+" | "-" | "/" | "<" | ">" | "=" | "^" | "|" | "~" }
 
 WHITESPACE = _{ " " | "\t" | NEWLINE }
 
-COMMENT = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
+COMMENT = _{ ("/*" ~ (!"*/" ~ ANY)* ~ "*/") | ("//" ~ (!NEWLINE ~ ANY)*) }
