@@ -199,7 +199,7 @@ impl Pool {
 		for statement in pair.into_inner() {
 			match statement.as_rule() {
 				Rule::identifier => {
-					vec.push(statement.as_span().as_str().to_string());
+					vec.push(statement.as_span().as_str()[1..].to_string());
 				}
 				_ => {
 					println!("{}", statement);
@@ -302,24 +302,24 @@ impl Pool {
 		return if vec.is_empty() {
 			caller
 		} else {
-			let mut iter = vec.iter().rev().cloned();
+			let mut iter = vec.iter().cloned();
 			let start = iter.next().unwrap();
-			AstNode::Call {
+			iter.fold(AstNode::Call {
 				caller: Box::new(caller),
 				method: ".".to_string(),
-				callee: Box::new(iter.fold(start, |a, b| {
-					AstNode::Call {
-						caller: Box::new(a),
-						method: ".".to_string(),
-						callee: Box::new(b),
-					}
-				})),
-			}
+				callee: Box::new(start),
+			}, |a, b| {
+				AstNode::Call {
+					caller: Box::new(a),
+					method: ".".to_string(),
+					callee: Box::new(b),
+				}
+			})
 		};
 	}
 
 	fn parse_identifier(&mut self, pair: Pair<Rule>) -> AstNode {
-		let id = pair.as_span().as_str().to_string();
+		let id = pair.as_span().as_str()[1..].to_string();
 		return AstNode::Identifier(id);
 	}
 

@@ -50,7 +50,7 @@ namespace pool {
 
 		shared_ptr<Variable> find(const string &name) const;
 
-		void add(const shared_ptr<Variable> &var);
+		shared_ptr<Variable> add(const shared_ptr<Variable> &var);
 
 		void associate(const vector<string> &params, const vector<shared_ptr<Object>> &args);
 
@@ -69,6 +69,10 @@ namespace pool {
 		inline auto cend() const {
 			return heap.cend();
 		}
+
+		inline auto empty() const {
+			return heap.empty();
+		}
 	};
 
 	class Object : public enable_shared_from_this<Object> {
@@ -84,7 +88,7 @@ namespace pool {
 
 		Object(shared_ptr<Context> context, shared_ptr<Class> cls) : context(move(context)), cls(move(cls)) {}
 
-		virtual string_view getType() const;;
+		virtual string_view getType() const;
 
 		inline string toString() const {
 			return string(getType()) + "@" + to_string(getID());
@@ -110,16 +114,25 @@ namespace pool {
 
 	class Class : public Object {
 	public:
+		static long INSTANCES;
 		string name;
 		shared_ptr<Class> super;
 		unordered_map<string, method_t> methodsMap;
+
+		unordered_map<string, method_t> staticMethodsMap;
 
 		Class(string name, shared_ptr<Class> super, const shared_ptr<Context> &context = Context::global);
 
 		const method_t *getMethod(const string &methodName) const;
 
+		const method_t *findMethod(const string &methodName) const override;
+
 		inline void addMethod(const string &methodName, const method_t &method) {
 			methodsMap[methodName] = method;
+		}
+
+		inline void addStaticMethod(const string &methodName, const method_t &method) {
+			staticMethodsMap[methodName] = method;
 		}
 	};
 
@@ -174,7 +187,12 @@ namespace pool {
 				: Object(context, ArrayClass), values(move(values)) {}
 	};
 
-	class Call : public Object {
+	class Callable {
+	public:
+		virtual shared_ptr<Object> invoke() = 0;
+	};
+
+	class Call : public Object, public Callable {
 	public:
 		shared_ptr<Object> caller;
 		string method;
@@ -193,14 +211,15 @@ namespace pool {
 		};
 
 		Call(shared_ptr<Object> caller, string method, shared_ptr<Object> callee, bool prefix, const shared_ptr<Context> &context)
-				: Object(context, CallClass), caller(move(caller)), method(move(method)), callee(move(callee)), prefix(prefix) {}
+				: Object(context, CallClass), caller(move(caller)), method(move(method)), callee(move(callee)),
+				  prefix(prefix) {}
 
-		shared_ptr<Object> invoke() const {
+		shared_ptr<Object> invoke() override {
 			auto first = caller, second = callee;
-			if (auto call = dynamic_pointer_cast<Call>(caller)) {
+			if (auto call = dynamic_pointer_cast<Callable>(caller)) {
 				first = call->invoke();
 			}
-			if (auto call = dynamic_pointer_cast<Call>(callee)) {
+			if (auto call = dynamic_pointer_cast<Callable>(callee)) {
 				second = call->invoke();
 			}
 			auto function = first->findMethod(method);
@@ -243,7 +262,7 @@ namespace pool {
 		Variable(const string &name, const shared_ptr<Context> &context) : Variable(name, Null, context) {}
 	};
 
-	class Block : public Object {
+	class Block : public Object, public Callable {
 	public:
 		vector<string> params;
 		vector<shared_ptr<Call>> calls;
@@ -253,9 +272,6 @@ namespace pool {
 				: Object(context, BlockClass), params(move(params)), calls(move(calls)) {
 			for (auto &param : params) {
 				context->add(make_shared<Variable>(param, context));
-			}
-			if (this->params.empty() && this->context != Context::global) {
-				execute({});
 			}
 		}
 
@@ -269,6 +285,15 @@ namespace pool {
 			}
 			return returnValue;
 		}
+
+		shared_ptr<Object> invoke() override {
+			if (this->params.empty()) {
+				execute({});
+			}
+			return shared_from_this();
+		}
+
+		static vector<shared_ptr<Object>> makeArgs(const shared_ptr<Object> &other, const shared_ptr<Object> &prepend = nullptr);
 	};
 
 	extern bool initialize() noexcept;

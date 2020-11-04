@@ -27,18 +27,44 @@ $stdout println $z;
 $z.$c = 5;
 $stdout println $z.$c;
 $stdout println $z;
-$Test = ($Object extend "Test");
-$Test.$init = ($who) : {
-	$stdout println ("Oh " + ($who + "!"));
-};
-$Test.$greet = ($who) : {
-	$stdout println ("Hello " + ($who + "!"));
-};
-$n = ($Test new "boy");
+$Test = ($Object extend {
+	$init = ($this, $who) : {
+		$this.$long = 0;
+		$stdout println ("Oh " + ($who + "!"));
+	};
+	$++ = ($this) : {
+		$this.$long += 10;
+	};
+	$print = ($this) : {
+		$stdout println $this.$long;
+	};
+	$greet = ($class, $who) : {
+		$class.$int ++;
+		$stdout println ("Hello " + ($who + "!"));
+	};
+	$int = 0;
+	$no = ($ok, $who) : {
+		$stdout println ($ok + (" " + $who));
+	};
+});
+$n = ($Test new "yes");
+$Test.$no("Ok", "good");
 $stdout println $n;
-$n.$init("god");
-$Test.$init("no");
-$n.$greet("world");
-$x = (! true);
-$z.$c++;
+$n init("wow");
+//$n greet("instance");
+$stdout println $Test.$int;
+$Test greet "static";
+$stdout println $Test.$int;
+$n print;
+$n ++;
+$n print;
+$z.$c ++;
 $stdout println $z.$c;
+$stdout println ($x = (! true));
+$stdout println ({$a = $x;}.$a);
+$x = 1;
+$b = {
+	$x ++;
+	$a = {$f = $x;};
+};
+$stdout println ($b.$a.$f);

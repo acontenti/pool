@@ -20,7 +20,7 @@ term = { null | num | bool | string | fun | tuple | array | par | block | identi
 
 par = { "(" ~ expression? ~ ")" }
 
-block = { "{" ~ (statement)* ~ "}" }
+block = { "{" ~ statement* ~ "}" }
 
 tuple = { "(" ~ (expression ~ ",")+ ~ expression? ~ ")" }
 
@@ -54,13 +54,9 @@ char = @{
 
 identifier = @{ "$" ~ IDENT_PART+ }
 
-operator = @{ OP_START ~ OP_PART* }
+operator = @{ IDENT_PART+ }
 
-IDENT_PART = @{ ASCII_ALPHANUMERIC | "_" }
-
-OP_START = @{ ASCII_ALPHA       | "_" | "!" | "%" | "&" | "*" | "+" | "-" | "/" | "<" | ">" | "=" | "^" | "|" | "~" }
-
-OP_PART = @{ ASCII_ALPHANUMERIC | "_" | "!" | "%" | "&" | "*" | "+" | "-" | "/" | "<" | ">" | "=" | "^" | "|" | "~" }
+IDENT_PART = @{ ASCII_ALPHANUMERIC | "_" | "!" | "%" | "&" | "*" | "+" | "-" | "/" | "<" | ">" | "=" | "^" | "|" | "~" }
 
 WHITESPACE = _{ " " | "\t" | NEWLINE }
 

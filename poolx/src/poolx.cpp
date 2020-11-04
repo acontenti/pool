@@ -14,7 +14,7 @@ shared_ptr<PoolX> PoolX::load(const string &file, bool debug) {
 }
 
 PoolX::PoolX(const json &jsonAST) {
-	main = parseBlock(jsonAST.begin().value());
+	main = parseBlock(jsonAST.begin().value(), nullptr);
 }
 
 void PoolX::execute(const vector<string> &args) {
@@ -65,7 +65,7 @@ shared_ptr<Block> PoolX::parseBlock(const json &ast, const shared_ptr<Context> &
 		vector<shared_ptr<Call>> calls;
 		auto paramsAst = ast["params"];
 		for (auto &item : paramsAst) {
-			params.push_back(item.get<string>().substr(1));
+			params.push_back(item.get<string>());
 		}
 		auto callsAst = ast["calls"];
 		for (auto &callAst : callsAst) {
@@ -89,7 +89,11 @@ shared_ptr<Call> PoolX::parseCall(const json &ast, const shared_ptr<Context> &co
 		auto calleeAst = ast["callee"];
 		const shared_ptr<Object> &caller = parseTerm(callerAst, context);
 		auto method = methodAst.get<string>();
-		const shared_ptr<Object> &callee = parseTerm(calleeAst, context);
+		shared_ptr<Object> callee;
+		if (method == ".")
+			callee = parseTerm(calleeAst, make_shared<Context>(nullptr));
+		else
+			callee = parseTerm(calleeAst, context);
 		if (caller->getType() == "Void") {
 			return make_shared<Call>(callee, method, Void, true, context);
 		} else {
@@ -140,7 +144,7 @@ shared_ptr<String> PoolX::parseString(const json &ast, const shared_ptr<Context>
 }
 
 shared_ptr<Variable> PoolX::parseIdent(const json &ast, const shared_ptr<Context> &context) {
-	auto id = ast.get<string>().substr(1);
+	auto id = ast.get<string>();
 	if (auto find = context->find(id)) {
 		return find;
 	} else {
