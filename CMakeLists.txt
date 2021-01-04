@@ -15,13 +15,12 @@ set_property(TARGET poolx PROPERTY CXX_STANDARD 17)
 if (WIN32)
 	target_link_libraries(poolx poolparser ws2_32 userenv)
 else ()
-	target_link_libraries(poolx poolparser dl pthread)
+	target_link_libraries(poolx poolparser dl pthread stdc++fs)
 endif ()
-target_link_libraries(poolx poolparser stdc++fs)
 
 # INSTALL
 install(TARGETS poolx CONFIGURATIONS Release DESTINATION ${CMAKE_SOURCE_DIR}/dist)
 
 # TEST
 enable_testing()
-add_test(NAME basic_test COMMAND poolx test.pool ctest WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME basic_test COMMAND poolx test ctest WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
