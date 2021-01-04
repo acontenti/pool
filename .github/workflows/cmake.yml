@@ -12,6 +12,8 @@ jobs:
         include:
           - os: macos-latest
             cmake_extra: -DCMAKE_C_COMPILER=/usr/local/bin/gcc-9 -DCMAKE_CXX_COMPILER=/usr/local/bin/g++-9
+          - os: ubuntu-latest
+            cmake_extra: -DCMAKE_C_COMPILER=gcc-9 -DCMAKE_CXX_COMPILER=g++-9
     steps:
       - name: Checkout
         uses: actions/checkout@v2
