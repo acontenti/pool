@@ -8,7 +8,6 @@
 #include <functional>
 #include "util.hpp"
 
-
 using namespace std;
 
 namespace pool {
@@ -20,6 +19,8 @@ namespace pool {
 
 	class Block;
 
+	extern bool debug;
+	extern vector<shared_ptr<Object>> arguments;
 	extern const shared_ptr<Class> ClassClass;
 	extern const shared_ptr<Class> ObjectClass;
 	extern const shared_ptr<Class> BoolClass;
@@ -225,7 +226,7 @@ namespace pool {
 			auto function = first->findMethod(method);
 			if (function) {
 				return (*function)(first, second);
-			} else throw execution_error(__FILE__, __LINE__, "method " + method + " not found");
+			} else throw execution_error("method " + method + " not found");
 		}
 
 		static shared_ptr<Call> Identity(const shared_ptr<Object> &result, const shared_ptr<Context> &context) {
@@ -234,9 +235,28 @@ namespace pool {
 	};
 
 	class Variable : public Object {
-	public:
-		string name;
 		shared_ptr<Object> value;
+		bool immutable = false;
+	public:
+		const string name;
+
+		bool isImmutable() const {
+			return immutable;
+		}
+
+		void setImmutable(bool _immutable) {
+			Variable::immutable = _immutable;
+		}
+
+		const shared_ptr<Object> &getValue() const {
+			return value;
+		}
+
+		void setValue(const shared_ptr<Object> &val) {
+			if (!immutable)
+				value = val;
+			else throw execution_error("Cannot assign immutable variable \"" + name + "\"");
+		}
 
 		const method_t *findMethod(const string &methodName) const override {
 			const method_t *method = value->findMethod(methodName);
@@ -247,10 +267,6 @@ namespace pool {
 			}
 		}
 
-		Variable(string name, shared_ptr<Object> value, const shared_ptr<Context> &context)
-				: Object(context, VariableClass), name(move(name)), value(move(value)) {
-		}
-
 		string_view getType() const override {
 			return value->getType();
 		}
@@ -259,7 +275,17 @@ namespace pool {
 			return true;
 		}
 
-		Variable(const string &name, const shared_ptr<Context> &context) : Variable(name, Null, context) {}
+		Variable(string name, shared_ptr<Object> value, const shared_ptr<Context> &context, bool immutable = false)
+				: Object(context, VariableClass), name(move(name)), value(move(value)), immutable(immutable) {
+		}
+
+		static shared_ptr<Variable> create(const string &name, const shared_ptr<Object> &value, const shared_ptr<Context> &context, bool immutable = false) {
+			return make_shared<Variable>(name, value, context, immutable);
+		}
+
+		static shared_ptr<Variable> create(const string &name, const shared_ptr<Context> &context) {
+			return make_shared<Variable>(name, Null, context);
+		}
 	};
 
 	class Block : public Object, public Callable {
@@ -271,7 +297,7 @@ namespace pool {
 		Block(vector<string> params, vector<shared_ptr<Call>> calls, const shared_ptr<Context> &context)
 				: Object(context, BlockClass), params(move(params)), calls(move(calls)) {
 			for (auto &param : params) {
-				context->add(make_shared<Variable>(param, context));
+				context->add(Variable::create(param, context));
 			}
 		}
 

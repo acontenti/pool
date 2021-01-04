@@ -28,7 +28,7 @@ array = { "[" ~ expression? ~ ("," + ~ expression)* ~ "]" }
 
 fun = { params ~ ":" ~ block }
 
-params = { "(" ~ identifier? ~ ("," ~ identifier)* ~ ")" }
+params = { identifier | ("(" ~ identifier? ~ ("," ~ identifier)* ~ ")") }
 
 args = { "(" ~ expression? ~ ("," ~ expression)* ~ ")" }
 

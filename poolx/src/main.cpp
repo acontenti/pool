@@ -2,26 +2,31 @@
 #include "poolx.hpp"
 #include "../lib/argagg.hpp"
 
+using namespace pool;
+
 int main(int argc, char **argv) {
 	try {
 		vector<argagg::definition> options{
-				{"debug", {"-d", "--debug"}, "enables debug options", 0}
+				{"debug", vector<string>{"-d", "--debug"}, "enables debug options", 0}
 		};
 		argagg::parser argparser{options};
 		argagg::parser_results result = argparser.parse(argc, argv);
+		bool debug = result["debug"];
+		if (debug || result.pos.empty()) {
+			cout << "poolx " << pool::PoolX::VERSION << endl;
+		}
 		if (!result.pos.empty()) {
-			string file = result.pos[0];
 			vector<string> args;
+			string filename = result.pos[0];
 			for (int i = 1; i < result.pos.size(); ++i) {
 				args.emplace_back(result.pos[i]);
 			}
-			auto app = pool::PoolX::load(file, result["debug"]);
-			app->execute(args);
-		} else {
-			std::cout << "poolx " << pool::PoolX::VERSION << std::endl;
+			PoolX::setOptions({debug, args});
+			PoolX::execute(filename);
 		}
-	} catch (const std::exception &e) {
-		std::cerr << e.what() << std::endl;
+		return EXIT_SUCCESS;
+	} catch (const exception &e) {
+		cerr << e.what() << endl;
 		return EXIT_FAILURE;
 	}
 }

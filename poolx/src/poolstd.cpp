@@ -1,10 +1,13 @@
 #include <iostream>
 #include "poolstd.hpp"
+#include "poolx.hpp"
 
 using namespace pool;
 
 long Object::ID_COUNTER = 0;
 long Class::INSTANCES = 0;
+bool pool::debug = false;
+vector<shared_ptr<Object>> pool::arguments{};
 const shared_ptr<Context> Context::global = shared_ptr<Context>(new Context);
 const shared_ptr<Class> pool::ClassClass = make_shared<Class>("Class", nullptr); //ObjectClass is null
 const shared_ptr<Class> pool::ObjectClass = make_shared<Class>("Object", nullptr);
@@ -45,9 +48,9 @@ void Context::associate(const vector<string> &params, const vector<shared_ptr<Ob
 		auto name = params[i];
 		auto value = args[i];
 		if (const auto &var = find(name)) {
-			var->value = value;
+			var->setValue(value);
 		} else {
-			add(make_shared<Variable>(name, value, shared_from_this()));
+			add(Variable::create(name, value, shared_from_this()));
 		}
 	}
 }
@@ -65,7 +68,7 @@ const Object::method_t *Object::findMethod(const string &methodName) const {
 }
 
 shared_ptr<Object> Object::getVariableValue() {
-	return reinterpret_pointer_cast<Variable>(shared_from_this())->value;
+	return reinterpret_pointer_cast<Variable>(shared_from_this())->getValue();
 }
 
 const Object::method_t *Class::getMethod(const string &methodName) const {
@@ -150,12 +153,13 @@ bool pool::initialize() noexcept try {
 			auto value = self->as<Object>();
 			auto ctx = value->context;
 			const shared_ptr<Object> &result = ctx->find(id);
-			return result ? result : ctx->add(make_shared<Variable>(id, ctx));
-		} else throw execution_error(__FILE__, __LINE__, "Invalid value for . call");
+			return result ? result : ctx->add(Variable::create(id, ctx));
+		} else throw execution_error("Invalid value for . call");
 	});
 	ObjectClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) {
 		return make_shared<String>(self->toString(), self->context);
 	});
+	Context::global->add(Variable::create("Object", ObjectClass, Context::global));
 	VoidClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		return make_shared<String>("void", self->context);
 	});
@@ -267,11 +271,25 @@ bool pool::initialize() noexcept try {
 	StringClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		return self;
 	});
+	StringClass->addMethod("import", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		auto moduleName = self->as<String>()->value;
+		try {
+			PoolX::execute(moduleName);
+		} catch (const exception &e) {
+			throw execution_error(e.what());
+		}
+		return Void;
+	});
 	IdentityClass->addMethod("", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		return self->as<class Call::Identity>()->result;
 	});
 	VariableClass->addMethod("=", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
-		self->as<Variable>()->value = other->as<Object>();
+		self->as<Variable>()->setValue(other->as<Object>());
+		return self;
+	});
+	VariableClass->addMethod(":=", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		self->as<Variable>()->setValue(other->as<Object>());
+		self->as<Variable>()->setImmutable(true);
 		return self;
 	});
 	BlockClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
@@ -280,7 +298,7 @@ bool pool::initialize() noexcept try {
 		ss << "{";
 		if (!ctx->empty()) {
 			for (auto &item : *ctx) {
-				shared_ptr<Object> var = item.second->value->as<Object>();
+				shared_ptr<Object> var = item.second->getValue()->as<Object>();
 				if (auto method = var->findMethod("toString")) {
 					auto result = (*method)(var, Tuple::Empty);
 					ss << item.first << ":";
@@ -312,8 +330,7 @@ bool pool::initialize() noexcept try {
 		return Void;
 	});
 	const shared_ptr<Object> &Io = make_shared<Object>(Context::global, IoClass);
-	Context::global->add(make_shared<Variable>("stdout", Io, Context::global));
-	Context::global->add(make_shared<Variable>("Object", ObjectClass, Context::global));
+	Context::global->add(Variable::create("stdout", Io, Context::global));
 	return true;
 } catch (...) {
 	cerr << "Initialization error" << endl;

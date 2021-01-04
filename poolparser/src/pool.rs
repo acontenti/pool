@@ -58,7 +58,11 @@ impl Display for AstNode {
 			AstNode::Bool(x) => {
 				write!(f, "\"{}\"", x);
 			}
-			AstNode::Call { caller, method, callee } => {
+			AstNode::Call {
+				caller,
+				method,
+				callee,
+			} => {
 				write!(f, "{} {} {}", caller, method, callee);
 			}
 			AstNode::Invocation { caller, args } => {
@@ -123,7 +127,7 @@ impl Pool {
 		for statement in file {
 			match statement.as_rule() {
 				Rule::statement => {
-					statements.push(self.parse_statement(statement));
+					statements.push(Pool::parse_statement(statement));
 				}
 				Rule::EOI => {}
 				_ => {
@@ -132,24 +136,25 @@ impl Pool {
 				}
 			}
 		}
-		Ok(AstNode::Block { params: vec![], calls: statements })
+		Ok(AstNode::Block {
+			params: vec![],
+			calls: statements,
+		})
 	}
 
-	fn parse_statement(&mut self, pair: Pair<Rule>) -> AstNode {
+	fn parse_statement(pair: Pair<Rule>) -> AstNode {
 		let inner = pair.into_inner().next();
 		return if inner.is_none() {
 			AstNode::Void()
 		} else {
 			let statement = inner.unwrap();
-			self.parse_expression(statement)
+			Pool::parse_expression(statement)
 		};
 	}
 
-	fn parse_expression(&mut self, statement: Pair<Rule>) -> AstNode {
+	fn parse_expression(statement: Pair<Rule>) -> AstNode {
 		return match statement.as_rule() {
-			Rule::call => {
-				self.parse_call(statement)
-			}
+			Rule::call => Pool::parse_call(statement),
 			_ => {
 				println!("{}", statement);
 				panic!()
@@ -157,22 +162,22 @@ impl Pool {
 		};
 	}
 
-	fn parse_call(&mut self, call: Pair<Rule>) -> AstNode {
+	fn parse_call(call: Pair<Rule>) -> AstNode {
 		let mut inner = call.into_inner();
 		let pair = inner.next().unwrap();
 		let (caller, method) = if pair.clone().into_inner().next().is_some() {
 			let option = inner.next();
 			if option.is_none() {
-				return self.parse_invocation(pair);
+				return Pool::parse_invocation(pair);
 			}
-			(self.parse_invocation(pair), option.unwrap().as_span().as_str().to_string())
+			(Pool::parse_invocation(pair), option.unwrap().as_span().as_str().to_string())
 		} else {
 			(AstNode::Void(), pair.as_span().as_str().to_string())
 		};
 		let option = inner.next();
 		let mut callee = AstNode::Void();
 		if option.is_some() {
-			callee = self.parse_invocation(option.unwrap());
+			callee = Pool::parse_invocation(option.unwrap());
 		}
 		return AstNode::Call {
 			caller: Box::new(caller),
@@ -181,20 +186,22 @@ impl Pool {
 		};
 	}
 
-	fn parse_invocation(&mut self, call: Pair<Rule>) -> AstNode {
+	fn parse_invocation(call: Pair<Rule>) -> AstNode {
 		let mut inner = call.into_inner();
-		let caller = self.parse_access(inner.next().unwrap());
+		let caller = Pool::parse_access(inner.next().unwrap());
 		let option = inner.next();
 		return if option.is_some() {
-			let args = self.parse_args(option.unwrap());
+			let args = Pool::parse_args(option.unwrap());
 			AstNode::Invocation {
 				caller: Box::new(caller),
 				args,
 			}
-		} else { caller };
+		} else {
+			caller
+		};
 	}
 
-	fn parse_params(&mut self, pair: Pair<Rule>) -> Vec<String> {
+	fn parse_params(pair: Pair<Rule>) -> Vec<String> {
 		let mut vec = vec![];
 		for statement in pair.into_inner() {
 			match statement.as_rule() {
@@ -210,81 +217,48 @@ impl Pool {
 		return vec;
 	}
 
-	fn parse_args(&mut self, pair: Pair<Rule>) -> Vec<AstNode> {
+	fn parse_args(pair: Pair<Rule>) -> Vec<AstNode> {
 		let mut vec = vec![];
 		for statement in pair.into_inner() {
-			vec.push(self.parse_expression(statement))
+			vec.push(Pool::parse_expression(statement))
 		}
 		return vec;
 	}
 
-	fn parse_fun(&mut self, call: Pair<Rule>) -> AstNode {
+	fn parse_fun(call: Pair<Rule>) -> AstNode {
 		let mut inner = call.into_inner();
-		let params = self.parse_params(inner.next().unwrap());
-		let block = self.parse_block(inner.next().unwrap());
+		let params = Pool::parse_params(inner.next().unwrap());
+		let block = Pool::parse_block(inner.next().unwrap());
 		AstNode::Block {
 			params,
 			calls: block,
 		}
 	}
 
-	fn parse_term(&mut self, pair: Pair<Rule>) -> AstNode {
+	fn parse_term(pair: Pair<Rule>) -> AstNode {
 		let option = pair.into_inner().next();
 		if option.is_none() {
 			return AstNode::Void();
 		}
 		let term = option.unwrap();
 		match term.as_rule() {
-			Rule::term => {
-				return self.parse_term(term);
-			}
-			Rule::null => {
-				return AstNode::Null();
-			}
-			Rule::identifier => {
-				return self.parse_identifier(term);
-			}
-			Rule::bool => {
-				let bool = term.as_span().as_str() == "true";
-				return AstNode::Bool(bool);
-			}
-			Rule::string => {
-				let str = term
-					.into_inner()
-					.next()
-					.unwrap()
-					.as_span()
-					.as_str()
-					.to_string();
-				return AstNode::Str(str);
-			}
-			Rule::num => {
-				return self.parse_num(term);
-			}
-			Rule::block => {
-				return AstNode::Block { params: vec![], calls: self.parse_block(term) };
-			}
-			Rule::array => {
-				return self.parse_array(term);
-			}
-			Rule::tuple => {
-				return self.parse_tuple(term);
-			}
-			Rule::par => {
-				return self.parse_term(term);
-			}
-			Rule::call => {
-				return self.parse_call(term);
-			}
-			Rule::fun => {
-				return self.parse_fun(term);
-			}
-			Rule::access => {
-				return self.parse_access(term);
-			}
-			Rule::invocation => {
-				return self.parse_invocation(term);
-			}
+			Rule::term => Pool::parse_term(term),
+			Rule::null => AstNode::Null(),
+			Rule::identifier => Pool::parse_identifier(term),
+			Rule::bool => AstNode::Bool(term.as_span().as_str() == "true"),
+			Rule::string => Pool::parse_string(term),
+			Rule::num => Pool::parse_num(term),
+			Rule::block => AstNode::Block {
+				params: vec![],
+				calls: Pool::parse_block(term),
+			},
+			Rule::array => Pool::parse_array(term),
+			Rule::tuple => Pool::parse_tuple(term),
+			Rule::par => Pool::parse_term(term),
+			Rule::call => Pool::parse_call(term),
+			Rule::fun => Pool::parse_fun(term),
+			Rule::access => Pool::parse_access(term),
+			Rule::invocation => Pool::parse_invocation(term),
 			_ => {
 				println!("{}", term);
 				panic!()
@@ -292,59 +266,90 @@ impl Pool {
 		}
 	}
 
-	fn parse_access(&mut self, pair: Pair<Rule>) -> AstNode {
+	fn unescape(s: &str) -> String {
+		let mut result = String::with_capacity(s.len());
+		let mut chars = s.chars();
+		while let Some(ch) = chars.next() {
+			result.push(if ch != '\\' {
+				ch
+			} else {
+				match chars.next() {
+					Some('u') => {
+						let value = chars.by_ref().take(4).fold(0, |acc, c| acc * 16 + c.to_digit(16).unwrap());
+						std::char::from_u32(value).unwrap()
+					}
+					Some('b') => '\x08',
+					Some('f') => '\x0c',
+					Some('n') => '\n',
+					Some('r') => '\r',
+					Some('t') => '\t',
+					Some(ch) => ch,
+					_ => panic!("Malformed escape"),
+				}
+			})
+		}
+		return result;
+	}
+
+	fn parse_string(term: Pair<Rule>) -> AstNode {
+		let str = term.into_inner().next().unwrap().as_span().as_str();
+		return AstNode::Str(Pool::unescape(str));
+	}
+
+	fn parse_access(pair: Pair<Rule>) -> AstNode {
 		let mut inner = pair.into_inner();
-		let caller = self.parse_term(inner.next().unwrap());
+		let caller = Pool::parse_term(inner.next().unwrap());
 		let mut vec = vec![];
 		for statement in inner {
-			vec.push(self.parse_identifier(statement));
+			vec.push(Pool::parse_identifier(statement));
 		}
 		return if vec.is_empty() {
 			caller
 		} else {
 			let mut iter = vec.iter().cloned();
 			let start = iter.next().unwrap();
-			iter.fold(AstNode::Call {
-				caller: Box::new(caller),
-				method: ".".to_string(),
-				callee: Box::new(start),
-			}, |a, b| {
+			iter.fold(
 				AstNode::Call {
+					caller: Box::new(caller),
+					method: ".".to_string(),
+					callee: Box::new(start),
+				},
+				|a, b| AstNode::Call {
 					caller: Box::new(a),
 					method: ".".to_string(),
 					callee: Box::new(b),
-				}
-			})
+				},
+			)
 		};
 	}
 
-	fn parse_identifier(&mut self, pair: Pair<Rule>) -> AstNode {
+	fn parse_identifier(pair: Pair<Rule>) -> AstNode {
 		let id = pair.as_span().as_str()[1..].to_string();
 		return AstNode::Identifier(id);
 	}
 
-	fn parse_tuple(&mut self, pair: Pair<Rule>) -> AstNode {
+	fn parse_tuple(pair: Pair<Rule>) -> AstNode {
 		let mut vec = vec![];
 		for statement in pair.into_inner() {
-			vec.push(self.parse_expression(statement));
+			vec.push(Pool::parse_expression(statement));
 		}
 		return AstNode::Tuple(vec);
 	}
 
-	fn parse_array(&mut self, pair: Pair<Rule>) -> AstNode {
+	fn parse_array(pair: Pair<Rule>) -> AstNode {
 		let mut vec = vec![];
 		for statement in pair.into_inner() {
-			vec.push(self.parse_expression(statement));
+			vec.push(Pool::parse_expression(statement));
 		}
 		return AstNode::Array(vec);
 	}
 
-	fn parse_block(&mut self, pair: Pair<Rule>) -> Vec<AstNode> {
+	fn parse_block(pair: Pair<Rule>) -> Vec<AstNode> {
 		let mut statements = vec![];
 		for statement in pair.into_inner() {
 			match statement.as_rule() {
 				Rule::statement => {
-					statements.push(self.parse_statement(statement));
+					statements.push(Pool::parse_statement(statement));
 				}
 				_ => {
 					println!("{}", statement);
@@ -355,7 +360,7 @@ impl Pool {
 		return statements;
 	}
 
-	fn parse_num(&mut self, pair: Pair<Rule>) -> AstNode {
+	fn parse_num(pair: Pair<Rule>) -> AstNode {
 		let term = pair.into_inner().next().unwrap();
 		match term.as_rule() {
 			Rule::integer => {

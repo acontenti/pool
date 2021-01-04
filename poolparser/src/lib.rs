@@ -8,7 +8,7 @@ use std::os::raw::c_char;
 mod pool;
 
 #[no_mangle]
-pub extern fn generate_json_ast(file: *const c_char) -> *const c_char {
+pub extern "C" fn generate_json_ast(file: *const c_char) -> *const c_char {
 	use pool::Pool;
 	let c_str = unsafe { CStr::from_ptr(file) };
 	let mut pool = Pool::new(c_str.to_str().expect("Invalid input"));

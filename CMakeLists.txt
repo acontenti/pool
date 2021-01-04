@@ -17,11 +17,11 @@ if (WIN32)
 else ()
 	target_link_libraries(poolx poolparser dl pthread)
 endif ()
-configure_file(test.pool ${CMAKE_BINARY_DIR}/test.pool COPYONLY)
+target_link_libraries(poolx poolparser stdc++fs)
 
 # INSTALL
 install(TARGETS poolx CONFIGURATIONS Release DESTINATION ${CMAKE_SOURCE_DIR}/dist)
 
 # TEST
 enable_testing()
-add_test(NAME basic_test COMMAND poolx ${CMAKE_SOURCE_DIR}/test.pool)
+add_test(NAME basic_test COMMAND poolx test.pool ctest WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
