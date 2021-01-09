@@ -2,8 +2,11 @@
 
 #include <vector>
 #include <memory>
+#include "../gen/PoolParserBaseListener.h"
+#include "../gen/PoolLexer.h"
 
 using namespace std;
+using namespace antlr4;
 
 namespace pool {
 	struct Settings {
@@ -11,7 +14,7 @@ namespace pool {
 		const vector<string> &args;
 	};
 
-	class PoolX {
+	class PoolX : PoolParserBaseListener {
 		explicit PoolX(const string &file);
 
 	public:
@@ -21,5 +24,11 @@ namespace pool {
 		static void setOptions(const Settings &settings);
 
 		static PoolX execute(const string &filename);
+
+		static void compile_warning(const std::string &message, antlr4::Token *token = nullptr) noexcept;
+
+		static void compile_error(const std::string &message, antlr4::Token *token = nullptr) noexcept;
+
+		static void compile_fatal(const std::string &message, antlr4::Token *token = nullptr) noexcept(false);
 	};
 }

@@ -112,6 +112,7 @@ bool pool::initialize() noexcept try {
 	ClassClass->super = ObjectClass;
 	ClassClass->addMethod("extend", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		if (other->getType() == "Block") {
+			other->as<Block>()->execute({});
 			auto cls = make_shared<Class>("Class" + to_string(Class::INSTANCES++), self->as<Class>(), self->context);
 			for (auto[name, var] : *other->context) {
 				if (var->getType() == "Block") {
@@ -171,6 +172,20 @@ bool pool::initialize() noexcept try {
 	});
 	BoolClass->addMethod("!", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		return make_shared<Bool>(!self->as<Bool>()->value, self->context);
+	});
+	Context::global->add(Variable::create("Conditional", Context::global));
+	BoolClass->addMethod("then", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		if (other->getType() == "Block") {
+			bool condition = self->as<Bool>()->value;
+			if (condition) {
+				other->as<Block>()->execute({});
+			}
+			auto conditional = self->context->find("Conditional");
+			if (conditional)
+				if (auto newF = conditional->findMethod("new"))
+					return (*newF)(conditional, make_shared<Bool>(condition, self->context));
+			throw execution_error("Method new not found");
+		} else return Null;
 	});
 	IntegerClass->addMethod("+", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		auto value = self->as<Integer>()->value;

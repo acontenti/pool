@@ -14,9 +14,9 @@ public:
   enum {
     WS = 1, COMMENT = 2, LINE_COMMENT = 3, SEMI = 4, LP = 5, RP = 6, LB = 7, 
     RB = 8, LSB = 9, RSB = 10, DOT = 11, COMMA = 12, COLON = 13, TRUE = 14, 
-    FALSE = 15, NULL_ = 16, IDENTIFIER = 17, OPERATOR = 18, IDENT_PART = 19, 
-    STRING_LITERAL = 20, DECIMAL_INTEGER_LITERAL = 21, HEX_INTEGER_LITERAL = 22, 
-    BIN_INTEGER_LITERAL = 23, FLOAT_LITERAL = 24
+    FALSE = 15, NULL_ = 16, DECIMAL_INTEGER_LITERAL = 17, HEX_INTEGER_LITERAL = 18, 
+    BIN_INTEGER_LITERAL = 19, FLOAT_LITERAL = 20, STRING_LITERAL = 21, IDENTIFIER = 22, 
+    OPERATOR = 23, IDENT_PART = 24, SYMBOL = 25
   };
 
   enum {
@@ -117,8 +117,6 @@ public:
 
   class  AccessContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *identifierToken = nullptr;;
-    std::vector<antlr4::Token *> ids;;
     AccessContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     TermContext *term();
@@ -136,6 +134,7 @@ public:
 
   class  TermContext : public antlr4::ParserRuleContext {
   public:
+    enum Type {NIL,NUM,BLN,STR,FUN,TPL,ARR,PAR,BLK,IDT} type;
     TermContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     NullContext *null();
@@ -240,8 +239,6 @@ public:
 
   class  ParamsContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *identifierToken = nullptr;;
-    std::vector<antlr4::Token *> ids;;
     ParamsContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     std::vector<antlr4::tree::TerminalNode *> IDENTIFIER();
@@ -260,16 +257,14 @@ public:
 
   class  ArgsContext : public antlr4::ParserRuleContext {
   public:
-    PoolParser::CallContext *callContext = nullptr;;
-    std::vector<CallContext *> calls;;
     ArgsContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *LP();
     antlr4::tree::TerminalNode *RP();
-    std::vector<antlr4::tree::TerminalNode *> COMMA();
-    antlr4::tree::TerminalNode* COMMA(size_t i);
     std::vector<CallContext *> call();
     CallContext* call(size_t i);
+    std::vector<antlr4::tree::TerminalNode *> COMMA();
+    antlr4::tree::TerminalNode* COMMA(size_t i);
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -293,6 +288,7 @@ public:
 
   class  NumContext : public antlr4::ParserRuleContext {
   public:
+    enum Type {DEC,HEX,BIN,FLT} type;
     NumContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *DECIMAL_INTEGER_LITERAL();
@@ -322,6 +318,7 @@ public:
 
   class  BooleanContext : public antlr4::ParserRuleContext {
   public:
+    bool value;
     BooleanContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *TRUE();

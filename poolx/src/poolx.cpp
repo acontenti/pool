@@ -1,36 +1,45 @@
 #include <poolparser.h>
 #include <iostream>
 #include <filesystem>
-#include <fstream>
+#include <chrono>
+#include <numeric>
 #include "poolstd.hpp"
 #include "poolx.hpp"
-#include "../../lib/json.hpp"
+#include "../../lib/termcolor.hpp"
+#include "ErrorListener.hpp"
 
 using namespace pool;
-using json = nlohmann::json;
+using namespace chrono;
 namespace fs = filesystem;
 
-shared_ptr<Object> parseTerm(const json &ast, const shared_ptr<Context> &context);
+class compile_error : public std::runtime_error {
+public:
+	explicit compile_error(const std::string &arg) : std::runtime_error(arg) {}
+};
 
-shared_ptr<Call> parseCall(const json &ast, const shared_ptr<Context> &context);
+shared_ptr<Block> parsePool(PoolParser::PoolContext *ast, const vector<string> &params, const shared_ptr<Context> &context);
 
-shared_ptr<Call> parseInvocation(const json &ast, const shared_ptr<Context> &context);
+shared_ptr<Call> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context);
 
-shared_ptr<Block> parseBlock(const json &ast, const shared_ptr<Context> &parent);
+std::string getExecutionTime(high_resolution_clock::time_point startTime, high_resolution_clock::time_point endTime) {
+	auto execution_time_ms = duration_cast<std::chrono::microseconds>(endTime - startTime).count();
+	auto execution_time_sec = duration_cast<std::chrono::seconds>(endTime - startTime).count();
+	auto execution_time_min = duration_cast<std::chrono::minutes>(endTime - startTime).count();
+	auto execution_time_hour = duration_cast<std::chrono::hours>(endTime - startTime).count();
+	std::stringstream output;
+	if (execution_time_hour > 0)
+		output << execution_time_hour << "h, ";
+	if (execution_time_min > 0)
+		output << execution_time_min % 60 << "m, ";
+	if (execution_time_sec > 0)
+		output << execution_time_sec % 60 << "s, ";
+	if (execution_time_ms > 0)
+		output << execution_time_ms % long(1E+3) << "ms";
+	return output.str();
+}
 
-shared_ptr<Decimal> parseDecimal(const json &ast, const shared_ptr<Context> &context);
-
-shared_ptr<Integer> parseInteger(const json &ast, const shared_ptr<Context> &context);
-
-shared_ptr<Bool> parseBool(const json &ast, const shared_ptr<Context> &context);
-
-shared_ptr<String> parseString(const json &ast, const shared_ptr<Context> &context);
-
-shared_ptr<Tuple> parseTuple(const json &ast, const shared_ptr<Context> &context);
-
-shared_ptr<Array> parseArray(const json &ast, const shared_ptr<Context> &context);
-
-shared_ptr<Variable> parseIdent(const json &ast, const shared_ptr<Context> &context);
+static int errors = 0;
+static int warnings = 0;
 
 void PoolX::setOptions(const Settings &settings) {
 	debug = settings.debug;
@@ -55,139 +64,68 @@ PoolX PoolX::execute(const string &module) {
 }
 
 PoolX::PoolX(const string &file) {
-	string jsonAstString = parser::generate_json_ast(file.c_str());
-	auto jsonAst = json::parse(jsonAstString);
+	bool result, fatal = false;
+	auto startTime = high_resolution_clock::now();
+	ifstream is(file);
+	auto inputStream = make_unique<ANTLRInputStream>(is);
+	inputStream->name = file;
+	auto lexer = make_unique<PoolLexer>(inputStream.get());
+	lexer->removeErrorListeners();
+	lexer->addErrorListener(ErrorListener::INSTANCE());
+	auto tokens = make_unique<CommonTokenStream>(lexer.get());
+	auto parser = make_unique<PoolParser>(tokens.get());
+	parser->removeErrorListeners();
+	parser->addErrorListener(ErrorListener::INSTANCE());
+	parser->addParseListener(this);
+	try {
+		vector<shared_ptr<Object>> args{make_shared<String>(file, Context::global)};
+		args.insert(args.end(), arguments.begin(), arguments.end());
+		auto tree = parser->pool();
+		if (debug) {
+			cout << tree->toStringTree(parser.get()) << endl;
+		}
+		vector<string> params(arguments.size() + 1);
+		for (int i = 0; i < arguments.size() + 1; ++i) {
+			params.emplace_back(to_string(i));
+		}
+		auto main = parsePool(tree, params, Context::global);
+		main->execute(args);
+		result = errors == 0;
+	} catch (::compile_error &error) {
+		std::cout << termcolor::red << "FATAL ERROR: " << error.what() << termcolor::reset << std::endl;
+		result = false;
+		fatal = true;
+	}
 	if (debug) {
-		cout << jsonAst.dump(4) << endl;
-	}
-	auto main = parseBlock(jsonAst.begin().value(), Context::global);
-	for (int i = 0; i < arguments.size() + 1; ++i) {
-		main->params.emplace_back(to_string(i));
-	}
-	vector<shared_ptr<Object>> args{make_shared<String>(file, Context::global)};
-	args.insert(args.end(), arguments.begin(), arguments.end());
-	main->execute(args);
-}
-
-shared_ptr<Object> parseTerm(const json &ast, const shared_ptr<Context> &context) {
-	auto object = ast.get<json::object_t>();
-	auto[key, value] = *object.begin();
-	if ("Block" == key) {
-		return parseBlock(value, context);
-	} else if ("Call" == key) {
-		return parseCall(value, context);
-	} else if ("Invocation" == key) {
-		return parseInvocation(value, context);
-	} else if ("Decimal" == key) {
-		return parseDecimal(value, context);
-	} else if ("Integer" == key) {
-		return parseInteger(value, context);
-	} else if ("Bool" == key) {
-		return parseBool(value, context);
-	} else if ("Str" == key) {
-		return parseString(value, context);
-	} else if ("Identifier" == key) {
-		return parseIdent(value, context);
-	} else if ("Tuple" == key) {
-		return parseTuple(value, context);
-	} else if ("Array" == key) {
-		return parseArray(value, context);
-	} else if ("Void" == key) {
-		return Void;
-	} else if ("Null" == key) {
-		return Null;
-	} else {
-		throw runtime_error("unknown term type: " + key);
-	}
-}
-
-shared_ptr<Block> parseBlock(const json &ast, const shared_ptr<Context> &parent) {
-	auto context = make_shared<Context>(parent);
-	if (ast.is_object()) {
-		vector<string> params;
-		vector<shared_ptr<Call>> calls;
-		auto paramsAst = ast["params"];
-		for (auto &item : paramsAst) {
-			params.push_back(item.get<string>());
-		}
-		auto callsAst = ast["calls"];
-		for (auto &callAst : callsAst) {
-			auto term = parseTerm(callAst, context);
-			if (term->getType() == "Call") {
-				calls.push_back(static_pointer_cast<Call>(term));
-			} else if (term->getType() == "Void") {
-				calls.push_back(Call::Empty);
-			} else {
-				calls.push_back(Call::Identity(term, context));
-			}
-		}
-		return make_shared<Block>(params, calls, context);
-	} else throw runtime_error("invalid block: " + ast.dump());
-}
-
-shared_ptr<Call> parseCall(const json &ast, const shared_ptr<Context> &context) {
-	if (ast.is_object()) {
-		auto callerAst = ast["caller"];
-		auto methodAst = ast["method"];
-		auto calleeAst = ast["callee"];
-		const shared_ptr<Object> &caller = parseTerm(callerAst, context);
-		auto method = methodAst.get<string>();
-		shared_ptr<Object> callee;
-		if (method == ".")
-			callee = parseTerm(calleeAst, make_shared<Context>(nullptr));
-		else
-			callee = parseTerm(calleeAst, context);
-		if (caller->getType() == "Void") {
-			return make_shared<Call>(callee, method, Void, true, context);
+		auto executionTime = getExecutionTime(startTime, high_resolution_clock::now());
+		if (result) {
+			std::cout << std::endl << termcolor::green << "Execution successful" << termcolor::reset;
 		} else {
-			return make_shared<Call>(caller, method, callee, false, context);
+			std::cout << std::endl << termcolor::red << "Execution failed" << termcolor::reset;
 		}
-	} else throw runtime_error("invalid call: " + ast.dump());
-}
-
-shared_ptr<Call> parseInvocation(const json &ast, const shared_ptr<Context> &context) {
-	if (ast.is_object()) {
-		auto callerAst = ast["caller"];
-		auto argsAst = ast["args"];
-		const shared_ptr<Object> &caller = parseTerm(callerAst, context);
-		vector<shared_ptr<Object>> args;
-		for (auto &argAst : argsAst) {
-			args.push_back(parseTerm(argAst, context));
+		std::cout << " in " << executionTime;
+		if (!fatal) {
+			std::cout << " with ";
+			if (warnings > 0)
+				std::cout << termcolor::yellow << warnings << " warning(s)" << termcolor::reset;
+			else
+				std::cout << "0 warning(s)";
+			std::cout << " and ";
+			if (errors > 0)
+				std::cout << termcolor::red << errors << " error(s)" << termcolor::reset;
+			else
+				std::cout << "0 error(s)";
 		}
-		shared_ptr<Object> arg;
-		if (args.empty()) {
-			arg = Void;
-		} else if (args.size() == 1) {
-			arg = args.front();
-		} else {
-			arg = make_shared<Tuple>(args, context);
-		}
-		return make_shared<Call>(caller, "->", arg, false, context);
-	} else throw runtime_error("invalid invocation: " + ast.dump());
+		std::cout << std::endl << std::endl;
+	}
 }
 
-shared_ptr<Decimal> parseDecimal(const json &ast, const shared_ptr<Context> &context) {
-	auto value = ast.get<double>();
-	return make_shared<Decimal>(value, context);
+string getId(tree::TerminalNode *ast) {
+	return ast->getText().substr(1);
 }
 
-shared_ptr<Integer> parseInteger(const json &ast, const shared_ptr<Context> &context) {
-	auto value = ast.get<int64_t>();
-	return make_shared<Integer>(value, context);
-}
-
-shared_ptr<Bool> parseBool(const json &ast, const shared_ptr<Context> &context) {
-	auto value = ast.get<bool>();
-	return make_shared<Bool>(value, context);
-}
-
-shared_ptr<String> parseString(const json &ast, const shared_ptr<Context> &context) {
-	auto value = ast.get<string>();
-	return make_shared<String>(value, context);
-}
-
-shared_ptr<Variable> parseIdent(const json &ast, const shared_ptr<Context> &context) {
-	auto id = ast.get<string>();
+shared_ptr<Object> parseIdentifier(tree::TerminalNode *ast, const shared_ptr<Context> &context) {
+	auto id = getId(ast);
 	if (auto find = context->find(id)) {
 		return find;
 	} else {
@@ -197,20 +135,241 @@ shared_ptr<Variable> parseIdent(const json &ast, const shared_ptr<Context> &cont
 	}
 }
 
-shared_ptr<Tuple> parseTuple(const json &ast, const shared_ptr<Context> &context) {
-	vector<shared_ptr<Object>> terms;
-	for (auto &termAst : ast) {
-		auto term = parseTerm(termAst, context);
-		terms.push_back(term);
+shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Context> &context) {
+	switch (ast->type) {
+		case PoolParser::NumContext::DEC: {
+			Token *token = ast->DECIMAL_INTEGER_LITERAL()->getSymbol();
+			try {
+				auto value = stoll(token->getText());
+				return make_shared<Integer>(value, context);
+			} catch (const invalid_argument &ex) {
+				PoolX::compile_fatal(ex.what(), token);
+			} catch (const out_of_range &ex) {
+				PoolX::compile_fatal(ex.what(), token);
+			}
+			return nullptr;
+		}
+		case PoolParser::NumContext::HEX: {
+			Token *token = ast->HEX_INTEGER_LITERAL()->getSymbol();
+			try {
+				auto value = stoll(token->getText().substr(2), nullptr, 16);
+				return make_shared<Integer>(value, context);
+			} catch (const invalid_argument &ex) {
+				PoolX::compile_fatal(ex.what(), token);
+			} catch (const out_of_range &ex) {
+				PoolX::compile_fatal(ex.what(), token);
+			}
+			return nullptr;
+		}
+		case PoolParser::NumContext::BIN: {
+			Token *token = ast->BIN_INTEGER_LITERAL()->getSymbol();
+			try {
+				auto value = stoll(token->getText().substr(2), nullptr, 2);
+				return make_shared<Integer>(value, context);
+			} catch (const invalid_argument &ex) {
+				PoolX::compile_fatal(ex.what(), token);
+			} catch (const out_of_range &ex) {
+				PoolX::compile_fatal(ex.what(), token);
+			}
+			return nullptr;
+		}
+		case PoolParser::NumContext::FLT: {
+			Token *token = ast->FLOAT_LITERAL()->getSymbol();
+			try {
+				auto value = stod(token->getText());
+				return make_shared<Decimal>(value, context);
+			} catch (const invalid_argument &ex) {
+				PoolX::compile_fatal(ex.what(), token);
+			} catch (const out_of_range &ex) {
+				PoolX::compile_fatal(ex.what(), token);
+			}
+			return nullptr;
+		}
 	}
-	return make_shared<Tuple>(terms, context);
 }
 
-shared_ptr<Array> parseArray(const json &ast, const shared_ptr<Context> &context) {
-	vector<shared_ptr<Object>> terms;
-	for (auto &termAst : ast) {
-		auto term = parseTerm(termAst, context);
-		terms.push_back(term);
+vector<shared_ptr<Call>> parseStatements(const vector<PoolParser::StatementContext *> &statements, const shared_ptr<Context> &context) {
+	vector<shared_ptr<Call>> result(statements.size());
+	for (auto ast : statements) {
+		result.emplace_back(parseCall(ast->call(), context));
 	}
-	return make_shared<Array>(terms, context);
+	return result;
+}
+
+shared_ptr<Bool> parseBool(PoolParser::BooleanContext *ast, const shared_ptr<Context> &context) {
+	return make_shared<Bool>(ast->value, context);
+}
+
+shared_ptr<String> parseString(PoolParser::StringContext *ast, const shared_ptr<Context> &context) {
+	auto value = ast->STRING_LITERAL()->getText();
+	return make_shared<String>(value.substr(1, value.size() - 1), context);
+}
+
+shared_ptr<Tuple> parseTuple(PoolParser::TupleContext *ast, const shared_ptr<Context> &context) {
+	auto callsAst = ast->call();
+	vector<shared_ptr<Object>> result(callsAst.size());
+	for (auto &call : callsAst) {
+		result.emplace_back(parseCall(call, context));
+	}
+	return make_shared<Tuple>(result, context);
+}
+
+shared_ptr<Array> parseArray(PoolParser::ArrayContext *ast, const shared_ptr<Context> &context) {
+	auto callsAst = ast->call();
+	vector<shared_ptr<Object>> result(callsAst.size());
+	for (auto &call : callsAst) {
+		result.emplace_back(parseCall(call, context));
+	}
+	return make_shared<Array>(result, context);
+}
+
+shared_ptr<Block> parseBlock(PoolParser::BlockContext *ast, const vector<string> &params, const shared_ptr<Context> &parent) {
+	auto context = make_shared<Context>(parent);
+	auto statements = parseStatements(ast->statement(), context);
+	return make_shared<Block>(params, statements, context);
+}
+
+vector<string> parseParams(PoolParser::ParamsContext *ast) {
+	auto idsAst = ast->IDENTIFIER();
+	vector<string> params(idsAst.size());
+	for (auto id : idsAst) {
+		params.emplace_back(getId(id));
+	}
+	return params;
+}
+
+shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<Context> &context) {
+	vector<string> params = parseParams(ast->params());
+	return parseBlock(ast->block(), params, context);
+}
+
+shared_ptr<Object> parseTerm(PoolParser::TermContext *ast, const shared_ptr<Context> &context) {
+	switch (ast->type) {
+		case PoolParser::TermContext::NIL:
+			return Null;
+		case PoolParser::TermContext::NUM:
+			return parseNum(ast->num(), context);
+		case PoolParser::TermContext::BLN:
+			return parseBool(ast->boolean(), context);
+		case PoolParser::TermContext::STR:
+			return parseString(ast->string(), context);
+		case PoolParser::TermContext::FUN:
+			return parseFunction(ast->fun(), context);
+		case PoolParser::TermContext::TPL:
+			return parseTuple(ast->tuple(), context);
+		case PoolParser::TermContext::ARR:
+			return parseArray(ast->array(), context);
+		case PoolParser::TermContext::PAR:
+			return parseCall(ast->par()->call(), context);
+		case PoolParser::TermContext::BLK:
+			return parseBlock(ast->block(), vector<string>(), context);
+		case PoolParser::TermContext::IDT:
+			return parseIdentifier(ast->id()->IDENTIFIER(), context);
+	}
+}
+
+shared_ptr<Object> parseAccess(PoolParser::AccessContext *ast, const shared_ptr<Context> &context) {
+	auto termAst = ast->term();
+	auto caller = parseTerm(termAst, context);
+	auto ids = ast->IDENTIFIER();
+	if (ids.empty()) {
+		return caller;
+	} else {
+		auto first = make_shared<Call>(caller, ".", parseIdentifier(ids[0], context), false, context);
+		const auto &call = accumulate(ids.begin(), ids.end(), first, [context](const shared_ptr<Call> &call, tree::TerminalNode *id) {
+			return make_shared<Call>(call, ".", parseIdentifier(id, context), false, context);
+		});
+		return call;
+	}
+}
+
+vector<shared_ptr<Object>> parseArgs(PoolParser::ArgsContext *ast, const shared_ptr<Context> &context) {
+	auto callsAst = ast->call();
+	vector<shared_ptr<Object>> args(callsAst.size());
+	for (auto call : callsAst) {
+		args.emplace_back(parseCall(call, context));
+	}
+	return args;
+}
+
+shared_ptr<Call> parseInvocation(PoolParser::InvocationContext *ast, const shared_ptr<Context> &context) {
+	auto accessAst = ast->access();
+	auto argsAst = ast->args();
+	const shared_ptr<Object> &caller = parseAccess(accessAst, context);
+	vector<shared_ptr<Object>> args;
+	if (argsAst) {
+		args = parseArgs(argsAst, context);
+	}
+	shared_ptr<Object> arg;
+	if (args.empty()) {
+		arg = Void;
+	} else if (args.size() == 1) {
+		arg = args.front();
+	} else {
+		arg = make_shared<Tuple>(args, context);
+	}
+	return make_shared<Call>(caller, "->", arg, false, context);
+}
+
+shared_ptr<Call> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context) {
+	if (ast) {
+		auto callerAst = ast->caller;
+		auto methodAst = ast->OPERATOR();
+		auto calleeAst = ast->callee;
+		bool prefix = false;
+		shared_ptr<Object> caller, callee;
+		if (callerAst) {
+			caller = parseInvocation(callerAst, context);
+			if (calleeAst) {
+				callee = parseInvocation(calleeAst, context);
+			} else {
+				callee = Void;
+			}
+		} else {
+			caller = parseInvocation(calleeAst, context);
+			callee = Void;
+			prefix = true;
+		}
+		if (methodAst != nullptr) {
+			auto method = methodAst->getText();
+			return make_shared<Call>(caller, method, callee, prefix, context);
+		} else return Call::Identity(caller, context);
+	} else return Call::Empty;
+}
+
+shared_ptr<Block> parsePool(PoolParser::PoolContext *ast, const vector<string> &params, const shared_ptr<Context> &context) {
+	auto statements = parseStatements(ast->statement(), context);
+	return make_shared<Block>(params, statements, context);
+}
+
+
+void PoolX::compile_warning(const std::string &message, antlr4::Token *token) noexcept {
+	if (token) {
+		std::cout << token->getInputStream()->getSourceName() << ":"
+				  << token->getLine() << ":"
+				  << token->getCharPositionInLine() << ": ";
+	}
+	std::cout << termcolor::yellow << "WARNING: " << message << termcolor::reset << std::endl;
+	warnings++;
+}
+
+void PoolX::compile_error(const std::string &message, antlr4::Token *token) noexcept {
+	if (token) {
+		std::cout << token->getInputStream()->getSourceName() << ":"
+				  << token->getLine() << ":"
+				  << token->getCharPositionInLine() << ": ";
+	}
+	std::cout << termcolor::red << "ERROR: " << message << termcolor::reset << std::endl;
+	errors++;
+}
+
+void PoolX::compile_fatal(const std::string &message, antlr4::Token *token) noexcept(false) {
+	std::stringstream string;
+	if (token) {
+		string << token->getInputStream()->getSourceName() << ":"
+			   << token->getLine() << ":"
+			   << token->getCharPositionInLine() << ": ";
+	}
+	string << "FATAL ERROR: " << message << std::endl;
+	throw ::compile_error(string.str());
 }

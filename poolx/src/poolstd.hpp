@@ -314,7 +314,7 @@ namespace pool {
 
 		shared_ptr<Object> invoke() override {
 			if (this->params.empty()) {
-				execute({});
+				//execute({});
 			}
 			return shared_from_this();
 		}
