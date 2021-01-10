@@ -25,9 +25,6 @@ const shared_ptr<Class> pool::VoidClass = make_shared<Class>("Void", ObjectClass
 const shared_ptr<Class> pool::NothingClass = make_shared<Class>("Nothing", ObjectClass);
 const shared_ptr<Object> pool::Void = make_shared<Object>(Context::global, VoidClass);
 const shared_ptr<Object> pool::Null = make_shared<Object>(Context::global, NothingClass);
-const shared_ptr<Tuple> Tuple::Empty = make_shared<Tuple>(vector<shared_ptr<Object>>(), Context::global);
-const shared_ptr<Block> Block::Empty = make_shared<Block>(vector<string>(), vector<shared_ptr<Call>>(), Context::global);
-const shared_ptr<Call> Call::Empty = make_shared<Call>(Block::Empty, "->", Void, false, Context::global);
 
 template<>
 shared_ptr<Variable> Object::as() {
@@ -276,7 +273,7 @@ bool pool::initialize() noexcept try {
 	StringClass->addMethod("+", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		shared_ptr<Object> var = other->as<Object>();
 		if (auto method = var->findMethod("toString")) {
-			auto result = (*method)(var, Tuple::Empty);
+			auto result = (*method)(var, Void);
 			if (result->getType() == "String") {
 				return make_shared<String>(self->as<String>()->value + result->as<String>()->value, self->context);
 			}
@@ -290,13 +287,10 @@ bool pool::initialize() noexcept try {
 		auto moduleName = self->as<String>()->value;
 		try {
 			PoolX::execute(moduleName);
-		} catch (const exception &e) {
-			throw execution_error(e.what());
+		} catch (const compile_error &e) {
+			throw PoolX::compile_fatal("Cannot import module \"" + moduleName + "\": " + e.message());
 		}
 		return Void;
-	});
-	IdentityClass->addMethod("", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
-		return self->as<class Call::Identity>()->result;
 	});
 	VariableClass->addMethod("=", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		self->as<Variable>()->setValue(other->as<Object>());
@@ -315,7 +309,7 @@ bool pool::initialize() noexcept try {
 			for (auto &item : *ctx) {
 				shared_ptr<Object> var = item.second->getValue()->as<Object>();
 				if (auto method = var->findMethod("toString")) {
-					auto result = (*method)(var, Tuple::Empty);
+					auto result = (*method)(var, Void);
 					ss << item.first << ":";
 					if (result->getType() == "String") {
 						ss << result->as<String>()->value;
@@ -337,7 +331,7 @@ bool pool::initialize() noexcept try {
 	IoClass->addMethod("println", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		shared_ptr<Object> var = other->as<Object>();
 		if (auto method = var->findMethod("toString")) {
-			auto result = (*method)(var, Tuple::Empty);
+			auto result = (*method)(var, Void);
 			if (result->getType() == "String") {
 				cout << result->as<String>()->value << endl;
 			}

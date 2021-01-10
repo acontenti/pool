@@ -12,14 +12,9 @@ using namespace pool;
 using namespace chrono;
 namespace fs = filesystem;
 
-class compile_error : public std::runtime_error {
-public:
-	explicit compile_error(const std::string &arg) : std::runtime_error(arg) {}
-};
-
 shared_ptr<Block> parsePool(PoolParser::PoolContext *ast, const vector<string> &params, const shared_ptr<Context> &context);
 
-shared_ptr<Call> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context);
+shared_ptr<Object> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context);
 
 std::string getExecutionTime(high_resolution_clock::time_point startTime, high_resolution_clock::time_point endTime) {
 	auto execution_time_ms = duration_cast<std::chrono::microseconds>(endTime - startTime).count();
@@ -58,9 +53,9 @@ PoolX PoolX::execute(const string &module) {
 			if (ifstream(file).good()) {
 				file = fs::canonical(file);
 				return PoolX(file.string());
-			} else throw runtime_error("File \"" + file.string() + "\" is not readable");
-		} else throw runtime_error("File \"" + file.string() + "\" is not a regular file");
-	} else throw runtime_error("File \"" + file.string() + "\" does not exist");
+			} else throw compile_fatal("File \"" + file.string() + "\" is not readable");
+		} else throw compile_fatal("File \"" + file.string() + "\" is not a regular file");
+	} else throw compile_fatal("File \"" + file.string() + "\" not found");
 }
 
 PoolX::PoolX(const string &file) {
@@ -84,7 +79,8 @@ PoolX::PoolX(const string &file) {
 		if (debug) {
 			cout << tree->toStringTree(parser.get()) << endl;
 		}
-		vector<string> params(arguments.size() + 1);
+		vector<string> params;
+		params.reserve(arguments.size() + 1);
 		for (int i = 0; i < arguments.size() + 1; ++i) {
 			params.emplace_back(to_string(i));
 		}
@@ -92,7 +88,7 @@ PoolX::PoolX(const string &file) {
 		main->execute(args);
 		result = errors == 0;
 	} catch (::compile_error &error) {
-		std::cout << termcolor::red << "FATAL ERROR: " << error.what() << termcolor::reset << std::endl;
+		std::cout << termcolor::red << error.message() << termcolor::reset << std::endl;
 		result = false;
 		fatal = true;
 	}
@@ -143,11 +139,10 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 				auto value = stoll(token->getText());
 				return make_shared<Integer>(value, context);
 			} catch (const invalid_argument &ex) {
-				PoolX::compile_fatal(ex.what(), token);
+				throw PoolX::compile_fatal(ex.what(), token);
 			} catch (const out_of_range &ex) {
-				PoolX::compile_fatal(ex.what(), token);
+				throw PoolX::compile_fatal(ex.what(), token);
 			}
-			return nullptr;
 		}
 		case PoolParser::NumContext::HEX: {
 			Token *token = ast->HEX_INTEGER_LITERAL()->getSymbol();
@@ -155,11 +150,10 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 				auto value = stoll(token->getText().substr(2), nullptr, 16);
 				return make_shared<Integer>(value, context);
 			} catch (const invalid_argument &ex) {
-				PoolX::compile_fatal(ex.what(), token);
+				throw PoolX::compile_fatal(ex.what(), token);
 			} catch (const out_of_range &ex) {
-				PoolX::compile_fatal(ex.what(), token);
+				throw PoolX::compile_fatal(ex.what(), token);
 			}
-			return nullptr;
 		}
 		case PoolParser::NumContext::BIN: {
 			Token *token = ast->BIN_INTEGER_LITERAL()->getSymbol();
@@ -167,11 +161,10 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 				auto value = stoll(token->getText().substr(2), nullptr, 2);
 				return make_shared<Integer>(value, context);
 			} catch (const invalid_argument &ex) {
-				PoolX::compile_fatal(ex.what(), token);
+				throw PoolX::compile_fatal(ex.what(), token);
 			} catch (const out_of_range &ex) {
-				PoolX::compile_fatal(ex.what(), token);
+				throw PoolX::compile_fatal(ex.what(), token);
 			}
-			return nullptr;
 		}
 		case PoolParser::NumContext::FLT: {
 			Token *token = ast->FLOAT_LITERAL()->getSymbol();
@@ -179,19 +172,26 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 				auto value = stod(token->getText());
 				return make_shared<Decimal>(value, context);
 			} catch (const invalid_argument &ex) {
-				PoolX::compile_fatal(ex.what(), token);
+				throw PoolX::compile_fatal(ex.what(), token);
 			} catch (const out_of_range &ex) {
-				PoolX::compile_fatal(ex.what(), token);
+				throw PoolX::compile_fatal(ex.what(), token);
 			}
-			return nullptr;
 		}
+		default:
+			throw execution_error("Invalid execution point");
 	}
 }
 
-vector<shared_ptr<Call>> parseStatements(const vector<PoolParser::StatementContext *> &statements, const shared_ptr<Context> &context) {
-	vector<shared_ptr<Call>> result(statements.size());
+vector<shared_ptr<Callable>> parseStatements(const vector<PoolParser::StatementContext *> &statements, const shared_ptr<Context> &context) {
+	vector<shared_ptr<Callable>> result;
+	result.reserve(statements.size());
 	for (auto ast : statements) {
-		result.emplace_back(parseCall(ast->call(), context));
+		auto statement = parseCall(ast->call(), context);
+		if (auto call = dynamic_pointer_cast<Callable>(statement)) {
+			result.emplace_back(call);
+		} else {
+			result.emplace_back(Identity::create(statement, context));
+		}
 	}
 	return result;
 }
@@ -202,12 +202,13 @@ shared_ptr<Bool> parseBool(PoolParser::BooleanContext *ast, const shared_ptr<Con
 
 shared_ptr<String> parseString(PoolParser::StringContext *ast, const shared_ptr<Context> &context) {
 	auto value = ast->STRING_LITERAL()->getText();
-	return make_shared<String>(value.substr(1, value.size() - 1), context);
+	return make_shared<String>(value.substr(1, value.size() - 2), context);
 }
 
 shared_ptr<Tuple> parseTuple(PoolParser::TupleContext *ast, const shared_ptr<Context> &context) {
 	auto callsAst = ast->call();
-	vector<shared_ptr<Object>> result(callsAst.size());
+	vector<shared_ptr<Object>> result;
+	result.reserve(callsAst.size());
 	for (auto &call : callsAst) {
 		result.emplace_back(parseCall(call, context));
 	}
@@ -216,7 +217,8 @@ shared_ptr<Tuple> parseTuple(PoolParser::TupleContext *ast, const shared_ptr<Con
 
 shared_ptr<Array> parseArray(PoolParser::ArrayContext *ast, const shared_ptr<Context> &context) {
 	auto callsAst = ast->call();
-	vector<shared_ptr<Object>> result(callsAst.size());
+	vector<shared_ptr<Object>> result;
+	result.reserve(callsAst.size());
 	for (auto &call : callsAst) {
 		result.emplace_back(parseCall(call, context));
 	}
@@ -226,12 +228,13 @@ shared_ptr<Array> parseArray(PoolParser::ArrayContext *ast, const shared_ptr<Con
 shared_ptr<Block> parseBlock(PoolParser::BlockContext *ast, const vector<string> &params, const shared_ptr<Context> &parent) {
 	auto context = make_shared<Context>(parent);
 	auto statements = parseStatements(ast->statement(), context);
-	return make_shared<Block>(params, statements, context);
+	return Block::create(params, statements, context);
 }
 
 vector<string> parseParams(PoolParser::ParamsContext *ast) {
 	auto idsAst = ast->IDENTIFIER();
-	vector<string> params(idsAst.size());
+	vector<string> params;
+	params.reserve(idsAst.size());
 	for (auto id : idsAst) {
 		params.emplace_back(getId(id));
 	}
@@ -265,6 +268,8 @@ shared_ptr<Object> parseTerm(PoolParser::TermContext *ast, const shared_ptr<Cont
 			return parseBlock(ast->block(), vector<string>(), context);
 		case PoolParser::TermContext::IDT:
 			return parseIdentifier(ast->id()->IDENTIFIER(), context);
+		default:
+			throw execution_error("Invalid execution point");
 	}
 }
 
@@ -275,31 +280,32 @@ shared_ptr<Object> parseAccess(PoolParser::AccessContext *ast, const shared_ptr<
 	if (ids.empty()) {
 		return caller;
 	} else {
-		auto first = make_shared<Call>(caller, ".", parseIdentifier(ids[0], context), false, context);
-		const auto &call = accumulate(ids.begin(), ids.end(), first, [context](const shared_ptr<Call> &call, tree::TerminalNode *id) {
-			return make_shared<Call>(call, ".", parseIdentifier(id, context), false, context);
-		});
-		return call;
+		auto first = Call::create(caller, ".", parseIdentifier(ids[0], context), false, context);
+		auto op = [context](const shared_ptr<Call> &call, tree::TerminalNode *id) {
+			return Call::create(call, ".", parseIdentifier(id, context), false, context);
+		};
+		return accumulate(ids.begin() + 1, ids.end(), first, op);
 	}
 }
 
 vector<shared_ptr<Object>> parseArgs(PoolParser::ArgsContext *ast, const shared_ptr<Context> &context) {
 	auto callsAst = ast->call();
-	vector<shared_ptr<Object>> args(callsAst.size());
+	vector<shared_ptr<Object>> args;
+	args.reserve(callsAst.size());
 	for (auto call : callsAst) {
 		args.emplace_back(parseCall(call, context));
 	}
 	return args;
 }
 
-shared_ptr<Call> parseInvocation(PoolParser::InvocationContext *ast, const shared_ptr<Context> &context) {
+shared_ptr<Object> parseInvocation(PoolParser::InvocationContext *ast, const shared_ptr<Context> &context) {
 	auto accessAst = ast->access();
 	auto argsAst = ast->args();
 	const shared_ptr<Object> &caller = parseAccess(accessAst, context);
-	vector<shared_ptr<Object>> args;
-	if (argsAst) {
-		args = parseArgs(argsAst, context);
+	if (!argsAst) {
+		return caller;
 	}
+	auto args = parseArgs(argsAst, context);
 	shared_ptr<Object> arg;
 	if (args.empty()) {
 		arg = Void;
@@ -308,10 +314,10 @@ shared_ptr<Call> parseInvocation(PoolParser::InvocationContext *ast, const share
 	} else {
 		arg = make_shared<Tuple>(args, context);
 	}
-	return make_shared<Call>(caller, "->", arg, false, context);
+	return Call::create(caller, "->", arg, false, context);
 }
 
-shared_ptr<Call> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context) {
+shared_ptr<Object> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context) {
 	if (ast) {
 		auto callerAst = ast->caller;
 		auto methodAst = ast->OPERATOR();
@@ -332,14 +338,14 @@ shared_ptr<Call> parseCall(PoolParser::CallContext *ast, const shared_ptr<Contex
 		}
 		if (methodAst != nullptr) {
 			auto method = methodAst->getText();
-			return make_shared<Call>(caller, method, callee, prefix, context);
-		} else return Call::Identity(caller, context);
-	} else return Call::Empty;
+			return Call::create(caller, method, callee, prefix, context);
+		} else return caller;
+	} else return Void;
 }
 
 shared_ptr<Block> parsePool(PoolParser::PoolContext *ast, const vector<string> &params, const shared_ptr<Context> &context) {
 	auto statements = parseStatements(ast->statement(), context);
-	return make_shared<Block>(params, statements, context);
+	return Block::create(params, statements, context);
 }
 
 
@@ -363,7 +369,7 @@ void PoolX::compile_error(const std::string &message, antlr4::Token *token) noex
 	errors++;
 }
 
-void PoolX::compile_fatal(const std::string &message, antlr4::Token *token) noexcept(false) {
+pool::compile_error PoolX::compile_fatal(const std::string &message, antlr4::Token *token) noexcept {
 	std::stringstream string;
 	if (token) {
 		string << token->getInputStream()->getSourceName() << ":"
@@ -371,5 +377,5 @@ void PoolX::compile_fatal(const std::string &message, antlr4::Token *token) noex
 			   << token->getCharPositionInLine() << ": ";
 	}
 	string << "FATAL ERROR: " << message << std::endl;
-	throw ::compile_error(string.str());
+	return pool::compile_error(string.str());
 }

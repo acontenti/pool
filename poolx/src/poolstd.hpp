@@ -174,7 +174,6 @@ namespace pool {
 	class Tuple : public Object {
 	public:
 		vector<shared_ptr<Object>> values;
-		static const shared_ptr<Tuple> Empty;
 
 		explicit Tuple(vector<shared_ptr<Object>> values, const shared_ptr<Context> &context)
 				: Object(context, TupleClass), values(move(values)) {}
@@ -188,31 +187,23 @@ namespace pool {
 				: Object(context, ArrayClass), values(move(values)) {}
 	};
 
-	class Callable {
+	class Callable : public Object {
 	public:
+		Callable(const shared_ptr<Context> &context, const shared_ptr<Class> &cls) : Object(context, cls) {}
+
 		virtual shared_ptr<Object> invoke() = 0;
 	};
 
-	class Call : public Object, public Callable {
-	public:
+	class Call : public Callable {
+	protected:
 		shared_ptr<Object> caller;
 		string method;
 		shared_ptr<Object> callee;
 		bool prefix;
-
-		static const shared_ptr<Call> Empty;
-
-		class Identity : public Object {
-		public:
-			shared_ptr<Object> result;
-
-			Identity(shared_ptr<Object> result, const shared_ptr<Context> &context)
-					: Object(context, IdentityClass), result(move(result)) {
-			}
-		};
+	public:
 
 		Call(shared_ptr<Object> caller, string method, shared_ptr<Object> callee, bool prefix, const shared_ptr<Context> &context)
-				: Object(context, CallClass), caller(move(caller)), method(move(method)), callee(move(callee)),
+				: Callable(context, CallClass), caller(move(caller)), method(move(method)), callee(move(callee)),
 				  prefix(prefix) {}
 
 		shared_ptr<Object> invoke() override {
@@ -229,8 +220,25 @@ namespace pool {
 			} else throw execution_error("method " + method + " not found");
 		}
 
-		static shared_ptr<Call> Identity(const shared_ptr<Object> &result, const shared_ptr<Context> &context) {
-			return make_shared<Call>(make_shared<class Identity>(result, context), "", Void, false, context);
+		static shared_ptr<Call> create(const shared_ptr<Object> &caller, const string &method, const shared_ptr<Object> &callee, const bool &prefix, const shared_ptr<Context> &context) {
+			return make_shared<Call>(caller, method, callee, prefix, context);
+		}
+	};
+
+	class Identity : public Callable {
+		shared_ptr<Object> result;
+	public:
+		Identity(const shared_ptr<Object> &result, const shared_ptr<Context> &context)
+				: Callable(context, IdentityClass), result(result) {}
+
+		shared_ptr<Object> invoke() override {
+			if (auto call = dynamic_pointer_cast<Callable>(result)) {
+				return call->invoke();
+			} else return result;
+		}
+
+		static shared_ptr<Identity> create(const shared_ptr<Object> &caller, const shared_ptr<Context> &context) {
+			return make_shared<Identity>(caller, context);
 		}
 	};
 
@@ -288,14 +296,13 @@ namespace pool {
 		}
 	};
 
-	class Block : public Object, public Callable {
+	class Block : public Callable {
 	public:
 		vector<string> params;
-		vector<shared_ptr<Call>> calls;
-		static const shared_ptr<Block> Empty;
+		vector<shared_ptr<Callable>> calls;
 
-		Block(vector<string> params, vector<shared_ptr<Call>> calls, const shared_ptr<Context> &context)
-				: Object(context, BlockClass), params(move(params)), calls(move(calls)) {
+		Block(vector<string> params, vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
+				: Callable(context, BlockClass), params(move(params)), calls(move(calls)) {
 			for (auto &param : params) {
 				context->add(Variable::create(param, context));
 			}
@@ -314,12 +321,16 @@ namespace pool {
 
 		shared_ptr<Object> invoke() override {
 			if (this->params.empty()) {
-				//execute({});
+				execute({});
 			}
 			return shared_from_this();
 		}
 
 		static vector<shared_ptr<Object>> makeArgs(const shared_ptr<Object> &other, const shared_ptr<Object> &prepend = nullptr);
+
+		static shared_ptr<Block> create(const vector<string> &params, const vector<shared_ptr<Callable>> &calls, const shared_ptr<Context> &context) {
+			return make_shared<Block>(params, calls, context);
+		}
 	};
 
 	extern bool initialize() noexcept;

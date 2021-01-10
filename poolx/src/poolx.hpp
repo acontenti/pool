@@ -14,6 +14,15 @@ namespace pool {
 		const vector<string> &args;
 	};
 
+	class compile_error : public std::runtime_error {
+	public:
+		explicit compile_error(const std::string &message) : std::runtime_error(message) {}
+
+		inline const string message() const noexcept {
+			return runtime_error::what();
+		}
+	};
+
 	class PoolX : PoolParserBaseListener {
 		explicit PoolX(const string &file);
 
@@ -29,6 +38,6 @@ namespace pool {
 
 		static void compile_error(const std::string &message, antlr4::Token *token = nullptr) noexcept;
 
-		static void compile_fatal(const std::string &message, antlr4::Token *token = nullptr) noexcept(false);
+		static pool::compile_error compile_fatal(const std::string &message, antlr4::Token *token = nullptr) noexcept;
 	};
 }
