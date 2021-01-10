@@ -39,7 +39,7 @@ static int warnings = 0;
 void PoolX::setOptions(const Settings &settings) {
 	debug = settings.debug;
 	for (const auto &arg : settings.args) {
-		arguments.push_back(make_shared<String>(arg, Context::global));
+		arguments.push_back(String::create(arg, Context::global));
 	}
 }
 
@@ -73,7 +73,7 @@ PoolX::PoolX(const string &file) {
 	parser->addErrorListener(ErrorListener::INSTANCE());
 	parser->addParseListener(this);
 	try {
-		vector<shared_ptr<Object>> args{make_shared<String>(file, Context::global)};
+		vector<shared_ptr<Object>> args{String::create(file, Context::global)};
 		args.insert(args.end(), arguments.begin(), arguments.end());
 		auto tree = parser->pool();
 		if (debug) {
@@ -137,7 +137,7 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 			Token *token = ast->DECIMAL_INTEGER_LITERAL()->getSymbol();
 			try {
 				auto value = stoll(token->getText());
-				return make_shared<Integer>(value, context);
+				return Integer::create(value, context);
 			} catch (const invalid_argument &ex) {
 				throw PoolX::compile_fatal(ex.what(), token);
 			} catch (const out_of_range &ex) {
@@ -148,7 +148,7 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 			Token *token = ast->HEX_INTEGER_LITERAL()->getSymbol();
 			try {
 				auto value = stoll(token->getText().substr(2), nullptr, 16);
-				return make_shared<Integer>(value, context);
+				return Integer::create(value, context);
 			} catch (const invalid_argument &ex) {
 				throw PoolX::compile_fatal(ex.what(), token);
 			} catch (const out_of_range &ex) {
@@ -159,7 +159,7 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 			Token *token = ast->BIN_INTEGER_LITERAL()->getSymbol();
 			try {
 				auto value = stoll(token->getText().substr(2), nullptr, 2);
-				return make_shared<Integer>(value, context);
+				return Integer::create(value, context);
 			} catch (const invalid_argument &ex) {
 				throw PoolX::compile_fatal(ex.what(), token);
 			} catch (const out_of_range &ex) {
@@ -170,7 +170,7 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 			Token *token = ast->FLOAT_LITERAL()->getSymbol();
 			try {
 				auto value = stod(token->getText());
-				return make_shared<Decimal>(value, context);
+				return Decimal::create(value, context);
 			} catch (const invalid_argument &ex) {
 				throw PoolX::compile_fatal(ex.what(), token);
 			} catch (const out_of_range &ex) {
@@ -197,12 +197,12 @@ vector<shared_ptr<Callable>> parseStatements(const vector<PoolParser::StatementC
 }
 
 shared_ptr<Bool> parseBool(PoolParser::BooleanContext *ast, const shared_ptr<Context> &context) {
-	return make_shared<Bool>(ast->value, context);
+	return Bool::create(ast->value, context);
 }
 
 shared_ptr<String> parseString(PoolParser::StringContext *ast, const shared_ptr<Context> &context) {
 	auto value = ast->STRING_LITERAL()->getText();
-	return make_shared<String>(value.substr(1, value.size() - 2), context);
+	return String::create(value.substr(1, value.size() - 2), context);
 }
 
 shared_ptr<Tuple> parseTuple(PoolParser::TupleContext *ast, const shared_ptr<Context> &context) {
@@ -212,7 +212,7 @@ shared_ptr<Tuple> parseTuple(PoolParser::TupleContext *ast, const shared_ptr<Con
 	for (auto &call : callsAst) {
 		result.emplace_back(parseCall(call, context));
 	}
-	return make_shared<Tuple>(result, context);
+	return Tuple::create(result, context);
 }
 
 shared_ptr<Array> parseArray(PoolParser::ArrayContext *ast, const shared_ptr<Context> &context) {
@@ -222,11 +222,11 @@ shared_ptr<Array> parseArray(PoolParser::ArrayContext *ast, const shared_ptr<Con
 	for (auto &call : callsAst) {
 		result.emplace_back(parseCall(call, context));
 	}
-	return make_shared<Array>(result, context);
+	return Array::create(result, context);
 }
 
 shared_ptr<Block> parseBlock(PoolParser::BlockContext *ast, const vector<string> &params, const shared_ptr<Context> &parent) {
-	auto context = make_shared<Context>(parent);
+	auto context = Context::create(parent);
 	auto statements = parseStatements(ast->statement(), context);
 	return Block::create(params, statements, context);
 }
@@ -312,7 +312,7 @@ shared_ptr<Object> parseInvocation(PoolParser::InvocationContext *ast, const sha
 	} else if (args.size() == 1) {
 		arg = args.front();
 	} else {
-		arg = make_shared<Tuple>(args, context);
+		arg = Tuple::create(args, context);
 	}
 	return Call::create(caller, "->", arg, false, context);
 }

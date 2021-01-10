@@ -9,22 +9,22 @@ long Class::INSTANCES = 0;
 bool pool::debug = false;
 vector<shared_ptr<Object>> pool::arguments{};
 const shared_ptr<Context> Context::global = shared_ptr<Context>(new Context);
-const shared_ptr<Class> pool::ClassClass = make_shared<Class>("Class", nullptr); //ObjectClass is null
-const shared_ptr<Class> pool::ObjectClass = make_shared<Class>("Object", nullptr);
-const shared_ptr<Class> pool::BoolClass = make_shared<Class>("Bool", ObjectClass);
-const shared_ptr<Class> pool::IntegerClass = make_shared<Class>("Integer", ObjectClass);
-const shared_ptr<Class> pool::DecimalClass = make_shared<Class>("Decimal", ObjectClass);
-const shared_ptr<Class> pool::StringClass = make_shared<Class>("String", ObjectClass);
-const shared_ptr<Class> pool::TupleClass = make_shared<Class>("Tuple", ObjectClass);
-const shared_ptr<Class> pool::ArrayClass = make_shared<Class>("Array", ObjectClass);
-const shared_ptr<Class> pool::CallClass = make_shared<Class>("Call", ObjectClass);
-const shared_ptr<Class> pool::IdentityClass = make_shared<Class>("Identity", ObjectClass);
-const shared_ptr<Class> pool::VariableClass = make_shared<Class>("Variable", ObjectClass);
-const shared_ptr<Class> pool::BlockClass = make_shared<Class>("Block", ObjectClass);
-const shared_ptr<Class> pool::VoidClass = make_shared<Class>("Void", ObjectClass);
-const shared_ptr<Class> pool::NothingClass = make_shared<Class>("Nothing", ObjectClass);
-const shared_ptr<Object> pool::Void = make_shared<Object>(Context::global, VoidClass);
-const shared_ptr<Object> pool::Null = make_shared<Object>(Context::global, NothingClass);
+const shared_ptr<Class> pool::ClassClass = Class::create("Class", nullptr); //ObjectClass is null
+const shared_ptr<Class> pool::ObjectClass = Class::create("Object", nullptr);
+const shared_ptr<Class> pool::BoolClass = Class::create("Bool", ObjectClass);
+const shared_ptr<Class> pool::IntegerClass = Class::create("Integer", ObjectClass);
+const shared_ptr<Class> pool::DecimalClass = Class::create("Decimal", ObjectClass);
+const shared_ptr<Class> pool::StringClass = Class::create("String", ObjectClass);
+const shared_ptr<Class> pool::TupleClass = Class::create("Tuple", ObjectClass);
+const shared_ptr<Class> pool::ArrayClass = Class::create("Array", ObjectClass);
+const shared_ptr<Class> pool::CallClass = Class::create("Call", ObjectClass);
+const shared_ptr<Class> pool::IdentityClass = Class::create("Identity", ObjectClass);
+const shared_ptr<Class> pool::VariableClass = Class::create("Variable", ObjectClass);
+const shared_ptr<Class> pool::BlockClass = Class::create("Block", ObjectClass);
+const shared_ptr<Class> pool::VoidClass = Class::create("Void", ObjectClass);
+const shared_ptr<Class> pool::NothingClass = Class::create("Nothing", ObjectClass);
+const shared_ptr<Object> pool::Void = Object::create(VoidClass, Context::global);
+const shared_ptr<Object> pool::Null = Object::create(NothingClass, Context::global);
 
 template<>
 shared_ptr<Variable> Object::as() {
@@ -47,7 +47,7 @@ void Context::associate(const vector<string> &params, const vector<shared_ptr<Ob
 		if (const auto &var = find(name)) {
 			var->setValue(value);
 		} else {
-			add(Variable::create(name, value, shared_from_this()));
+			add(Variable::create(name, value, shared_from_this(), false));
 		}
 	}
 }
@@ -78,7 +78,7 @@ const Object::method_t *Class::getMethod(const string &methodName) const {
 }
 
 Class::Class(string name, shared_ptr<Class> super, const shared_ptr<Context> &context)
-		: Object(make_shared<Context>(context), ClassClass), name(move(name)), super(move(super)) {}
+		: Object(Context::create(context), ClassClass), name(move(name)), super(move(super)) {}
 
 const Object::method_t *Class::findMethod(const string &methodName) const {
 	auto result = Object::findMethod(methodName);
@@ -110,7 +110,7 @@ bool pool::initialize() noexcept try {
 	ClassClass->addMethod("extend", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		if (other->getType() == "Block") {
 			other->as<Block>()->execute({});
-			auto cls = make_shared<Class>("Class" + to_string(Class::INSTANCES++), self->as<Class>(), self->context);
+			auto cls = Class::create("Class" + to_string(Class::INSTANCES++), self->as<Class>(), self->context);
 			for (auto[name, var] : *other->context) {
 				if (var->getType() == "Block") {
 					auto block = var->as<Block>();
@@ -138,7 +138,7 @@ bool pool::initialize() noexcept try {
 	});
 	ClassClass->addMethod("new", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		auto cls = self->as<Class>();
-		auto ptr = make_shared<Object>(make_shared<Context>(self->context), cls);
+		auto ptr = Object::create(cls, Context::create(self->context));
 		auto init = cls->getMethod("init");
 		if (init) {
 			(*init)(ptr, other);
@@ -155,20 +155,20 @@ bool pool::initialize() noexcept try {
 		} else throw execution_error("Invalid value for . call");
 	});
 	ObjectClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) {
-		return make_shared<String>(self->toString(), self->context);
+		return String::create(self->toString(), self->context);
 	});
-	Context::global->add(Variable::create("Object", ObjectClass, Context::global));
+	Context::global->add(Variable::create("Object", ObjectClass, Context::global, true));
 	VoidClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
-		return make_shared<String>("void", self->context);
+		return String::create("void", self->context);
 	});
 	NothingClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
-		return make_shared<String>("null", self->context);
+		return String::create("null", self->context);
 	});
 	BoolClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
-		return make_shared<String>(self->as<Bool>()->value ? "true" : "false", self->context);
+		return String::create(self->as<Bool>()->value ? "true" : "false", self->context);
 	});
 	BoolClass->addMethod("!", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
-		return make_shared<Bool>(!self->as<Bool>()->value, self->context);
+		return Bool::create(!self->as<Bool>()->value, self->context);
 	});
 	Context::global->add(Variable::create("Conditional", Context::global));
 	BoolClass->addMethod("then", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
@@ -180,26 +180,26 @@ bool pool::initialize() noexcept try {
 			auto conditional = self->context->find("Conditional");
 			if (conditional)
 				if (auto newF = conditional->findMethod("new"))
-					return (*newF)(conditional, make_shared<Bool>(condition, self->context));
+					return (*newF)(conditional, Bool::create(condition, self->context));
 			throw execution_error("Method new not found");
 		} else return Null;
 	});
 	IntegerClass->addMethod("+", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		auto value = self->as<Integer>()->value;
 		if (other->getType() == "Integer") {
-			return make_shared<Integer>(value + other->as<Integer>()->value, self->context);
+			return Integer::create(value + other->as<Integer>()->value, self->context);
 		} else if (other->getType() == "Decimal") {
-			return make_shared<Decimal>(value + other->as<Decimal>()->value, self->context);
+			return Decimal::create(value + other->as<Decimal>()->value, self->context);
 		} else if (other->getType() == "String") {
-			return make_shared<String>(to_string(value) + other->as<String>()->value, self->context);
+			return String::create(to_string(value) + other->as<String>()->value, self->context);
 		} else return Null;
 	});
 	IntegerClass->addMethod("-", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		auto value = self->as<Integer>()->value;
 		if (other->getType() == "Integer") {
-			return make_shared<Integer>(value - other->as<Integer>()->value, self->context);
+			return Integer::create(value - other->as<Integer>()->value, self->context);
 		} else if (other->getType() == "Decimal") {
-			return make_shared<Decimal>(value - other->as<Decimal>()->value, self->context);
+			return Decimal::create(value - other->as<Decimal>()->value, self->context);
 		} else return Null;
 	});
 	IntegerClass->addMethod("++", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
@@ -229,24 +229,24 @@ bool pool::initialize() noexcept try {
 		return self;
 	});
 	IntegerClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
-		return make_shared<String>(to_string(self->as<Integer>()->value), self->context);
+		return String::create(to_string(self->as<Integer>()->value), self->context);
 	});
 	DecimalClass->addMethod("+", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		auto value = self->as<Decimal>()->value;
 		if (other->getType() == "Integer") {
-			return make_shared<Decimal>(value + other->as<Integer>()->value, self->context);
+			return Decimal::create(value + other->as<Integer>()->value, self->context);
 		} else if (other->getType() == "Decimal") {
-			return make_shared<Decimal>(value + other->as<Decimal>()->value, self->context);
+			return Decimal::create(value + other->as<Decimal>()->value, self->context);
 		} else if (other->getType() == "String") {
-			return make_shared<String>(to_string(value) + other->as<String>()->value, self->context);
+			return String::create(to_string(value) + other->as<String>()->value, self->context);
 		} else return Null;
 	});
 	DecimalClass->addMethod("-", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		auto value = self->as<Decimal>()->value;
 		if (other->getType() == "Integer") {
-			return make_shared<Decimal>(value - other->as<Integer>()->value, self->context);
+			return Decimal::create(value - other->as<Integer>()->value, self->context);
 		} else if (other->getType() == "Decimal") {
-			return make_shared<Decimal>(value - other->as<Decimal>()->value, self->context);
+			return Decimal::create(value - other->as<Decimal>()->value, self->context);
 		} else return Null;
 	});
 	DecimalClass->addMethod("+=", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
@@ -268,14 +268,14 @@ bool pool::initialize() noexcept try {
 		return self;
 	});
 	DecimalClass->addMethod("toString", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
-		return make_shared<String>(to_string(self->as<Decimal>()->value), self->context);
+		return String::create(to_string(self->as<Decimal>()->value), self->context);
 	});
 	StringClass->addMethod("+", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		shared_ptr<Object> var = other->as<Object>();
 		if (auto method = var->findMethod("toString")) {
 			auto result = (*method)(var, Void);
 			if (result->getType() == "String") {
-				return make_shared<String>(self->as<String>()->value + result->as<String>()->value, self->context);
+				return String::create(self->as<String>()->value + result->as<String>()->value, self->context);
 			}
 		}
 		return Null;
@@ -322,12 +322,12 @@ bool pool::initialize() noexcept try {
 			ss.seekp(-1, stringstream::cur); //remove last comma
 		}
 		ss << "}";
-		return make_shared<String>(ss.str(), ctx);
+		return String::create(ss.str(), ctx);
 	});
 	BlockClass->addMethod("->", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		return self->as<Block>()->execute(Block::makeArgs(other));
 	});
-	auto IoClass = make_shared<Class>("Io", ObjectClass);
+	auto IoClass = Class::create("Io", ObjectClass);
 	IoClass->addMethod("println", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		shared_ptr<Object> var = other->as<Object>();
 		if (auto method = var->findMethod("toString")) {
@@ -338,8 +338,8 @@ bool pool::initialize() noexcept try {
 		}
 		return Void;
 	});
-	const shared_ptr<Object> &Io = make_shared<Object>(Context::global, IoClass);
-	Context::global->add(Variable::create("stdout", Io, Context::global));
+	auto Io = Object::create(IoClass, Context::global);
+	Context::global->add(Variable::create("stdout", Io, Context::global, true));
 	return true;
 } catch (...) {
 	cerr << "Initialization error" << endl;

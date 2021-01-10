@@ -74,6 +74,10 @@ namespace pool {
 		inline auto empty() const {
 			return heap.empty();
 		}
+
+		static shared_ptr<Context> create(const shared_ptr<Context> &parent) {
+			return make_shared<Context>(parent);
+		}
 	};
 
 	class Object : public enable_shared_from_this<Object> {
@@ -111,6 +115,10 @@ namespace pool {
 		virtual bool isVariable() const {
 			return false;
 		}
+
+		static shared_ptr<Object> create(const shared_ptr<Class> &cls, const shared_ptr<Context> &context) {
+			return make_shared<Object>(context, cls);
+		}
 	};
 
 	class Class : public Object {
@@ -122,7 +130,7 @@ namespace pool {
 
 		unordered_map<string, method_t> staticMethodsMap;
 
-		Class(string name, shared_ptr<Class> super, const shared_ptr<Context> &context = Context::global);
+		Class(string name, shared_ptr<Class> super, const shared_ptr<Context> &context);
 
 		const method_t *getMethod(const string &methodName) const;
 
@@ -135,21 +143,31 @@ namespace pool {
 		inline void addStaticMethod(const string &methodName, const method_t &method) {
 			staticMethodsMap[methodName] = method;
 		}
+
+		static shared_ptr<Class> create(const string &name, const shared_ptr<Class> &super, const shared_ptr<Context> &context = Context::global) {
+			return make_shared<Class>(name, super, context);
+		}
 	};
 
 	class Bool : public Object {
 	public:
 		bool value;
 
-		explicit Bool(bool value, const shared_ptr<Context> &context) : Object(context, BoolClass), value(value) {}
+		Bool(bool value, const shared_ptr<Context> &context) : Object(context, BoolClass), value(value) {}
+
+		static shared_ptr<Bool> create(const bool &value, const shared_ptr<Context> &context) {
+			return make_shared<Bool>(value, context);
+		}
 	};
 
 	class Integer : public Object {
 	public:
 		int64_t value;
 
-		explicit Integer(int64_t value, const shared_ptr<Context> &context)
-				: Object(context, IntegerClass), value(value) {
+		Integer(int64_t value, const shared_ptr<Context> &context) : Object(context, IntegerClass), value(value) {}
+
+		static shared_ptr<Integer> create(const int64_t &value, const shared_ptr<Context> &context) {
+			return make_shared<Integer>(value, context);
 		}
 	};
 
@@ -157,8 +175,10 @@ namespace pool {
 	public:
 		double value;
 
-		explicit Decimal(double value, const shared_ptr<Context> &context)
-				: Object(context, DecimalClass), value(value) {
+		Decimal(double value, const shared_ptr<Context> &context) : Object(context, DecimalClass), value(value) {}
+
+		static shared_ptr<Decimal> create(const double &value, const shared_ptr<Context> &context) {
+			return make_shared<Decimal>(value, context);
 		}
 	};
 
@@ -166,8 +186,10 @@ namespace pool {
 	public:
 		string value;
 
-		explicit String(string value, const shared_ptr<Context> &context)
-				: Object(context, StringClass), value(move(value)) {
+		String(string value, const shared_ptr<Context> &context) : Object(context, StringClass), value(move(value)) {}
+
+		static shared_ptr<String> create(const string &value, const shared_ptr<Context> &context) {
+			return make_shared<String>(value, context);
 		}
 	};
 
@@ -175,16 +197,24 @@ namespace pool {
 	public:
 		vector<shared_ptr<Object>> values;
 
-		explicit Tuple(vector<shared_ptr<Object>> values, const shared_ptr<Context> &context)
+		Tuple(vector<shared_ptr<Object>> values, const shared_ptr<Context> &context)
 				: Object(context, TupleClass), values(move(values)) {}
+
+		static shared_ptr<Tuple> create(const vector<shared_ptr<Object>>& values, const shared_ptr<Context> &context) {
+			return make_shared<Tuple>(values, context);
+		}
 	};
 
 	class Array : public Object {
 	public:
 		vector<shared_ptr<Object>> values;
 
-		explicit Array(vector<shared_ptr<Object>> values, const shared_ptr<Context> &context)
+		Array(vector<shared_ptr<Object>> values, const shared_ptr<Context> &context)
 				: Object(context, ArrayClass), values(move(values)) {}
+
+		static shared_ptr<Array> create(const vector<shared_ptr<Object>>& values, const shared_ptr<Context> &context) {
+			return make_shared<Array>(values, context);
+		}
 	};
 
 	class Callable : public Object {
@@ -287,7 +317,7 @@ namespace pool {
 				: Object(context, VariableClass), name(move(name)), value(move(value)), immutable(immutable) {
 		}
 
-		static shared_ptr<Variable> create(const string &name, const shared_ptr<Object> &value, const shared_ptr<Context> &context, bool immutable = false) {
+		static shared_ptr<Variable> create(const string &name, const shared_ptr<Object> &value, const shared_ptr<Context> &context, bool immutable) {
 			return make_shared<Variable>(name, value, context, immutable);
 		}
 
