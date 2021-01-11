@@ -1,0 +1,20 @@
+$Conditional = ($Object extend {
+	$init = ($this, $condition) : {
+		$this.$condition = $condition;
+	};
+	$elif = ($this, $condition) : {
+		$return;
+		(! $this.$condition) then {
+			$return = $condition;
+		};
+		($this.$condition) then {
+        	$return = false;
+        };
+        $return;
+	};
+	$else = ($this, $action) : {
+		(! $this.$condition) then {
+			$action();
+		};
+	};
+});

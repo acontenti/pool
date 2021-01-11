@@ -11,6 +11,12 @@ $z = {
 		$d = 2;
 	};;
 };
+$empty = ():{};
+$stdout println $empty();
+$stdout println ():{}();
+$empty = {};
+$stdout println $empty();
+$stdout println {}();
 $stdout println $fun;
 $stdout println $fun.$b;
 $res = $fun(100, 100);
@@ -51,7 +57,7 @@ $Test = ($Object extend {
 $n = ($Test new "yes");
 $Test.$no("Ok", "good");
 $stdout println $n;
-$n init("wow");
+$n init "wow";
 //$n greet("instance");
 $stdout println $Test.$int;
 $Test greet "static";
@@ -62,12 +68,20 @@ $n print;
 $z.$c ++;
 $stdout println $z.$c;
 $stdout println ($x = (! true));
-$stdout println ({$a = $x;}.$a);
+$stdout println {$a = $x;}.$a;
 $x = 1;
 $b = {
 	$x ++;
 	$a = {$f = $x;};
 };
-$stdout println ($b.$a.$f);
+$stdout println $b.$a.$f;
 import "mod";
-2.2+ 1;
+import "std";
+true then {
+	$stdout println true;
+};
+true then {
+	$stdout println "then";
+}; /*else {
+	$stdout println "else";
+};*/

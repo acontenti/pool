@@ -4,6 +4,7 @@
 #include <memory>
 #include "../gen/PoolParserBaseListener.h"
 #include "../gen/PoolLexer.h"
+#include "util.hpp"
 
 using namespace std;
 using namespace antlr4;
@@ -12,15 +13,6 @@ namespace pool {
 	struct Settings {
 		bool debug;
 		const vector<string> &args;
-	};
-
-	class compile_error : public std::runtime_error {
-	public:
-		explicit compile_error(const std::string &message) : std::runtime_error(message) {}
-
-		inline const string message() const noexcept {
-			return runtime_error::what();
-		}
 	};
 
 	class PoolX : PoolParserBaseListener {
@@ -34,10 +26,10 @@ namespace pool {
 
 		static PoolX execute(const string &filename);
 
-		static void compile_warning(const std::string &message, antlr4::Token *token = nullptr) noexcept;
+		static void compile_error(const string &message, Token *token, ostream &stream) noexcept;
 
-		static void compile_error(const std::string &message, antlr4::Token *token = nullptr) noexcept;
+		static void compile_error(const string &message, Token *token, size_t line, size_t col, ostream &stream) noexcept;
 
-		static pool::compile_error compile_fatal(const std::string &message, antlr4::Token *token = nullptr) noexcept;
+		static ::compile_error compile_fatal(const string &message, Token *token = nullptr) noexcept;
 	};
 }

@@ -21,6 +21,7 @@ const shared_ptr<Class> pool::CallClass = Class::create("Call", ObjectClass);
 const shared_ptr<Class> pool::IdentityClass = Class::create("Identity", ObjectClass);
 const shared_ptr<Class> pool::VariableClass = Class::create("Variable", ObjectClass);
 const shared_ptr<Class> pool::BlockClass = Class::create("Block", ObjectClass);
+const shared_ptr<Class> pool::FunClass = Class::create("Function", ObjectClass);
 const shared_ptr<Class> pool::VoidClass = Class::create("Void", ObjectClass);
 const shared_ptr<Class> pool::NothingClass = Class::create("Nothing", ObjectClass);
 const shared_ptr<Object> pool::Void = Object::create(VoidClass, Context::global);
@@ -92,7 +93,7 @@ const Object::method_t *Class::findMethod(const string &methodName) const {
 	}
 }
 
-vector<shared_ptr<Object>> Block::makeArgs(const shared_ptr<Object> &other, const shared_ptr<Object> &prepend) {
+vector<shared_ptr<Object>> Fun::makeArgs(const shared_ptr<Object> &other, const shared_ptr<Object> &prepend) {
 	vector<shared_ptr<Object>> args;
 	if (prepend)
 		args.push_back(prepend);
@@ -109,19 +110,19 @@ bool pool::initialize() noexcept try {
 	ClassClass->super = ObjectClass;
 	ClassClass->addMethod("extend", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		if (other->getType() == "Block") {
-			other->as<Block>()->execute({});
+			other->as<Block>()->execute();
 			auto cls = Class::create("Class" + to_string(Class::INSTANCES++), self->as<Class>(), self->context);
 			for (auto[name, var] : *other->context) {
-				if (var->getType() == "Block") {
-					auto block = var->as<Block>();
+				if (var->getType() == "Function") {
+					auto block = var->as<Fun>();
 					if (!block->params.empty()) {
 						if (block->params[0] == "this") {
 							cls->addMethod(name, [block](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
-								return block->execute(Block::makeArgs(other, self->as<Object>()));
+								return block->execute(Fun::makeArgs(other, self->as<Object>()));
 							});
 						} else if (block->params[0] == "class") {
 							cls->addStaticMethod(name, [block](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
-								return block->execute(Block::makeArgs(other, self->as<Object>()));
+								return block->execute(Fun::makeArgs(other, self->as<Object>()));
 							});
 						} else {
 							cls->context->add(var);
@@ -175,7 +176,7 @@ bool pool::initialize() noexcept try {
 		if (other->getType() == "Block") {
 			bool condition = self->as<Bool>()->value;
 			if (condition) {
-				other->as<Block>()->execute({});
+				other->as<Block>()->execute();
 			}
 			auto conditional = self->context->find("Conditional");
 			if (conditional)
@@ -288,7 +289,7 @@ bool pool::initialize() noexcept try {
 		try {
 			PoolX::execute(moduleName);
 		} catch (const compile_error &e) {
-			throw PoolX::compile_fatal("Cannot import module \"" + moduleName + "\": " + e.message());
+			throw PoolX::compile_fatal("Cannot import module \"" + moduleName + "\": " + string(e));
 		}
 		return Void;
 	});
@@ -296,7 +297,7 @@ bool pool::initialize() noexcept try {
 		self->as<Variable>()->setValue(other->as<Object>());
 		return self;
 	});
-	VariableClass->addMethod(":=", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+	VariableClass->addMethod("=>", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		self->as<Variable>()->setValue(other->as<Object>());
 		self->as<Variable>()->setImmutable(true);
 		return self;
@@ -325,7 +326,10 @@ bool pool::initialize() noexcept try {
 		return String::create(ss.str(), ctx);
 	});
 	BlockClass->addMethod("->", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
-		return self->as<Block>()->execute(Block::makeArgs(other));
+		return self->as<Block>()->execute();
+	});
+	FunClass->addMethod("->", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
+		return self->as<Fun>()->execute(Fun::makeArgs(other));
 	});
 	auto IoClass = Class::create("Io", ObjectClass);
 	IoClass->addMethod("println", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {

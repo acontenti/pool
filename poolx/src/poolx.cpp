@@ -11,7 +11,7 @@ using namespace pool;
 using namespace chrono;
 namespace fs = filesystem;
 
-shared_ptr<Block> parsePool(PoolParser::PoolContext *ast, const vector<string> &params, const shared_ptr<Context> &context);
+shared_ptr<Fun> parsePool(PoolParser::PoolContext *ast, const vector<string> &params, const shared_ptr<Context> &context);
 
 shared_ptr<Object> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context);
 
@@ -31,9 +31,6 @@ std::string getExecutionTime(high_resolution_clock::time_point startTime, high_r
 		output << execution_time_ms % long(1E+3) << "ms";
 	return output.str();
 }
-
-static int errors = 0;
-static int warnings = 0;
 
 void PoolX::setOptions(const Settings &settings) {
 	debug = settings.debug;
@@ -58,7 +55,7 @@ PoolX PoolX::execute(const string &module) {
 }
 
 PoolX::PoolX(const string &file) {
-	bool result, fatal = false;
+	bool result;
 	auto startTime = high_resolution_clock::now();
 	ifstream is(file);
 	auto inputStream = make_unique<ANTLRInputStream>(is);
@@ -85,11 +82,10 @@ PoolX::PoolX(const string &file) {
 		}
 		auto main = parsePool(tree, params, Context::global);
 		main->execute(args);
-		result = errors == 0;
+		result = true;
 	} catch (::compile_error &error) {
-		std::cout << termcolor::red << error.message() << termcolor::reset << std::endl;
+		std::cout << termcolor::red << error << termcolor::reset << std::endl;
 		result = false;
-		fatal = true;
 	}
 	if (debug) {
 		auto executionTime = getExecutionTime(startTime, high_resolution_clock::now());
@@ -99,18 +95,6 @@ PoolX::PoolX(const string &file) {
 			std::cout << std::endl << termcolor::red << "Execution failed" << termcolor::reset;
 		}
 		std::cout << " in " << executionTime;
-		if (!fatal) {
-			std::cout << " with ";
-			if (warnings > 0)
-				std::cout << termcolor::yellow << warnings << " warning(s)" << termcolor::reset;
-			else
-				std::cout << "0 warning(s)";
-			std::cout << " and ";
-			if (errors > 0)
-				std::cout << termcolor::red << errors << " error(s)" << termcolor::reset;
-			else
-				std::cout << "0 error(s)";
-		}
 		std::cout << std::endl << std::endl;
 	}
 }
@@ -224,10 +208,10 @@ shared_ptr<Array> parseArray(PoolParser::ArrayContext *ast, const shared_ptr<Con
 	return Array::create(result, context);
 }
 
-shared_ptr<Block> parseBlock(PoolParser::BlockContext *ast, const vector<string> &params, const shared_ptr<Context> &parent) {
+shared_ptr<Block> parseBlock(PoolParser::BlockContext *ast, const shared_ptr<Context> &parent) {
 	auto context = Context::create(parent);
 	auto statements = parseStatements(ast->statement(), context);
-	return Block::create(params, statements, context);
+	return Block::create(statements, context);
 }
 
 vector<string> parseParams(PoolParser::ParamsContext *ast) {
@@ -240,9 +224,10 @@ vector<string> parseParams(PoolParser::ParamsContext *ast) {
 	return params;
 }
 
-shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<Context> &context) {
+shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<Context> &parent) {
 	vector<string> params = parseParams(ast->params());
-	return parseBlock(ast->block(), params, context);
+	auto block = parseBlock(ast->block(), parent);
+	return Fun::create(params, block->calls, block->context);
 }
 
 shared_ptr<Object> parseTerm(PoolParser::TermContext *ast, const shared_ptr<Context> &context) {
@@ -264,7 +249,7 @@ shared_ptr<Object> parseTerm(PoolParser::TermContext *ast, const shared_ptr<Cont
 		case PoolParser::TermContext::PAR:
 			return parseCall(ast->par()->call(), context);
 		case PoolParser::TermContext::BLK:
-			return parseBlock(ast->block(), vector<string>(), context);
+			return parseBlock(ast->block(), context);
 		case PoolParser::TermContext::IDT:
 			return parseIdentifier(ast->id()->IDENTIFIER(), context);
 		default:
@@ -342,39 +327,41 @@ shared_ptr<Object> parseCall(PoolParser::CallContext *ast, const shared_ptr<Cont
 	} else return Void;
 }
 
-shared_ptr<Block> parsePool(PoolParser::PoolContext *ast, const vector<string> &params, const shared_ptr<Context> &context) {
+shared_ptr<Fun> parsePool(PoolParser::PoolContext *ast, const vector<string> &params, const shared_ptr<Context> &context) {
 	auto statements = parseStatements(ast->statement(), context);
-	return Block::create(params, statements, context);
+	return Fun::create(params, statements, context);
 }
 
-
-void PoolX::compile_warning(const std::string &message, antlr4::Token *token) noexcept {
+unsigned long getNextLineToken(Token *token, Token *original = nullptr) {
+	if (!original)
+		original = token;
 	if (token) {
-		std::cout << token->getInputStream()->getSourceName() << ":"
-				  << token->getLine() << ":"
-				  << token->getCharPositionInLine() << ": ";
-	}
-	std::cout << termcolor::yellow << "WARNING: " << message << termcolor::reset << std::endl;
-	warnings++;
+		if (token->getLine() > original->getLine()) {
+			return token->getStartIndex() - token->getCharPositionInLine() - 1;
+		} else return getNextLineToken(token->getTokenSource()->nextToken().get(), original);
+	} else return original->getStopIndex();
 }
 
-void PoolX::compile_error(const std::string &message, antlr4::Token *token) noexcept {
-	if (token) {
-		std::cout << token->getInputStream()->getSourceName() << ":"
-				  << token->getLine() << ":"
-				  << token->getCharPositionInLine() << ": ";
-	}
-	std::cout << termcolor::red << "ERROR: " << message << termcolor::reset << std::endl;
-	errors++;
+void PoolX::compile_error(const std::string &message, Token *token, ostream &stream) noexcept {
+	return compile_error(message, token, token->getLine(), token->getCharPositionInLine(), stream);
 }
 
-pool::compile_error PoolX::compile_fatal(const std::string &message, antlr4::Token *token) noexcept {
-	std::stringstream string;
+void PoolX::compile_error(const string &message, Token *token, size_t line, size_t col, ostream &stream) noexcept {
 	if (token) {
-		string << token->getInputStream()->getSourceName() << ":"
-			   << token->getLine() << ":"
-			   << token->getCharPositionInLine() << ": ";
+		stream << token->getInputStream()->getSourceName() << ":" << line << ":" << col + 1 << ": ";
 	}
-	string << "FATAL ERROR: " << message << std::endl;
-	return pool::compile_error(string.str());
+	stream << termcolor::red << termcolor::bold << "ERROR: " << termcolor::reset << message << std::endl;
+	if (token) {
+		misc::Interval interval(token->getStartIndex() - token->getCharPositionInLine(), getNextLineToken(token));
+		auto code = token->getInputStream()->getText(interval);
+		code = rtrim(code.substr(0, code.find_first_of('\n')));
+		stream << "  " << termcolor::red << code << termcolor::reset << endl;
+		stream << "  " << string(token->getCharPositionInLine(), '~') << '^' << endl;
+	}
+}
+
+::compile_error PoolX::compile_fatal(const std::string &message, antlr4::Token *token) noexcept {
+	std::stringstream stream;
+	compile_error(message, token, stream);
+	return ::compile_error(stream.str());
 }

@@ -33,6 +33,7 @@ namespace pool {
 	extern const shared_ptr<Class> IdentityClass;
 	extern const shared_ptr<Class> VariableClass;
 	extern const shared_ptr<Class> BlockClass;
+	extern const shared_ptr<Class> FunClass;
 	extern const shared_ptr<Class> VoidClass;
 	extern const shared_ptr<Class> NothingClass;
 	extern const shared_ptr<Object> Void;
@@ -200,7 +201,7 @@ namespace pool {
 		Tuple(vector<shared_ptr<Object>> values, const shared_ptr<Context> &context)
 				: Object(context, TupleClass), values(move(values)) {}
 
-		static shared_ptr<Tuple> create(const vector<shared_ptr<Object>>& values, const shared_ptr<Context> &context) {
+		static shared_ptr<Tuple> create(const vector<shared_ptr<Object>> &values, const shared_ptr<Context> &context) {
 			return make_shared<Tuple>(values, context);
 		}
 	};
@@ -212,7 +213,7 @@ namespace pool {
 		Array(vector<shared_ptr<Object>> values, const shared_ptr<Context> &context)
 				: Object(context, ArrayClass), values(move(values)) {}
 
-		static shared_ptr<Array> create(const vector<shared_ptr<Object>>& values, const shared_ptr<Context> &context) {
+		static shared_ptr<Array> create(const vector<shared_ptr<Object>> &values, const shared_ptr<Context> &context) {
 			return make_shared<Array>(values, context);
 		}
 	};
@@ -326,13 +327,13 @@ namespace pool {
 		}
 	};
 
-	class Block : public Callable {
+	class Fun : public Object {
 	public:
 		vector<string> params;
 		vector<shared_ptr<Callable>> calls;
 
-		Block(vector<string> params, vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
-				: Callable(context, BlockClass), params(move(params)), calls(move(calls)) {
+		Fun(vector<string> params, vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
+				: Object(context, FunClass), params(move(params)), calls(move(calls)) {
 			for (auto &param : params) {
 				context->add(Variable::create(param, context));
 			}
@@ -349,17 +350,29 @@ namespace pool {
 			return returnValue;
 		}
 
-		shared_ptr<Object> invoke() override {
-			if (this->params.empty()) {
-				execute({});
+		static vector<shared_ptr<Object>> makeArgs(const shared_ptr<Object> &other, const shared_ptr<Object> &prepend = nullptr);
+
+		static shared_ptr<Fun> create(const vector<string> &params, const vector<shared_ptr<Callable>> &calls, const shared_ptr<Context> &context) {
+			return make_shared<Fun>(params, calls, context);
+		}
+	};
+
+	class Block : public Object {
+	public:
+		vector<shared_ptr<Callable>> calls;
+
+		Block(vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
+				: Object(context, BlockClass), calls(move(calls)) {}
+
+		shared_ptr<Object> execute() {
+			for (auto &call: calls) {
+				call->invoke();
 			}
 			return shared_from_this();
 		}
 
-		static vector<shared_ptr<Object>> makeArgs(const shared_ptr<Object> &other, const shared_ptr<Object> &prepend = nullptr);
-
-		static shared_ptr<Block> create(const vector<string> &params, const vector<shared_ptr<Callable>> &calls, const shared_ptr<Context> &context) {
-			return make_shared<Block>(params, calls, context);
+		static shared_ptr<Block> create(const vector<shared_ptr<Callable>> &calls, const shared_ptr<Context> &context) {
+			return make_shared<Block>(calls, context);
 		}
 	};
 

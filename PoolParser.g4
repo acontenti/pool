@@ -51,6 +51,6 @@ num returns [enum Type {DEC,HEX,BIN,FLT} type]:
 
 string: STRING_LITERAL;
 
-boolean returns [bool value]: (TRUE {$value = false;} | FALSE {$value = true;});
+boolean returns [bool value]: (TRUE {$value = true;} | FALSE {$value = false;});
 
 null: NULL_;

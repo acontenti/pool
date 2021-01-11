@@ -1533,14 +1533,14 @@ PoolParser::BooleanContext* PoolParser::boolean() {
       case PoolParser::TRUE: {
         setState(199);
         match(PoolParser::TRUE);
-        dynamic_cast<BooleanContext *>(_localctx)->value =  false;
+        dynamic_cast<BooleanContext *>(_localctx)->value =  true;
         break;
       }
 
       case PoolParser::FALSE: {
         setState(201);
         match(PoolParser::FALSE);
-        dynamic_cast<BooleanContext *>(_localctx)->value =  true;
+        dynamic_cast<BooleanContext *>(_localctx)->value =  false;
         break;
       }
 

@@ -7,7 +7,7 @@ using namespace antlr4;
 
 class ErrorListener : public BaseErrorListener {
 	void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine, const std::string &msg, std::exception_ptr e) override {
-		pool::PoolX::compile_error(msg, offendingSymbol);
+		pool::PoolX::compile_error(msg, offendingSymbol, line, charPositionInLine, cout);
 	}
 
 public:
