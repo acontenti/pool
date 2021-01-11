@@ -1,4 +1,3 @@
-#include <poolparser.h>
 #include <iostream>
 #include <filesystem>
 #include <chrono>

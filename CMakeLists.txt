@@ -26,22 +26,16 @@ find_package(ANTLR REQUIRED)
 antlr_target(PoolLexer PoolLexer.g4 LEXER OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/gen)
 antlr_target(PoolParser PoolParser.g4 PARSER OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/gen LISTENER DEPENDS_ANTLR PoolLexer)
 
-# CONFIGURE RUST
-enable_language(Rust)
-include(CMakeCargo)
-
-add_subdirectory(poolparser)
-
-include_directories(include)
+# POOLX
 include_directories(${ANTLR_PoolLexer_OUTPUT_DIR} ${ANTLR_PoolParser_OUTPUT_DIR} ${ANTLR4_INCLUDE_DIRS})
 add_compile_definitions(POOL_VERSION="${PROJECT_VERSION}")
 file(GLOB_RECURSE POOLX_SRC poolx/src/*.cpp)
 add_executable(poolx ${POOLX_SRC} ${ANTLR_PoolLexer_CXX_OUTPUTS} ${ANTLR_PoolParser_CXX_OUTPUTS})
 set_property(TARGET poolx PROPERTY CXX_STANDARD 17)
 if (WIN32)
-	target_link_libraries(poolx poolparser ws2_32 userenv)
+	target_link_libraries(poolx ws2_32 userenv)
 else ()
-	target_link_libraries(poolx poolparser dl pthread stdc++fs)
+	target_link_libraries(poolx dl pthread stdc++fs)
 endif ()
 target_link_libraries(poolx ${ANTLR4_LIB})
 
