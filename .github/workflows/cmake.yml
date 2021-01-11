@@ -11,12 +11,18 @@ jobs:
         os: [ macos-latest, windows-latest, ubuntu-latest ]
         include:
           - os: macos-latest
-            cmake_extra: -DCMAKE_C_COMPILER=/usr/local/bin/gcc-9 -DCMAKE_CXX_COMPILER=/usr/local/bin/g++-9
+            cc: /usr/local/bin/gcc-9
+            cxx: /usr/local/bin/g++-9
           - os: ubuntu-latest
-            cmake_extra: -DCMAKE_C_COMPILER=gcc-9 -DCMAKE_CXX_COMPILER=g++-9
+            cc: gcc-9
+            cxx: g++-9
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+
+      - name: Ubuntu dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install uuid-dev
 
       - name: Create build environment
         run: cmake -E make_directory ${{runner.workspace}}/build
@@ -24,22 +30,34 @@ jobs:
       - name: Configure CMake
         shell: bash
         working-directory: ${{runner.workspace}}/build
-        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE ${{matrix.cmake_extra}}
+        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        env:
+          CC: ${{matrix.cc}}
+          CXX:  ${{matrix.cxx}}
 
       - name: Build
         working-directory: ${{runner.workspace}}/build
         shell: bash
         run: cmake --build . --config $BUILD_TYPE
+        env:
+          CC: ${{matrix.cc}}
+          CXX: ${{matrix.cxx}}
 
       - name: Dist
         working-directory: ${{runner.workspace}}/build
         shell: bash
         run: cmake --build . --target install --config $BUILD_TYPE
+        env:
+          CC: ${{matrix.cc}}
+          CXX: ${{matrix.cxx}}
 
       - name: Test
         working-directory: ${{runner.workspace}}/build
         shell: bash
         run: ctest -C Release
+        env:
+          CC: ${{matrix.cc}}
+          CXX: ${{matrix.cxx}}
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v2

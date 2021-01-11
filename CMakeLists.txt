@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(pool VERSION 0.1.0 LANGUAGES CXX)
 
 # ANTLR4 RUNTIME
+add_compile_definitions(_HAS_STD_BYTE=0)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 if (ANTLR4_BASE_DIR)
 	# ANTLR4 runtime as external project - define:

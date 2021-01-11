@@ -332,7 +332,7 @@ shared_ptr<Fun> parsePool(PoolParser::PoolContext *ast, const vector<string> &pa
 	return Fun::create(params, statements, context);
 }
 
-unsigned long getNextLineToken(Token *token, Token *original = nullptr) {
+size_t getNextLineToken(Token *token, Token *original = nullptr) {
 	if (!original)
 		original = token;
 	if (token) {
