@@ -3,8 +3,8 @@
 #include <chrono>
 #include <numeric>
 #include "poolstd.hpp"
-#include "poolx.hpp"
-#include "../../lib/termcolor.hpp"
+#include "pool.hpp"
+#include "../lib/termcolor.hpp"
 #include "ErrorListener.hpp"
 
 using namespace pool;
@@ -32,14 +32,14 @@ std::string getExecutionTime(high_resolution_clock::time_point startTime, high_r
 	return output.str();
 }
 
-void PoolX::setOptions(const Settings &settings) {
+void Pool::setOptions(const Settings &settings) {
 	debug = settings.debug;
 	for (const auto &arg : settings.args) {
 		arguments.push_back(String::create(arg, Context::global));
 	}
 }
 
-PoolX PoolX::execute(const string &module) {
+Pool Pool::execute(const string &module) {
 	string filename = module;
 	if (!endsWith(filename, EXT))
 		filename += EXT;
@@ -48,13 +48,13 @@ PoolX PoolX::execute(const string &module) {
 		if (fs::is_regular_file(file)) {
 			if (ifstream(file).good()) {
 				file = fs::canonical(file);
-				return PoolX(file.string());
+				return Pool(file.string());
 			} else throw compile_fatal("File \"" + file.string() + "\" is not readable");
 		} else throw compile_fatal("File \"" + file.string() + "\" is not a regular file");
 	} else throw compile_fatal("File \"" + file.string() + "\" not found");
 }
 
-PoolX::PoolX(const string &file) {
+Pool::Pool(const string &file) {
 	bool result;
 	auto startTime = high_resolution_clock::now();
 	ifstream is(file);
@@ -122,9 +122,9 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 				auto value = stoll(token->getText());
 				return Integer::create(value, context);
 			} catch (const invalid_argument &ex) {
-				throw PoolX::compile_fatal(ex.what(), token);
+				throw Pool::compile_fatal(ex.what(), token);
 			} catch (const out_of_range &ex) {
-				throw PoolX::compile_fatal(ex.what(), token);
+				throw Pool::compile_fatal(ex.what(), token);
 			}
 		}
 		case PoolParser::NumContext::HEX: {
@@ -133,9 +133,9 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 				auto value = stoll(token->getText().substr(2), nullptr, 16);
 				return Integer::create(value, context);
 			} catch (const invalid_argument &ex) {
-				throw PoolX::compile_fatal(ex.what(), token);
+				throw Pool::compile_fatal(ex.what(), token);
 			} catch (const out_of_range &ex) {
-				throw PoolX::compile_fatal(ex.what(), token);
+				throw Pool::compile_fatal(ex.what(), token);
 			}
 		}
 		case PoolParser::NumContext::BIN: {
@@ -144,9 +144,9 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 				auto value = stoll(token->getText().substr(2), nullptr, 2);
 				return Integer::create(value, context);
 			} catch (const invalid_argument &ex) {
-				throw PoolX::compile_fatal(ex.what(), token);
+				throw Pool::compile_fatal(ex.what(), token);
 			} catch (const out_of_range &ex) {
-				throw PoolX::compile_fatal(ex.what(), token);
+				throw Pool::compile_fatal(ex.what(), token);
 			}
 		}
 		case PoolParser::NumContext::FLT: {
@@ -155,9 +155,9 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 				auto value = stod(token->getText());
 				return Decimal::create(value, context);
 			} catch (const invalid_argument &ex) {
-				throw PoolX::compile_fatal(ex.what(), token);
+				throw Pool::compile_fatal(ex.what(), token);
 			} catch (const out_of_range &ex) {
-				throw PoolX::compile_fatal(ex.what(), token);
+				throw Pool::compile_fatal(ex.what(), token);
 			}
 		}
 		default:
@@ -342,11 +342,11 @@ size_t getNextLineToken(Token *token, Token *original = nullptr) {
 	} else return original->getStopIndex();
 }
 
-void PoolX::compile_error(const std::string &message, Token *token, ostream &stream) noexcept {
+void Pool::compile_error(const std::string &message, Token *token, ostream &stream) noexcept {
 	return compile_error(message, token, token->getLine(), token->getCharPositionInLine(), stream);
 }
 
-void PoolX::compile_error(const string &message, Token *token, size_t line, size_t col, ostream &stream) noexcept {
+void Pool::compile_error(const string &message, Token *token, size_t line, size_t col, ostream &stream) noexcept {
 	if (token) {
 		stream << token->getInputStream()->getSourceName() << ":" << line << ":" << col + 1 << ": ";
 	}
@@ -360,7 +360,7 @@ void PoolX::compile_error(const string &message, Token *token, size_t line, size
 	}
 }
 
-::compile_error PoolX::compile_fatal(const std::string &message, antlr4::Token *token) noexcept {
+::compile_error Pool::compile_fatal(const std::string &message, antlr4::Token *token) noexcept {
 	std::stringstream stream;
 	compile_error(message, token, stream);
 	return ::compile_error(stream.str());

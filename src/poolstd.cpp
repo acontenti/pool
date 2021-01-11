@@ -1,6 +1,6 @@
 #include <iostream>
 #include "poolstd.hpp"
-#include "poolx.hpp"
+#include "pool.hpp"
 
 using namespace pool;
 
@@ -287,9 +287,9 @@ bool pool::initialize() noexcept try {
 	StringClass->addMethod("import", [](const shared_ptr<Object> &self, const shared_ptr<Object> &other) -> shared_ptr<Object> {
 		auto moduleName = self->as<String>()->value;
 		try {
-			PoolX::execute(moduleName);
+			Pool::execute(moduleName);
 		} catch (const compile_error &e) {
-			throw PoolX::compile_fatal("Cannot import module \"" + moduleName + "\": " + string(e));
+			throw Pool::compile_fatal("Cannot import module \"" + moduleName + "\": " + string(e));
 		}
 		return Void;
 	});

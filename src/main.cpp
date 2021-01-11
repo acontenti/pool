@@ -1,5 +1,5 @@
 #include <iostream>
-#include "poolx.hpp"
+#include "pool.hpp"
 #include "../lib/argagg.hpp"
 
 using namespace pool;
@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
 		argagg::parser_results result = argparser.parse(argc, argv);
 		bool debug = result["debug"];
 		if (debug || result.pos.empty()) {
-			cout << "poolx " << pool::PoolX::VERSION << endl;
+			cout << "pool " << pool::Pool::VERSION << endl;
 		}
 		if (!result.pos.empty()) {
 			vector<string> args;
@@ -21,8 +21,8 @@ int main(int argc, char **argv) {
 			for (int i = 1; i < result.pos.size(); ++i) {
 				args.emplace_back(result.pos[i]);
 			}
-			PoolX::setOptions({debug, args});
-			PoolX::execute(filename);
+			Pool::setOptions({debug, args});
+			Pool::execute(filename);
 		}
 		return EXIT_SUCCESS;
 	} catch (const exception &e) {

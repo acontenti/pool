@@ -2,8 +2,8 @@
 
 #include <vector>
 #include <memory>
-#include "../gen/PoolParserBaseListener.h"
-#include "../gen/PoolLexer.h"
+#include "PoolParserBaseListener.h"
+#include "PoolLexer.h"
 #include "util.hpp"
 
 using namespace std;
@@ -15,8 +15,8 @@ namespace pool {
 		const vector<string> &args;
 	};
 
-	class PoolX : PoolParserBaseListener {
-		explicit PoolX(const string &file);
+	class Pool : PoolParserBaseListener {
+		explicit Pool(const string &file);
 
 	public:
 		constexpr static const string_view VERSION = POOL_VERSION;
@@ -24,7 +24,7 @@ namespace pool {
 
 		static void setOptions(const Settings &settings);
 
-		static PoolX execute(const string &filename);
+		static Pool execute(const string &filename);
 
 		static void compile_error(const string &message, Token *token, ostream &stream) noexcept;
 
