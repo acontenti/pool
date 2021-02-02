@@ -4,6 +4,7 @@ env:
   BUILD_TYPE: Release
 jobs:
   build:
+    name: Build
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -33,7 +34,7 @@ jobs:
         run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
         env:
           CC: ${{matrix.cc}}
-          CXX:  ${{matrix.cxx}}
+          CXX: ${{matrix.cxx}}
 
       - name: Build
         working-directory: ${{runner.workspace}}/build
@@ -65,10 +66,40 @@ jobs:
           name: dist-${{ matrix.os }}
           path: ${{github.workspace}}/dist/*
           if-no-files-found: error
-  release:
+
+  create-release:
     name: Create Release
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [ build ]
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Get ref
+        id: get_ref
+        run: |
+          if [[ $GITHUB_REF =~ refs\/tags\/* ]] ;
+            then
+            echo ::set-output name=ref::${GITHUB_REF/refs\/tags\//}
+          else
+            echo ::set-output name=ref::${GITHUB_SHA::8}
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_ref.outputs.ref }}
+          release_name: Release ${{ steps.get_ref.outputs.ref }}
+          draft: true
+          prerelease: true
+
+  upload-release-artifacts:
+    name: Upload release artifacts
+    runs-on: ubuntu-latest
+    needs: [ create-release ]
     strategy:
       matrix:
         os: [ macos-latest, windows-latest, ubuntu-latest ]
@@ -78,20 +109,21 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: dist-${{ matrix.os }}
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+          path: ${{github.workspace}}
+
+      - name: Create zip archive
+        id: create_zip
+        uses: TheDoctor0/zip-release@0.4.1
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: true
-          prerelease: false
+          filename: dist-${{ matrix.os }}.zip
+
       - name: Upload Release Asset
-        uses: skx/github-action-publish-binaries@master
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          releaseId: ${{ steps.create_release.outputs.id }}
-          args: dist*/
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dist-${{ matrix.os }}.zip
+          asset_name: dist-${{ matrix.os }}.zip
+          asset_content_type: application/zip
