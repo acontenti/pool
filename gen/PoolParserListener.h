@@ -14,8 +14,8 @@
 class  PoolParserListener : public antlr4::tree::ParseTreeListener {
 public:
 
-  virtual void enterPool(PoolParser::PoolContext *ctx) = 0;
-  virtual void exitPool(PoolParser::PoolContext *ctx) = 0;
+  virtual void enterProgram(PoolParser::ProgramContext *ctx) = 0;
+  virtual void exitProgram(PoolParser::ProgramContext *ctx) = 0;
 
   virtual void enterStatement(PoolParser::StatementContext *ctx) = 0;
   virtual void exitStatement(PoolParser::StatementContext *ctx) = 0;
@@ -23,11 +23,8 @@ public:
   virtual void enterCall(PoolParser::CallContext *ctx) = 0;
   virtual void exitCall(PoolParser::CallContext *ctx) = 0;
 
-  virtual void enterInvocation(PoolParser::InvocationContext *ctx) = 0;
-  virtual void exitInvocation(PoolParser::InvocationContext *ctx) = 0;
-
-  virtual void enterAccess(PoolParser::AccessContext *ctx) = 0;
-  virtual void exitAccess(PoolParser::AccessContext *ctx) = 0;
+  virtual void enterArgs(PoolParser::ArgsContext *ctx) = 0;
+  virtual void exitArgs(PoolParser::ArgsContext *ctx) = 0;
 
   virtual void enterTerm(PoolParser::TermContext *ctx) = 0;
   virtual void exitTerm(PoolParser::TermContext *ctx) = 0;
@@ -38,20 +35,11 @@ public:
   virtual void enterBlock(PoolParser::BlockContext *ctx) = 0;
   virtual void exitBlock(PoolParser::BlockContext *ctx) = 0;
 
-  virtual void enterTuple(PoolParser::TupleContext *ctx) = 0;
-  virtual void exitTuple(PoolParser::TupleContext *ctx) = 0;
-
   virtual void enterArray(PoolParser::ArrayContext *ctx) = 0;
   virtual void exitArray(PoolParser::ArrayContext *ctx) = 0;
 
   virtual void enterFun(PoolParser::FunContext *ctx) = 0;
   virtual void exitFun(PoolParser::FunContext *ctx) = 0;
-
-  virtual void enterParams(PoolParser::ParamsContext *ctx) = 0;
-  virtual void exitParams(PoolParser::ParamsContext *ctx) = 0;
-
-  virtual void enterArgs(PoolParser::ArgsContext *ctx) = 0;
-  virtual void exitArgs(PoolParser::ArgsContext *ctx) = 0;
 
   virtual void enterId(PoolParser::IdContext *ctx) = 0;
   virtual void exitId(PoolParser::IdContext *ctx) = 0;

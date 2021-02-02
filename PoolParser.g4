@@ -5,23 +5,27 @@ options {
 	tokenVocab=PoolLexer;
 }
 
-pool: statement*;
+program: statement* EOF;
 
 statement: call? SEMI;
 
-call: (caller=invocation? op=OPERATOR callee=invocation) | (caller=invocation op=OPERATOR callee=invocation?)| (caller=invocation (op=OPERATOR callee=invocation)?);
+call returns [enum Type {T,TA,TI,TIA,TO,TOC,TOA} type]:
+	callee=call DOT IDENTIFIER args {$type=CallContext::TIA;} |
+	callee=call DOT IDENTIFIER {$type=CallContext::TI;} |
+    <assoc=right> callee=call args {$type=CallContext::TA;} |
+	<assoc=right> callee=call OPERATOR args {$type=CallContext::TOA;} |
+	<assoc=right> callee=call OPERATOR arg=call {$type=CallContext::TOC;} |
+	<assoc=right> callee=call OPERATOR {$type=CallContext::TO;} |
+	term {$type=CallContext::T;};
 
-invocation: access args?;
+args: LP call? (COMMA call)* RP;
 
-access: term (DOT IDENTIFIER)*;
-
-term returns [enum Type {NIL,NUM,BLN,STR,FUN,TPL,ARR,PAR,BLK,IDT} type]:
+term returns [enum Type {NIL,NUM,BLN,STR,FUN,ARR,PAR,BLK,IDT} type]:
 	null {$type=TermContext::NIL;} |
 	num {$type=TermContext::NUM;} |
 	boolean {$type=TermContext::BLN;} |
 	string {$type=TermContext::STR;} |
 	fun {$type=TermContext::FUN;} |
-	tuple {$type=TermContext::TPL;} |
 	array {$type=TermContext::ARR;} |
 	par {$type=TermContext::PAR;} |
 	block {$type=TermContext::BLK;} |
@@ -31,15 +35,9 @@ par: LP call? RP;
 
 block: LB statement* RB;
 
-tuple: LP (call COMMA)+ call? RP;
-
 array: LSB call? (COMMA + call)* RSB;
 
-fun: params COLON block;
-
-params: IDENTIFIER | (LP IDENTIFIER? (COMMA IDENTIFIER)* RP);
-
-args: LP call? (COMMA call)* RP;
+fun: (IDENTIFIER | (LP IDENTIFIER? (COMMA IDENTIFIER)* RP)) COLON LB statement* RB;
 
 id: IDENTIFIER;
 

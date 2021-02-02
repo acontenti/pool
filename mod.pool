@@ -1,1 +1,1 @@
-$stdout println ("Called from mod.pool with args:\n\t\"" + (($0 + "\"\n\t\"") + ($1 + "\"")));
+("Called from mod.pool with args:\n\t\"" + $args(0) + "\"\n\t\"" + $args(1) + "\"") println;

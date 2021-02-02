@@ -19,6 +19,10 @@ namespace pool {
 
 	class Block;
 
+	class Executable;
+
+	using method_t = function<shared_ptr<Object>(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other)>;
+
 	extern bool debug;
 	extern vector<shared_ptr<Object>> arguments;
 	extern const shared_ptr<Class> ClassClass;
@@ -27,10 +31,7 @@ namespace pool {
 	extern const shared_ptr<Class> IntegerClass;
 	extern const shared_ptr<Class> DecimalClass;
 	extern const shared_ptr<Class> StringClass;
-	extern const shared_ptr<Class> TupleClass;
 	extern const shared_ptr<Class> ArrayClass;
-	extern const shared_ptr<Class> CallClass;
-	extern const shared_ptr<Class> IdentityClass;
 	extern const shared_ptr<Class> VariableClass;
 	extern const shared_ptr<Class> BlockClass;
 	extern const shared_ptr<Class> FunClass;
@@ -40,7 +41,7 @@ namespace pool {
 	extern const shared_ptr<Object> Null;
 
 	class Context : public enable_shared_from_this<Context> {
-		unordered_map<string, shared_ptr<Variable>> heap;
+		unordered_map<string, shared_ptr<Object>> heap;
 		const shared_ptr<Context> parent;
 
 		Context() : Context(nullptr) {}
@@ -50,26 +51,26 @@ namespace pool {
 
 		explicit Context(shared_ptr<Context> parent) : parent(move(parent)) {}
 
-		shared_ptr<Variable> find(const string &name) const;
+		shared_ptr<Object> find(const string &name) const;
 
-		shared_ptr<Variable> add(const shared_ptr<Variable> &var);
+		shared_ptr<Executable> findMethod(const string &name) const;
+
+		shared_ptr<Object> add(const string &name);
+
+		shared_ptr<Object> add(const string &name, const shared_ptr<Object> &var);
+
+		void set(const string &name, const shared_ptr<Object> &value);
 
 		void associate(const vector<string> &params, const vector<shared_ptr<Object>> &args);
 
-		inline auto begin() {
+		string toString() const;
+
+		inline auto begin() const {
 			return heap.begin();
 		}
 
-		inline auto cbegin() const {
-			return heap.cbegin();
-		}
-
-		inline auto end() {
+		inline auto end() const {
 			return heap.end();
-		}
-
-		inline auto cend() const {
-			return heap.cend();
 		}
 
 		inline auto empty() const {
@@ -82,27 +83,20 @@ namespace pool {
 	};
 
 	class Object : public enable_shared_from_this<Object> {
-		static long ID_COUNTER;
-		const long id = ID_COUNTER++;
-
 		shared_ptr<Object> getVariableValue();
 
 	public:
-		typedef function<shared_ptr<Object>(const shared_ptr<Object> &, const shared_ptr<Object> &)> method_t;
+		const size_t id;
 		const shared_ptr<Class> cls;
 		const shared_ptr<Context> context;
 
-		Object(shared_ptr<Context> context, shared_ptr<Class> cls) : context(move(context)), cls(move(cls)) {}
+		Object(shared_ptr<Context> context, shared_ptr<Class> cls);
 
-		virtual string_view getType() const;
+		virtual string_view getType();
 
-		inline string toString() const {
-			return string(getType()) + "@" + to_string(getID());
+		inline string toString() {
+			return string(getType()) + "@" + to_string(id);
 		};
-
-		inline long getID() const {
-			return id;
-		}
 
 		template<class T>
 		shared_ptr<T> as() {
@@ -111,39 +105,58 @@ namespace pool {
 			return reinterpret_pointer_cast<T>(shared_from_this());
 		}
 
-		virtual const method_t *findMethod(const string &methodName) const;
+		virtual shared_ptr<Executable> findMethod(const string &methodName) const;
+
+		virtual shared_ptr<Object> find(const string &name) const;
 
 		virtual bool isVariable() const {
 			return false;
 		}
 
-		static shared_ptr<Object> create(const shared_ptr<Class> &cls, const shared_ptr<Context> &context) {
-			return make_shared<Object>(context, cls);
-		}
+		static shared_ptr<Object> create(const shared_ptr<Class> &cls, const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other);
 	};
 
 	class Class : public Object {
 	public:
-		static long INSTANCES;
+		constexpr static const string_view TYPE = "Class";
+		static std::size_t COUNTER;
+		size_t instances = 0;
 		string name;
 		shared_ptr<Class> super;
-		unordered_map<string, method_t> methodsMap;
-
-		unordered_map<string, method_t> staticMethodsMap;
 
 		Class(string name, shared_ptr<Class> super, const shared_ptr<Context> &context);
 
-		const method_t *getMethod(const string &methodName) const;
+		shared_ptr<Executable> getMethod(const string &methodName) const;
 
-		const method_t *findMethod(const string &methodName) const override;
+		shared_ptr<Executable> findMethod(const string &methodName) const override;
 
-		inline void addMethod(const string &methodName, const method_t &method) {
-			methodsMap[methodName] = method;
+		shared_ptr<Object> find(const string &id) const override {
+			if (auto local = findLocal(id)) {
+				return local;
+			}
+			if (cls) {
+				return cls->find(id);
+			}
+			return nullptr;
 		}
 
-		inline void addStaticMethod(const string &methodName, const method_t &method) {
-			staticMethodsMap[methodName] = method;
-		}
+		shared_ptr<Object> findLocal(const string &id) const {
+			if (auto local = context->find(id)) {
+				return local;
+			}
+			if (super) {
+				return super->findLocal(id);
+			}
+			return nullptr;
+		};
+
+		void addMethod(const string &methodName, const shared_ptr<Executable> &method);
+
+		void addMethod(const string &methodName, const method_t &method);
+
+		shared_ptr<Object> newInstance(const vector<shared_ptr<Object>> &other);
+
+		shared_ptr<Class> extend(const shared_ptr<Block> &other);
 
 		static shared_ptr<Class> create(const string &name, const shared_ptr<Class> &super, const shared_ptr<Context> &context = Context::global) {
 			return make_shared<Class>(name, super, context);
@@ -153,6 +166,7 @@ namespace pool {
 	class Bool : public Object {
 	public:
 		bool value;
+		constexpr static const string_view TYPE = "Bool";
 
 		Bool(bool value, const shared_ptr<Context> &context) : Object(context, BoolClass), value(value) {}
 
@@ -164,6 +178,7 @@ namespace pool {
 	class Integer : public Object {
 	public:
 		int64_t value;
+		constexpr static const string_view TYPE = "Integer";
 
 		Integer(int64_t value, const shared_ptr<Context> &context) : Object(context, IntegerClass), value(value) {}
 
@@ -175,6 +190,7 @@ namespace pool {
 	class Decimal : public Object {
 	public:
 		double value;
+		constexpr static const string_view TYPE = "Decimal";
 
 		Decimal(double value, const shared_ptr<Context> &context) : Object(context, DecimalClass), value(value) {}
 
@@ -185,6 +201,7 @@ namespace pool {
 
 	class String : public Object {
 	public:
+		constexpr static const string_view TYPE = "String";
 		string value;
 
 		String(string value, const shared_ptr<Context> &context) : Object(context, StringClass), value(move(value)) {}
@@ -192,86 +209,62 @@ namespace pool {
 		static shared_ptr<String> create(const string &value, const shared_ptr<Context> &context) {
 			return make_shared<String>(value, context);
 		}
+
 	};
 
-	class Tuple : public Object {
+	class Callable {
 	public:
-		vector<shared_ptr<Object>> values;
-
-		Tuple(vector<shared_ptr<Object>> values, const shared_ptr<Context> &context)
-				: Object(context, TupleClass), values(move(values)) {}
-
-		static shared_ptr<Tuple> create(const vector<shared_ptr<Object>> &values, const shared_ptr<Context> &context) {
-			return make_shared<Tuple>(values, context);
-		}
-	};
-
-	class Array : public Object {
-	public:
-		vector<shared_ptr<Object>> values;
-
-		Array(vector<shared_ptr<Object>> values, const shared_ptr<Context> &context)
-				: Object(context, ArrayClass), values(move(values)) {}
-
-		static shared_ptr<Array> create(const vector<shared_ptr<Object>> &values, const shared_ptr<Context> &context) {
-			return make_shared<Array>(values, context);
-		}
-	};
-
-	class Callable : public Object {
-	public:
-		Callable(const shared_ptr<Context> &context, const shared_ptr<Class> &cls) : Object(context, cls) {}
-
 		virtual shared_ptr<Object> invoke() = 0;
 	};
 
-	class Call : public Callable {
-	protected:
-		shared_ptr<Object> caller;
-		string method;
-		shared_ptr<Object> callee;
-		bool prefix;
+	class Access : public Callable {
+		shared_ptr<Callable> caller;
+		string id;
 	public:
 
-		Call(shared_ptr<Object> caller, string method, shared_ptr<Object> callee, bool prefix, const shared_ptr<Context> &context)
-				: Callable(context, CallClass), caller(move(caller)), method(move(method)), callee(move(callee)),
-				  prefix(prefix) {}
+		Access(shared_ptr<Callable> caller, string id) : caller(move(caller)), id(move(id)) {}
 
 		shared_ptr<Object> invoke() override {
-			auto first = caller, second = callee;
-			if (auto call = dynamic_pointer_cast<Callable>(caller)) {
-				first = call->invoke();
-			}
-			if (auto call = dynamic_pointer_cast<Callable>(callee)) {
-				second = call->invoke();
-			}
-			auto function = first->findMethod(method);
-			if (function) {
-				return (*function)(first, second);
-			} else throw execution_error("method " + method + " not found");
+			auto ptr = caller->invoke();
+			auto result = ptr->find(id);
+			return result ? result : ptr->context->add(id);
 		}
 
-		static shared_ptr<Call> create(const shared_ptr<Object> &caller, const string &method, const shared_ptr<Object> &callee, const bool &prefix, const shared_ptr<Context> &context) {
-			return make_shared<Call>(caller, method, callee, prefix, context);
+		static shared_ptr<Access> create(const shared_ptr<Callable> &caller, const string &id) {
+			return make_shared<Access>(caller, id);
+		}
+	};
+
+	class Invocation : public Callable {
+		shared_ptr<Callable> self;
+		shared_ptr<Callable> caller;
+		vector<shared_ptr<Callable>> callee;
+	public:
+
+		Invocation(const shared_ptr<Callable> &self, shared_ptr<Callable> caller, const vector<shared_ptr<Callable>> &callee)
+				: self(self), caller(move(caller)), callee(callee) {}
+
+		shared_ptr<Object> invoke() override;
+
+		static shared_ptr<Invocation> create(const shared_ptr<Callable> &self, const shared_ptr<Callable> &caller, const vector<shared_ptr<Callable>> &callee) {
+			return make_shared<Invocation>(self, caller, callee);
 		}
 	};
 
 	class Identity : public Callable {
-		shared_ptr<Object> result;
+		shared_ptr<Object> object;
 	public:
-		Identity(const shared_ptr<Object> &result, const shared_ptr<Context> &context)
-				: Callable(context, IdentityClass), result(result) {}
+		explicit Identity(const shared_ptr<Object> &object) : object(object) {}
 
 		shared_ptr<Object> invoke() override {
-			if (auto call = dynamic_pointer_cast<Callable>(result)) {
-				return call->invoke();
-			} else return result;
-		}
+			return object;
+		};
 
-		static shared_ptr<Identity> create(const shared_ptr<Object> &caller, const shared_ptr<Context> &context) {
-			return make_shared<Identity>(caller, context);
+		static shared_ptr<Callable> create(const shared_ptr<Object> &caller) {
+			return make_shared<Identity>(caller);
 		}
 	};
+
 
 	class Variable : public Object {
 		shared_ptr<Object> value;
@@ -297,16 +290,19 @@ namespace pool {
 			else throw execution_error("Cannot assign immutable variable \"" + name + "\"");
 		}
 
-		const method_t *findMethod(const string &methodName) const override {
-			const method_t *method = value->findMethod(methodName);
-			if (method) {
+		shared_ptr<Executable> findMethod(const string &methodName) const override {
+			if (auto method = value->findMethod(methodName)) {
 				return method;
-			} else {
-				return Object::findMethod(methodName);
-			}
+			} else return Object::findMethod(methodName);
 		}
 
-		string_view getType() const override {
+		shared_ptr<Object> find(const string &id) const override {
+			if (auto result = value->find(id)) {
+				return result;
+			} else return Object::find(id);
+		}
+
+		string_view getType() override {
 			return value->getType();
 		}
 
@@ -314,35 +310,68 @@ namespace pool {
 			return true;
 		}
 
-		Variable(string name, shared_ptr<Object> value, const shared_ptr<Context> &context, bool immutable = false)
+		Variable(string name, shared_ptr<Object> value, const shared_ptr<Context> &context, bool immutable)
 				: Object(context, VariableClass), name(move(name)), value(move(value)), immutable(immutable) {
 		}
 
-		static shared_ptr<Variable> create(const string &name, const shared_ptr<Object> &value, const shared_ptr<Context> &context, bool immutable) {
-			return make_shared<Variable>(name, value, context, immutable);
-		}
-
 		static shared_ptr<Variable> create(const string &name, const shared_ptr<Context> &context) {
-			return make_shared<Variable>(name, Null, context);
+			return make_shared<Variable>(name, Null, context, false);
 		}
 	};
 
-	class Fun : public Object {
+	class Executable : public Object {
 	public:
 		vector<string> params;
+
+		Executable(const vector<string> &params, const shared_ptr<Context> &context, const shared_ptr<Class> &cls)
+				: Object(context, cls), params(params) {}
+
+		virtual shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) = 0;
+	};
+
+	class NativeFun : public Executable {
+	public:
+		method_t code;
+
+		NativeFun(method_t code, const shared_ptr<Context> &context)
+				: Executable({"this", "other"}, context, FunClass), code(move(code)) {}
+
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override {
+			auto returnValue = code(self, other);
+			return returnValue;
+		}
+
+		static shared_ptr<NativeFun> create(const method_t &code) {
+			return make_shared<NativeFun>(code, Context::global);
+		}
+	};
+
+	class Fun : public Executable {
+	public:
 		vector<shared_ptr<Callable>> calls;
 
-		Fun(vector<string> params, vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
-				: Object(context, FunClass), params(move(params)), calls(move(calls)) {
+		Fun(const vector<string> &params, vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
+				: Executable(params, context, FunClass), calls(move(calls)) {
 			for (auto &param : params) {
-				context->add(Variable::create(param, context));
+				context->add(param);
 			}
 		}
 
-		shared_ptr<Object> execute(const vector<shared_ptr<Object>> &args) {
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override {
 			shared_ptr<Object> returnValue = Void;
+			vector<shared_ptr<Object>> args;
+			if (self) {
+				auto ptr = self->as<Object>();
+				if (ptr != shared_from_this()) {
+					args.reserve(other.size() + 1);
+					args.push_back(ptr);
+				}
+			} else {
+				args.reserve(other.size());
+			}
+			args.insert(args.end(), other.begin(), other.end());
 			if (params.size() != args.size())
-				return Null;
+				throw execution_error("Parameters number does not match arguments number");
 			context->associate(params, args);
 			for (auto &call: calls) {
 				returnValue = call->invoke();
@@ -350,29 +379,48 @@ namespace pool {
 			return returnValue;
 		}
 
-		static vector<shared_ptr<Object>> makeArgs(const shared_ptr<Object> &other, const shared_ptr<Object> &prepend = nullptr);
-
 		static shared_ptr<Fun> create(const vector<string> &params, const vector<shared_ptr<Callable>> &calls, const shared_ptr<Context> &context) {
 			return make_shared<Fun>(params, calls, context);
 		}
 	};
 
-	class Block : public Object {
+	class Block : public Executable, public Callable {
 	public:
 		vector<shared_ptr<Callable>> calls;
 
 		Block(vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
-				: Object(context, BlockClass), calls(move(calls)) {}
+				: Executable({}, context, BlockClass), calls(move(calls)) {}
 
-		shared_ptr<Object> execute() {
+		shared_ptr<Object> invoke() override {
 			for (auto &call: calls) {
 				call->invoke();
 			}
 			return shared_from_this();
 		}
 
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override {
+			return invoke();
+		}
+
 		static shared_ptr<Block> create(const vector<shared_ptr<Callable>> &calls, const shared_ptr<Context> &context) {
 			return make_shared<Block>(calls, context);
+		}
+	};
+
+	class Array : public Callable, public Executable {
+	public:
+		vector<shared_ptr<Callable>> calls;
+		vector<shared_ptr<Object>> values;
+
+		Array(vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
+				: Executable({"index"}, context, ArrayClass), calls(move(calls)) {}
+
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override;
+
+		shared_ptr<Object> invoke() override;
+
+		static shared_ptr<Array> create(const vector<shared_ptr<Callable>> &calls, const shared_ptr<Context> &context) {
+			return make_shared<Array>(calls, context);
 		}
 	};
 

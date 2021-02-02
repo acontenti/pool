@@ -1,7 +1,6 @@
 #include <iostream>
 #include <filesystem>
 #include <chrono>
-#include <numeric>
 #include "poolstd.hpp"
 #include "pool.hpp"
 #include "../lib/termcolor.hpp"
@@ -11,9 +10,9 @@ using namespace pool;
 using namespace chrono;
 namespace fs = filesystem;
 
-shared_ptr<Fun> parsePool(PoolParser::PoolContext *ast, const vector<string> &params, const shared_ptr<Context> &context);
+shared_ptr<Fun> parseProgram(PoolParser::ProgramContext *ast, const vector<string> &params, const shared_ptr<Context> &context);
 
-shared_ptr<Object> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context);
+shared_ptr<Callable> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context);
 
 std::string getExecutionTime(high_resolution_clock::time_point startTime, high_resolution_clock::time_point endTime) {
 	auto execution_time_ms = duration_cast<std::chrono::microseconds>(endTime - startTime).count();
@@ -69,19 +68,17 @@ Pool::Pool(const string &file) {
 	parser->addErrorListener(ErrorListener::INSTANCE());
 	parser->addParseListener(this);
 	try {
-		vector<shared_ptr<Object>> args{String::create(file, Context::global)};
-		args.insert(args.end(), arguments.begin(), arguments.end());
-		auto tree = parser->pool();
+		vector<shared_ptr<Callable>> args(arguments.size() + 1);
+		args[0] = Identity::create(String::create(file, Context::global));
+		transform(arguments.begin(), arguments.end(), args.begin() + 1, [](const shared_ptr<Object> &item) {
+			return Identity::create(item);
+		});
+		auto tree = parser->program();
 		if (debug) {
 			cout << tree->toStringTree(parser.get()) << endl;
 		}
-		vector<string> params;
-		params.reserve(arguments.size() + 1);
-		for (int i = 0; i < arguments.size() + 1; ++i) {
-			params.emplace_back(to_string(i));
-		}
-		auto main = parsePool(tree, params, Context::global);
-		main->execute(args);
+		auto main = parseProgram(tree, {"args"}, Context::global);
+		main->execute(nullptr, {Array::create(args, Context::global)->invoke()});
 		result = true;
 	} catch (::compile_error &error) {
 		std::cout << termcolor::red << error << termcolor::reset << std::endl;
@@ -108,9 +105,7 @@ shared_ptr<Object> parseIdentifier(tree::TerminalNode *ast, const shared_ptr<Con
 	if (auto find = context->find(id)) {
 		return find;
 	} else {
-		auto var = Variable::create(id, context);
-		context->add(var);
-		return var;
+		return context->add(id);
 	}
 }
 
@@ -169,12 +164,8 @@ vector<shared_ptr<Callable>> parseStatements(const vector<PoolParser::StatementC
 	vector<shared_ptr<Callable>> result;
 	result.reserve(statements.size());
 	for (auto ast : statements) {
-		auto statement = parseCall(ast->call(), context);
-		if (auto call = dynamic_pointer_cast<Callable>(statement)) {
-			result.emplace_back(call);
-		} else {
-			result.emplace_back(Identity::create(statement, context));
-		}
+		auto call = parseCall(ast->call(), context);
+		result.emplace_back(call);
 	}
 	return result;
 }
@@ -188,19 +179,9 @@ shared_ptr<String> parseString(PoolParser::StringContext *ast, const shared_ptr<
 	return String::create(value.substr(1, value.size() - 2), context);
 }
 
-shared_ptr<Tuple> parseTuple(PoolParser::TupleContext *ast, const shared_ptr<Context> &context) {
-	auto callsAst = ast->call();
-	vector<shared_ptr<Object>> result;
-	result.reserve(callsAst.size());
-	for (auto &call : callsAst) {
-		result.emplace_back(parseCall(call, context));
-	}
-	return Tuple::create(result, context);
-}
-
 shared_ptr<Array> parseArray(PoolParser::ArrayContext *ast, const shared_ptr<Context> &context) {
 	auto callsAst = ast->call();
-	vector<shared_ptr<Object>> result;
+	vector<shared_ptr<Callable>> result;
 	result.reserve(callsAst.size());
 	for (auto &call : callsAst) {
 		result.emplace_back(parseCall(call, context));
@@ -214,67 +195,46 @@ shared_ptr<Block> parseBlock(PoolParser::BlockContext *ast, const shared_ptr<Con
 	return Block::create(statements, context);
 }
 
-vector<string> parseParams(PoolParser::ParamsContext *ast) {
+shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<Context> &parent) {
 	auto idsAst = ast->IDENTIFIER();
 	vector<string> params;
 	params.reserve(idsAst.size());
 	for (auto id : idsAst) {
 		params.emplace_back(getId(id));
 	}
-	return params;
+	auto context = Context::create(parent);
+	auto statements = parseStatements(ast->statement(), context);
+	return Fun::create(params, statements, context);
 }
 
-shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<Context> &parent) {
-	vector<string> params = parseParams(ast->params());
-	auto block = parseBlock(ast->block(), parent);
-	return Fun::create(params, block->calls, block->context);
-}
-
-shared_ptr<Object> parseTerm(PoolParser::TermContext *ast, const shared_ptr<Context> &context) {
+shared_ptr<Callable> parseTerm(PoolParser::TermContext *ast, const shared_ptr<Context> &context) {
 	switch (ast->type) {
 		case PoolParser::TermContext::NIL:
-			return Null;
+			return Identity::create(Null);
 		case PoolParser::TermContext::NUM:
-			return parseNum(ast->num(), context);
+			return Identity::create(parseNum(ast->num(), context));
 		case PoolParser::TermContext::BLN:
-			return parseBool(ast->boolean(), context);
+			return Identity::create(parseBool(ast->boolean(), context));
 		case PoolParser::TermContext::STR:
-			return parseString(ast->string(), context);
+			return Identity::create(parseString(ast->string(), context));
 		case PoolParser::TermContext::FUN:
-			return parseFunction(ast->fun(), context);
-		case PoolParser::TermContext::TPL:
-			return parseTuple(ast->tuple(), context);
+			return Identity::create(parseFunction(ast->fun(), context));
 		case PoolParser::TermContext::ARR:
-			return parseArray(ast->array(), context);
+			return Identity::create(parseArray(ast->array(), context));
 		case PoolParser::TermContext::PAR:
 			return parseCall(ast->par()->call(), context);
 		case PoolParser::TermContext::BLK:
-			return parseBlock(ast->block(), context);
+			return Identity::create(parseBlock(ast->block(), context));
 		case PoolParser::TermContext::IDT:
-			return parseIdentifier(ast->id()->IDENTIFIER(), context);
+			return Identity::create(parseIdentifier(ast->id()->IDENTIFIER(), context));
 		default:
 			throw execution_error("Invalid execution point");
 	}
 }
 
-shared_ptr<Object> parseAccess(PoolParser::AccessContext *ast, const shared_ptr<Context> &context) {
-	auto termAst = ast->term();
-	auto caller = parseTerm(termAst, context);
-	auto ids = ast->IDENTIFIER();
-	if (ids.empty()) {
-		return caller;
-	} else {
-		auto first = Call::create(caller, ".", parseIdentifier(ids[0], context), false, context);
-		auto op = [context](const shared_ptr<Call> &call, tree::TerminalNode *id) {
-			return Call::create(call, ".", parseIdentifier(id, context), false, context);
-		};
-		return accumulate(ids.begin() + 1, ids.end(), first, op);
-	}
-}
-
-vector<shared_ptr<Object>> parseArgs(PoolParser::ArgsContext *ast, const shared_ptr<Context> &context) {
+vector<shared_ptr<Callable>> parseArgs(PoolParser::ArgsContext *ast, const shared_ptr<Context> &context) {
 	auto callsAst = ast->call();
-	vector<shared_ptr<Object>> args;
+	vector<shared_ptr<Callable>> args;
 	args.reserve(callsAst.size());
 	for (auto call : callsAst) {
 		args.emplace_back(parseCall(call, context));
@@ -282,52 +242,57 @@ vector<shared_ptr<Object>> parseArgs(PoolParser::ArgsContext *ast, const shared_
 	return args;
 }
 
-shared_ptr<Object> parseInvocation(PoolParser::InvocationContext *ast, const shared_ptr<Context> &context) {
-	auto accessAst = ast->access();
-	auto argsAst = ast->args();
-	const shared_ptr<Object> &caller = parseAccess(accessAst, context);
-	if (!argsAst) {
-		return caller;
-	}
-	auto args = parseArgs(argsAst, context);
-	shared_ptr<Object> arg;
-	if (args.empty()) {
-		arg = Void;
-	} else if (args.size() == 1) {
-		arg = args.front();
-	} else {
-		arg = Tuple::create(args, context);
-	}
-	return Call::create(caller, "->", arg, false, context);
-}
-
-shared_ptr<Object> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context) {
+shared_ptr<Callable> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context) {
 	if (ast) {
-		auto callerAst = ast->caller;
-		auto methodAst = ast->OPERATOR();
-		auto calleeAst = ast->callee;
-		bool prefix = false;
-		shared_ptr<Object> caller, callee;
-		if (callerAst) {
-			caller = parseInvocation(callerAst, context);
-			if (calleeAst) {
-				callee = parseInvocation(calleeAst, context);
-			} else {
-				callee = Void;
+		switch (ast->type) {
+			case PoolParser::CallContext::T: {
+				auto caller = parseTerm(ast->term(), context);
+				return caller;
 			}
-		} else {
-			caller = parseInvocation(calleeAst, context);
-			callee = Void;
-			prefix = true;
+			case PoolParser::CallContext::TA: {
+				auto caller = parseCall(ast->callee, context);
+				auto callee = parseArgs(ast->args(), context);
+				return Invocation::create(caller, caller, callee);
+			}
+			case PoolParser::CallContext::TI: {
+				auto caller = parseCall(ast->callee, context);
+				auto id = getId(ast->IDENTIFIER());
+				return Access::create(caller, id);
+			}
+			case PoolParser::CallContext::TIA: {
+				auto caller = parseCall(ast->callee, context);
+				auto id = getId(ast->IDENTIFIER());
+				auto access = Access::create(caller, id);
+				auto callee = parseArgs(ast->args(), context);
+				return Invocation::create(caller, access, callee);
+			}
+			case PoolParser::CallContext::TO: {
+				auto caller = parseCall(ast->callee, context);
+				auto id = ast->OPERATOR()->getText();
+				auto access = Access::create(caller, id);
+				return Invocation::create(caller, access, {});
+			}
+			case PoolParser::CallContext::TOC: {
+				auto caller = parseCall(ast->callee, context);
+				auto id = ast->OPERATOR()->getText();
+				auto callee = parseCall(ast->arg, context);
+				auto access = Access::create(caller, id);
+				return Invocation::create(caller, access, {callee});
+			}
+			case PoolParser::CallContext::TOA: {
+				auto caller = parseCall(ast->callee, context);
+				auto id = ast->OPERATOR()->getText();
+				auto access = Access::create(caller, id);
+				auto callee = parseArgs(ast->args(), context);
+				return Invocation::create(caller, access, callee);
+			}
+			default:
+				throw Pool::compile_fatal("invalid call", ast->getStart());
 		}
-		if (methodAst != nullptr) {
-			auto method = methodAst->getText();
-			return Call::create(caller, method, callee, prefix, context);
-		} else return caller;
-	} else return Void;
+	} else return Identity::create(Void);
 }
 
-shared_ptr<Fun> parsePool(PoolParser::PoolContext *ast, const vector<string> &params, const shared_ptr<Context> &context) {
+shared_ptr<Fun> parseProgram(PoolParser::ProgramContext *ast, const vector<string> &params, const shared_ptr<Context> &context) {
 	auto statements = parseStatements(ast->statement(), context);
 	return Fun::create(params, statements, context);
 }

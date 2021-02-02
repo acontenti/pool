@@ -16,8 +16,8 @@
 class  PoolParserBaseListener : public PoolParserListener {
 public:
 
-  virtual void enterPool(PoolParser::PoolContext * /*ctx*/) override { }
-  virtual void exitPool(PoolParser::PoolContext * /*ctx*/) override { }
+  virtual void enterProgram(PoolParser::ProgramContext * /*ctx*/) override { }
+  virtual void exitProgram(PoolParser::ProgramContext * /*ctx*/) override { }
 
   virtual void enterStatement(PoolParser::StatementContext * /*ctx*/) override { }
   virtual void exitStatement(PoolParser::StatementContext * /*ctx*/) override { }
@@ -25,11 +25,8 @@ public:
   virtual void enterCall(PoolParser::CallContext * /*ctx*/) override { }
   virtual void exitCall(PoolParser::CallContext * /*ctx*/) override { }
 
-  virtual void enterInvocation(PoolParser::InvocationContext * /*ctx*/) override { }
-  virtual void exitInvocation(PoolParser::InvocationContext * /*ctx*/) override { }
-
-  virtual void enterAccess(PoolParser::AccessContext * /*ctx*/) override { }
-  virtual void exitAccess(PoolParser::AccessContext * /*ctx*/) override { }
+  virtual void enterArgs(PoolParser::ArgsContext * /*ctx*/) override { }
+  virtual void exitArgs(PoolParser::ArgsContext * /*ctx*/) override { }
 
   virtual void enterTerm(PoolParser::TermContext * /*ctx*/) override { }
   virtual void exitTerm(PoolParser::TermContext * /*ctx*/) override { }
@@ -40,20 +37,11 @@ public:
   virtual void enterBlock(PoolParser::BlockContext * /*ctx*/) override { }
   virtual void exitBlock(PoolParser::BlockContext * /*ctx*/) override { }
 
-  virtual void enterTuple(PoolParser::TupleContext * /*ctx*/) override { }
-  virtual void exitTuple(PoolParser::TupleContext * /*ctx*/) override { }
-
   virtual void enterArray(PoolParser::ArrayContext * /*ctx*/) override { }
   virtual void exitArray(PoolParser::ArrayContext * /*ctx*/) override { }
 
   virtual void enterFun(PoolParser::FunContext * /*ctx*/) override { }
   virtual void exitFun(PoolParser::FunContext * /*ctx*/) override { }
-
-  virtual void enterParams(PoolParser::ParamsContext * /*ctx*/) override { }
-  virtual void exitParams(PoolParser::ParamsContext * /*ctx*/) override { }
-
-  virtual void enterArgs(PoolParser::ArgsContext * /*ctx*/) override { }
-  virtual void exitArgs(PoolParser::ArgsContext * /*ctx*/) override { }
 
   virtual void enterId(PoolParser::IdContext * /*ctx*/) override { }
   virtual void exitId(PoolParser::IdContext * /*ctx*/) override { }
