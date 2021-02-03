@@ -176,7 +176,8 @@ shared_ptr<Bool> parseBool(PoolParser::BooleanContext *ast, const shared_ptr<Con
 
 shared_ptr<String> parseString(PoolParser::StringContext *ast, const shared_ptr<Context> &context) {
 	auto value = ast->STRING_LITERAL()->getText();
-	return String::create(value.substr(1, value.size() - 2), context);
+	value = unescapeString( value.substr(1, value.size() - 2));
+	return String::create(value, context);
 }
 
 shared_ptr<Array> parseArray(PoolParser::ArrayContext *ast, const shared_ptr<Context> &context) {
