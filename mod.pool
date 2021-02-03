@@ -1,1 +1,5 @@
-$stdout println ("Called from mod.pool with args:\n\t\"" + (($0 + "\"\n\t\"") + ($1 + "\"")));
+("\u250C\n\u2502  Called from mod.pool with args:\n\u2502\t\""
+ + $args(0)
+ + "\"\n\u2502\t\""
+ + $args(1)
+ + "\"\n\u2514") println;

@@ -1,3 +1,22 @@
+$f.$=($x : {
+	$x.$println();
+});
+$f("x");
+
+$f = ($x) : {
+	$x println;
+};
+$f("x");
+
+$a.$=([0, 1, 2, 3]);
+$b.$=(1.$+($a.$size));
+$b.$println();
+
+$a = [0, 1, 2, 3];
+$b = 1 + ($a.$size);
+$b println;
+
+
 $fun = $x : {$x;};
 $fun = ($x, $y) : {
   	$b = ($x + $y);
@@ -11,63 +30,83 @@ $z = {
 		$d = 2;
 	};;
 };
-$stdout println $fun;
-$stdout println $fun.$b;
+$empty = ():{};
+$empty() println;
+():{}() println;
+$empty = {};
+$empty() println;
+{}() println;
+$fun println;
+$fun.$b println;
 $res = $fun(100, 100);
-$stdout println $fun;
-$stdout println $fun.$b;
-$stdout println $res;
-$stdout println $z;
-$stdout println $z.$b;
+$fun println;
+$fun.$b println;
+$res println;
+$z println;
+$z.$b println;
 $res = $z();
-$stdout println $z;
-$stdout println $z.$b;
-$stdout println $z.$c.$d;
-$stdout println $0;
-$stdout println $z;
+$z println;
+$z.$b println;
+$z.$c.$d println;
+$args println;
+$z println;
 $z.$c = 5;
-$stdout println $z.$c;
-$stdout println $z;
+$z.$c println;
+$z println;
 $Test = ($Object extend {
 	$init = ($this, $who) : {
 		$this.$long = 0;
-		$stdout println ("Oh " + ($who + "!"));
+		$this.$int = 0;
+		//("init: this = " + $this) println;
+		//("init: class = " + $this.$class) println;
+		//("init: who = " + $who) println;
 	};
 	$++ = ($this) : {
+		("++: this = " + $this) println;
+		("++: class = " + $this.$class) println;
 		$this.$long += 10;
 	};
 	$print = ($this) : {
-		$stdout println $this.$long;
+		("print: this = " + $this) println;
+		("print: class = " + $this.$class) println;
+		$this.$long println;
 	};
-	$greet = ($class, $who) : {
-		$class.$int ++;
-		$stdout println ("Hello " + ($who + "!"));
-	};
-	$int = 0;
-	$no = ($ok, $who) : {
-		$stdout println ($ok + (" " + $who));
+	$number = 0;
+	$no = ($class, $who) : {
+		("no: class = " + $class) println;
+		("no: who = " + $who) println;
+	} classmethod;
+	$yes = ($this, $who) : {
+		("yes: who = " + $who) println;
+	} staticmethod;
+	$maybe = ($this, $who) : {
+		("maybe: this = " + $this) println;
+		("maybe: who = " + $who) println;
 	};
 });
-$n = ($Test new "yes");
-$Test.$no("Ok", "good");
-$stdout println $n;
-$n init("wow");
-//$n greet("instance");
-$stdout println $Test.$int;
-$Test greet "static";
-$stdout println $Test.$int;
-$n print;
-$n ++;
-$n print;
+$n = $Test new "yes";
+("$n: " + $n) println;
+("$Test.$class: " + $Test.$class) println;
+("$Test: " + $Test) println;
+("$n.$class: " + $n.$class) println;
+("$Object.$class: " + $Object.$class) println;
+$Test no "you";
+$n no "me";
+$Test yes "you";
+$n yes "me";
+$Test maybe "you";
+$n maybe "me";
+("prop test: " + ($Test type)) println;
 $z.$c ++;
-$stdout println $z.$c;
-$stdout println ($x = (! true));
-$stdout println ({$a = $x;}.$a);
+$z.$c.$d.$e println;
+($x = true !) println;
+$abc = {$a = $x;}();
+$abc println;
 $x = 1;
 $b = {
 	$x ++;
-	$a = {$f = $x;};
-};
-$stdout println ($b.$a.$f);
-import "mod";
-2.2+ 1;
+	$a = {$f = $x;}();
+}();
+$b.$a.$f println;
+
+"mod" import;

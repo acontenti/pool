@@ -1,3 +1,0 @@
-language = "C++"
-pragma_once = true
-namespace = "pool::parser"
