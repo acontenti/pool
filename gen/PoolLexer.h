@@ -1,5 +1,5 @@
 
-// Generated from PoolLexer.g4 by ANTLR 4.7.2
+// Generated from PoolLexer.g4 by ANTLR 4.9.1
 
 #pragma once
 
@@ -19,7 +19,7 @@ public:
     OPERATOR = 23
   };
 
-  PoolLexer(antlr4::CharStream *input);
+  explicit PoolLexer(antlr4::CharStream *input);
   ~PoolLexer();
 
   virtual std::string getGrammarFileName() const override;

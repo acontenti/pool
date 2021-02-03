@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(pool VERSION 0.1.0 LANGUAGES CXX)
 
 # ANTLR4 RUNTIME
+set(ANTLR4_VERSION "4.9.1")
 add_compile_definitions(_HAS_STD_BYTE=0)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 if (ANTLR4_BASE_DIR)
@@ -14,13 +15,13 @@ else ()
 	# download and build ANTLR4 runtime in project
 	add_definitions(-DANTLR4CPP_STATIC)
 	set(ANTLR4_WITH_STATIC_CRT OFF)
-	set(ANTLR4_TAG "4.7.2")
+	set(ANTLR4_TAG "${ANTLR4_VERSION}")
 	include(ExternalAntlr4Cpp)
 	set(ANTLR4_LIB antlr4_static)
 endif ()
 
 # ANTLR4 JAVA
-set(ANTLR_EXECUTABLE ${CMAKE_SOURCE_DIR}/antlr4/antlr-4.7.2-complete.jar)
+set(ANTLR_EXECUTABLE ${CMAKE_SOURCE_DIR}/antlr4/antlr-${ANTLR4_VERSION}-complete.jar)
 find_package(ANTLR REQUIRED)
 
 # PARSER GENERATOR

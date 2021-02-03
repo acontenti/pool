@@ -1,5 +1,5 @@
 
-// Generated from PoolLexer.g4 by ANTLR 4.7.2
+// Generated from PoolLexer.g4 by ANTLR 4.9.1
 
 
 #include "PoolLexer.h"
@@ -60,11 +60,11 @@ atn::ATN PoolLexer::_atn;
 std::vector<uint16_t> PoolLexer::_serializedATN;
 
 std::vector<std::string> PoolLexer::_ruleNames = {
-  u8"WS", u8"COMMENT", u8"LINE_COMMENT", u8"SEMI", u8"LP", u8"RP", u8"LB", 
-  u8"RB", u8"LSB", u8"RSB", u8"DOT", u8"COMMA", u8"COLON", u8"TRUE", u8"FALSE", 
-  u8"NULL_", u8"HEX_DIGIT", u8"BIN_DIGIT", u8"DIGIT", u8"DECIMAL_INTEGER_LITERAL", 
-  u8"HEX_INTEGER_LITERAL", u8"BIN_INTEGER_LITERAL", u8"FLOAT_LITERAL", u8"ESCAPE", 
-  u8"STRING_LITERAL", u8"IDENTIFIER", u8"OPERATOR", u8"ID", u8"SYMBOL"
+  "WS", "COMMENT", "LINE_COMMENT", "SEMI", "LP", "RP", "LB", "RB", "LSB", 
+  "RSB", "DOT", "COMMA", "COLON", "TRUE", "FALSE", "NULL_", "HEX_DIGIT", 
+  "BIN_DIGIT", "DIGIT", "DECIMAL_INTEGER_LITERAL", "HEX_INTEGER_LITERAL", 
+  "BIN_INTEGER_LITERAL", "FLOAT_LITERAL", "ESCAPE", "STRING_LITERAL", "IDENTIFIER", 
+  "OPERATOR", "ID", "SYMBOL"
 };
 
 std::vector<std::string> PoolLexer::_channelNames = {
@@ -72,19 +72,19 @@ std::vector<std::string> PoolLexer::_channelNames = {
 };
 
 std::vector<std::string> PoolLexer::_modeNames = {
-  u8"DEFAULT_MODE"
+  "DEFAULT_MODE"
 };
 
 std::vector<std::string> PoolLexer::_literalNames = {
-  "", "", "", "", u8"';'", u8"'('", u8"')'", u8"'{'", u8"'}'", u8"'['", 
-  u8"']'", u8"'.'", u8"','", u8"':'", u8"'true'", u8"'false'", u8"'null'"
+  "", "", "", "", "';'", "'('", "')'", "'{'", "'}'", "'['", "']'", "'.'", 
+  "','", "':'", "'true'", "'false'", "'null'"
 };
 
 std::vector<std::string> PoolLexer::_symbolicNames = {
-  "", u8"WS", u8"COMMENT", u8"LINE_COMMENT", u8"SEMI", u8"LP", u8"RP", u8"LB", 
-  u8"RB", u8"LSB", u8"RSB", u8"DOT", u8"COMMA", u8"COLON", u8"TRUE", u8"FALSE", 
-  u8"NULL_", u8"DECIMAL_INTEGER_LITERAL", u8"HEX_INTEGER_LITERAL", u8"BIN_INTEGER_LITERAL", 
-  u8"FLOAT_LITERAL", u8"STRING_LITERAL", u8"IDENTIFIER", u8"OPERATOR"
+  "", "WS", "COMMENT", "LINE_COMMENT", "SEMI", "LP", "RP", "LB", "RB", "LSB", 
+  "RSB", "DOT", "COMMA", "COLON", "TRUE", "FALSE", "NULL_", "DECIMAL_INTEGER_LITERAL", 
+  "HEX_INTEGER_LITERAL", "BIN_INTEGER_LITERAL", "FLOAT_LITERAL", "STRING_LITERAL", 
+  "IDENTIFIER", "OPERATOR"
 };
 
 dfa::Vocabulary PoolLexer::_vocabulary(_literalNames, _symbolicNames);

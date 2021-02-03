@@ -1,5 +1,5 @@
 
-// Generated from PoolParser.g4 by ANTLR 4.7.2
+// Generated from PoolParser.g4 by ANTLR 4.9.1
 
 
 #include "PoolParserListener.h"
@@ -71,7 +71,11 @@ PoolParser::ProgramContext* PoolParser::program() {
   enterRule(_localctx, 0, PoolParser::RuleProgram);
   size_t _la = 0;
 
+#if __cplusplus > 201703L
+  auto onExit = finally([=, this] {
+#else
   auto onExit = finally([=] {
+#endif
     exitRule();
   });
   try {
@@ -148,7 +152,11 @@ PoolParser::StatementContext* PoolParser::statement() {
   enterRule(_localctx, 2, PoolParser::RuleStatement);
   size_t _la = 0;
 
+#if __cplusplus > 201703L
+  auto onExit = finally([=, this] {
+#else
   auto onExit = finally([=] {
+#endif
     exitRule();
   });
   try {
@@ -253,7 +261,11 @@ PoolParser::CallContext* PoolParser::call(int precedence) {
 
     
 
+#if __cplusplus > 201703L
+  auto onExit = finally([=, this] {
+#else
   auto onExit = finally([=] {
+#endif
     unrollRecursionContexts(parentContext);
   });
   try {
@@ -362,6 +374,8 @@ PoolParser::CallContext* PoolParser::call(int precedence) {
           break;
         }
 
+        default:
+          break;
         } 
       }
       setState(76);
@@ -429,7 +443,11 @@ PoolParser::ArgsContext* PoolParser::args() {
   enterRule(_localctx, 6, PoolParser::RuleArgs);
   size_t _la = 0;
 
+#if __cplusplus > 201703L
+  auto onExit = finally([=, this] {
+#else
   auto onExit = finally([=] {
+#endif
     exitRule();
   });
   try {
@@ -544,7 +562,11 @@ PoolParser::TermContext* PoolParser::term() {
   TermContext *_localctx = _tracker.createInstance<TermContext>(_ctx, getState());
   enterRule(_localctx, 8, PoolParser::RuleTerm);
 
+#if __cplusplus > 201703L
+  auto onExit = finally([=, this] {
+#else
   auto onExit = finally([=] {
+#endif
     exitRule();
   });
   try {
@@ -623,6 +645,8 @@ PoolParser::TermContext* PoolParser::term() {
       break;
     }
 
+    default:
+      break;
     }
    
   }
@@ -675,7 +699,11 @@ PoolParser::ParContext* PoolParser::par() {
   enterRule(_localctx, 10, PoolParser::RulePar);
   size_t _la = 0;
 
+#if __cplusplus > 201703L
+  auto onExit = finally([=, this] {
+#else
   auto onExit = finally([=] {
+#endif
     exitRule();
   });
   try {
@@ -759,7 +787,11 @@ PoolParser::BlockContext* PoolParser::block() {
   enterRule(_localctx, 12, PoolParser::RuleBlock);
   size_t _la = 0;
 
+#if __cplusplus > 201703L
+  auto onExit = finally([=, this] {
+#else
   auto onExit = finally([=] {
+#endif
     exitRule();
   });
   try {
@@ -854,7 +886,11 @@ PoolParser::ArrayContext* PoolParser::array() {
   enterRule(_localctx, 14, PoolParser::RuleArray);
   size_t _la = 0;
 
+#if __cplusplus > 201703L
+  auto onExit = finally([=, this] {
+#else
   auto onExit = finally([=] {
+#endif
     exitRule();
   });
   try {
@@ -986,7 +1022,11 @@ PoolParser::FunContext* PoolParser::fun() {
   enterRule(_localctx, 16, PoolParser::RuleFun);
   size_t _la = 0;
 
+#if __cplusplus > 201703L
+  auto onExit = finally([=, this] {
+#else
   auto onExit = finally([=] {
+#endif
     exitRule();
   });
   try {
@@ -1102,7 +1142,11 @@ PoolParser::IdContext* PoolParser::id() {
   IdContext *_localctx = _tracker.createInstance<IdContext>(_ctx, getState());
   enterRule(_localctx, 18, PoolParser::RuleId);
 
+#if __cplusplus > 201703L
+  auto onExit = finally([=, this] {
+#else
   auto onExit = finally([=] {
+#endif
     exitRule();
   });
   try {
@@ -1163,7 +1207,11 @@ PoolParser::NumContext* PoolParser::num() {
   NumContext *_localctx = _tracker.createInstance<NumContext>(_ctx, getState());
   enterRule(_localctx, 20, PoolParser::RuleNum);
 
+#if __cplusplus > 201703L
+  auto onExit = finally([=, this] {
+#else
   auto onExit = finally([=] {
+#endif
     exitRule();
   });
   try {
@@ -1247,7 +1295,11 @@ PoolParser::StringContext* PoolParser::string() {
   StringContext *_localctx = _tracker.createInstance<StringContext>(_ctx, getState());
   enterRule(_localctx, 22, PoolParser::RuleString);
 
+#if __cplusplus > 201703L
+  auto onExit = finally([=, this] {
+#else
   auto onExit = finally([=] {
+#endif
     exitRule();
   });
   try {
@@ -1300,7 +1352,11 @@ PoolParser::BooleanContext* PoolParser::boolean() {
   BooleanContext *_localctx = _tracker.createInstance<BooleanContext>(_ctx, getState());
   enterRule(_localctx, 24, PoolParser::RuleBoolean);
 
+#if __cplusplus > 201703L
+  auto onExit = finally([=, this] {
+#else
   auto onExit = finally([=] {
+#endif
     exitRule();
   });
   try {
@@ -1367,7 +1423,11 @@ PoolParser::NullContext* PoolParser::null() {
   NullContext *_localctx = _tracker.createInstance<NullContext>(_ctx, getState());
   enterRule(_localctx, 26, PoolParser::RuleNull);
 
+#if __cplusplus > 201703L
+  auto onExit = finally([=, this] {
+#else
   auto onExit = finally([=] {
+#endif
     exitRule();
   });
   try {

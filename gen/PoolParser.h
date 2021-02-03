@@ -1,5 +1,5 @@
 
-// Generated from PoolParser.g4 by ANTLR 4.7.2
+// Generated from PoolParser.g4 by ANTLR 4.9.1
 
 #pragma once
 
@@ -25,7 +25,7 @@ public:
     RuleNum = 10, RuleString = 11, RuleBoolean = 12, RuleNull = 13
   };
 
-  PoolParser(antlr4::TokenStream *input);
+  explicit PoolParser(antlr4::TokenStream *input);
   ~PoolParser();
 
   virtual std::string getGrammarFileName() const override;
@@ -82,8 +82,8 @@ public:
   class  CallContext : public antlr4::ParserRuleContext {
   public:
     enum Type {T,TA,TI,TIA,TO,TOC,TOA} type;
-    PoolParser::CallContext *callee = nullptr;;
-    PoolParser::CallContext *arg = nullptr;;
+    PoolParser::CallContext *callee = nullptr;
+    PoolParser::CallContext *arg = nullptr;
     CallContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     TermContext *term();
