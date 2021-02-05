@@ -7,7 +7,9 @@ options {
 
 program: statement* EOF;
 
-statement: call? SEMI;
+statement: (c=call | n=native)? SEMI;
+
+native: BACKTICK IDENTIFIER (DOT IDENTIFIER)* BACKTICK;
 
 call returns [enum Type {T,TA,TI,TIA,TO,TOC,TOA} type]:
 	callee=call DOT IDENTIFIER args {$type=CallContext::TIA;} |
@@ -20,16 +22,14 @@ call returns [enum Type {T,TA,TI,TIA,TO,TOC,TOA} type]:
 
 args: LP call? (COMMA call)* RP;
 
-term returns [enum Type {NIL,NUM,BLN,STR,FUN,ARR,PAR,BLK,IDT} type]:
-	null {$type=TermContext::NIL;} |
+term returns [enum Type {NUM,STR,FUN,ARR,PAR,BLK,IDT} type]:
 	num {$type=TermContext::NUM;} |
-	boolean {$type=TermContext::BLN;} |
 	string {$type=TermContext::STR;} |
 	fun {$type=TermContext::FUN;} |
 	array {$type=TermContext::ARR;} |
 	par {$type=TermContext::PAR;} |
 	block {$type=TermContext::BLK;} |
-	id {$type=TermContext::IDT;};
+	IDENTIFIER {$type=TermContext::IDT;};
 
 par: LP call? RP;
 
@@ -39,8 +39,6 @@ array: LSB call? (COMMA + call)* RSB;
 
 fun: (IDENTIFIER | (LP IDENTIFIER? (COMMA IDENTIFIER)* RP)) COLON LB statement* RB;
 
-id: IDENTIFIER;
-
 num returns [enum Type {DEC,HEX,BIN,FLT} type]:
 	DECIMAL_INTEGER_LITERAL {$type=NumContext::DEC;} |
 	HEX_INTEGER_LITERAL {$type=NumContext::HEX;} |
@@ -48,7 +46,3 @@ num returns [enum Type {DEC,HEX,BIN,FLT} type]:
 	FLOAT_LITERAL  {$type=NumContext::FLT;};
 
 string: STRING_LITERAL;
-
-boolean returns [bool value]: (TRUE {$value = true;} | FALSE {$value = false;});
-
-null: NULL_;

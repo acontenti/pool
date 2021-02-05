@@ -18,10 +18,10 @@ RSB:']';
 DOT:'.';
 COMMA:',';
 COLON:':';
-
-TRUE:'true';
-FALSE:'false';
-NULL_:'null';
+BACKTICK:'`';
+HASH:'#';
+AT:'@';
+QM:'?';
 
 fragment HEX_DIGIT: [0-9A-Fa-f];
 fragment BIN_DIGIT: [0-1];

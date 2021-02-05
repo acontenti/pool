@@ -13,16 +13,16 @@ class  PoolParser : public antlr4::Parser {
 public:
   enum {
     WS = 1, COMMENT = 2, LINE_COMMENT = 3, SEMI = 4, LP = 5, RP = 6, LB = 7, 
-    RB = 8, LSB = 9, RSB = 10, DOT = 11, COMMA = 12, COLON = 13, TRUE = 14, 
-    FALSE = 15, NULL_ = 16, DECIMAL_INTEGER_LITERAL = 17, HEX_INTEGER_LITERAL = 18, 
-    BIN_INTEGER_LITERAL = 19, FLOAT_LITERAL = 20, STRING_LITERAL = 21, IDENTIFIER = 22, 
-    OPERATOR = 23
+    RB = 8, LSB = 9, RSB = 10, DOT = 11, COMMA = 12, COLON = 13, BACKTICK = 14, 
+    HASH = 15, AT = 16, QM = 17, DECIMAL_INTEGER_LITERAL = 18, HEX_INTEGER_LITERAL = 19, 
+    BIN_INTEGER_LITERAL = 20, FLOAT_LITERAL = 21, STRING_LITERAL = 22, IDENTIFIER = 23, 
+    OPERATOR = 24
   };
 
   enum {
-    RuleProgram = 0, RuleStatement = 1, RuleCall = 2, RuleArgs = 3, RuleTerm = 4, 
-    RulePar = 5, RuleBlock = 6, RuleArray = 7, RuleFun = 8, RuleId = 9, 
-    RuleNum = 10, RuleString = 11, RuleBoolean = 12, RuleNull = 13
+    RuleProgram = 0, RuleStatement = 1, RuleNative = 2, RuleCall = 3, RuleArgs = 4, 
+    RuleTerm = 5, RulePar = 6, RuleBlock = 7, RuleArray = 8, RuleFun = 9, 
+    RuleNum = 10, RuleString = 11
   };
 
   explicit PoolParser(antlr4::TokenStream *input);
@@ -37,6 +37,7 @@ public:
 
   class ProgramContext;
   class StatementContext;
+  class NativeContext;
   class CallContext;
   class ArgsContext;
   class TermContext;
@@ -44,11 +45,8 @@ public:
   class BlockContext;
   class ArrayContext;
   class FunContext;
-  class IdContext;
   class NumContext;
-  class StringContext;
-  class BooleanContext;
-  class NullContext; 
+  class StringContext; 
 
   class  ProgramContext : public antlr4::ParserRuleContext {
   public:
@@ -67,10 +65,13 @@ public:
 
   class  StatementContext : public antlr4::ParserRuleContext {
   public:
+    PoolParser::CallContext *c = nullptr;
+    PoolParser::NativeContext *n = nullptr;
     StatementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *SEMI();
     CallContext *call();
+    NativeContext *native();
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -78,6 +79,24 @@ public:
   };
 
   StatementContext* statement();
+
+  class  NativeContext : public antlr4::ParserRuleContext {
+  public:
+    NativeContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    std::vector<antlr4::tree::TerminalNode *> BACKTICK();
+    antlr4::tree::TerminalNode* BACKTICK(size_t i);
+    std::vector<antlr4::tree::TerminalNode *> IDENTIFIER();
+    antlr4::tree::TerminalNode* IDENTIFIER(size_t i);
+    std::vector<antlr4::tree::TerminalNode *> DOT();
+    antlr4::tree::TerminalNode* DOT(size_t i);
+
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
+  };
+
+  NativeContext* native();
 
   class  CallContext : public antlr4::ParserRuleContext {
   public:
@@ -121,18 +140,16 @@ public:
 
   class  TermContext : public antlr4::ParserRuleContext {
   public:
-    enum Type {NIL,NUM,BLN,STR,FUN,ARR,PAR,BLK,IDT} type;
+    enum Type {NUM,STR,FUN,ARR,PAR,BLK,IDT} type;
     TermContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    NullContext *null();
     NumContext *num();
-    BooleanContext *boolean();
     StringContext *string();
     FunContext *fun();
     ArrayContext *array();
     ParContext *par();
     BlockContext *block();
-    IdContext *id();
+    antlr4::tree::TerminalNode *IDENTIFIER();
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -213,19 +230,6 @@ public:
 
   FunContext* fun();
 
-  class  IdContext : public antlr4::ParserRuleContext {
-  public:
-    IdContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *IDENTIFIER();
-
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
-  };
-
-  IdContext* id();
-
   class  NumContext : public antlr4::ParserRuleContext {
   public:
     enum Type {DEC,HEX,BIN,FLT} type;
@@ -255,34 +259,6 @@ public:
   };
 
   StringContext* string();
-
-  class  BooleanContext : public antlr4::ParserRuleContext {
-  public:
-    bool value;
-    BooleanContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *TRUE();
-    antlr4::tree::TerminalNode *FALSE();
-
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
-  };
-
-  BooleanContext* boolean();
-
-  class  NullContext : public antlr4::ParserRuleContext {
-  public:
-    NullContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *NULL_();
-
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
-  };
-
-  NullContext* null();
 
 
   virtual bool sempred(antlr4::RuleContext *_localctx, size_t ruleIndex, size_t predicateIndex) override;

@@ -20,6 +20,9 @@ public:
   virtual void enterStatement(PoolParser::StatementContext *ctx) = 0;
   virtual void exitStatement(PoolParser::StatementContext *ctx) = 0;
 
+  virtual void enterNative(PoolParser::NativeContext *ctx) = 0;
+  virtual void exitNative(PoolParser::NativeContext *ctx) = 0;
+
   virtual void enterCall(PoolParser::CallContext *ctx) = 0;
   virtual void exitCall(PoolParser::CallContext *ctx) = 0;
 
@@ -41,20 +44,11 @@ public:
   virtual void enterFun(PoolParser::FunContext *ctx) = 0;
   virtual void exitFun(PoolParser::FunContext *ctx) = 0;
 
-  virtual void enterId(PoolParser::IdContext *ctx) = 0;
-  virtual void exitId(PoolParser::IdContext *ctx) = 0;
-
   virtual void enterNum(PoolParser::NumContext *ctx) = 0;
   virtual void exitNum(PoolParser::NumContext *ctx) = 0;
 
   virtual void enterString(PoolParser::StringContext *ctx) = 0;
   virtual void exitString(PoolParser::StringContext *ctx) = 0;
-
-  virtual void enterBoolean(PoolParser::BooleanContext *ctx) = 0;
-  virtual void exitBoolean(PoolParser::BooleanContext *ctx) = 0;
-
-  virtual void enterNull(PoolParser::NullContext *ctx) = 0;
-  virtual void exitNull(PoolParser::NullContext *ctx) = 0;
 
 
 };

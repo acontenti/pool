@@ -22,6 +22,9 @@ public:
   virtual void enterStatement(PoolParser::StatementContext * /*ctx*/) override { }
   virtual void exitStatement(PoolParser::StatementContext * /*ctx*/) override { }
 
+  virtual void enterNative(PoolParser::NativeContext * /*ctx*/) override { }
+  virtual void exitNative(PoolParser::NativeContext * /*ctx*/) override { }
+
   virtual void enterCall(PoolParser::CallContext * /*ctx*/) override { }
   virtual void exitCall(PoolParser::CallContext * /*ctx*/) override { }
 
@@ -43,20 +46,11 @@ public:
   virtual void enterFun(PoolParser::FunContext * /*ctx*/) override { }
   virtual void exitFun(PoolParser::FunContext * /*ctx*/) override { }
 
-  virtual void enterId(PoolParser::IdContext * /*ctx*/) override { }
-  virtual void exitId(PoolParser::IdContext * /*ctx*/) override { }
-
   virtual void enterNum(PoolParser::NumContext * /*ctx*/) override { }
   virtual void exitNum(PoolParser::NumContext * /*ctx*/) override { }
 
   virtual void enterString(PoolParser::StringContext * /*ctx*/) override { }
   virtual void exitString(PoolParser::StringContext * /*ctx*/) override { }
-
-  virtual void enterBoolean(PoolParser::BooleanContext * /*ctx*/) override { }
-  virtual void exitBoolean(PoolParser::BooleanContext * /*ctx*/) override { }
-
-  virtual void enterNull(PoolParser::NullContext * /*ctx*/) override { }
-  virtual void exitNull(PoolParser::NullContext * /*ctx*/) override { }
 
 
   virtual void enterEveryRule(antlr4::ParserRuleContext * /*ctx*/) override { }

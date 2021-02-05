@@ -17,6 +17,8 @@ namespace pool {
 
 	class Object;
 
+	class Bool;
+
 	class Block;
 
 	class Executable;
@@ -25,27 +27,27 @@ namespace pool {
 
 	extern bool debug;
 	extern vector<shared_ptr<Object>> arguments;
-	extern const shared_ptr<Class> ClassClass;
-	extern const shared_ptr<Class> ObjectClass;
-	extern const shared_ptr<Class> BoolClass;
-	extern const shared_ptr<Class> IntegerClass;
-	extern const shared_ptr<Class> DecimalClass;
-	extern const shared_ptr<Class> StringClass;
-	extern const shared_ptr<Class> ArrayClass;
-	extern const shared_ptr<Class> VariableClass;
-	extern const shared_ptr<Class> BlockClass;
-	extern const shared_ptr<Class> FunClass;
-	extern const shared_ptr<Class> VoidClass;
-	extern const shared_ptr<Class> NothingClass;
-	extern const shared_ptr<Object> Void;
-	extern const shared_ptr<Object> Null;
+	extern unordered_map<string, shared_ptr<Object>> natives;
+	extern shared_ptr<Class> ClassClass;
+	extern shared_ptr<Class> ObjectClass;
+	extern shared_ptr<Class> BoolClass;
+	extern shared_ptr<Class> IntegerClass;
+	extern shared_ptr<Class> DecimalClass;
+	extern shared_ptr<Class> StringClass;
+	extern shared_ptr<Class> ArrayClass;
+	extern shared_ptr<Class> VariableClass;
+	extern shared_ptr<Class> BlockClass;
+	extern shared_ptr<Class> FunClass;
+	extern shared_ptr<Class> VoidClass;
+	extern shared_ptr<Class> NothingClass;
+	extern shared_ptr<Object> Void;
+	extern shared_ptr<Object> Null;
+	extern shared_ptr<Bool> True;
+	extern shared_ptr<Bool> False;
 
 	class Context : public enable_shared_from_this<Context> {
 		unordered_map<string, shared_ptr<Object>> heap;
 		const shared_ptr<Context> parent;
-
-		Context() : Context(nullptr) {}
-
 	public:
 		static const shared_ptr<Context> global;
 
@@ -86,11 +88,12 @@ namespace pool {
 		shared_ptr<Object> getVariableValue();
 
 	public:
+		constexpr static const string_view TYPE = "Object";
 		const size_t id;
 		const shared_ptr<Class> cls;
 		const shared_ptr<Context> context;
 
-		Object(shared_ptr<Context> context, shared_ptr<Class> cls);
+		Object(shared_ptr<Class> cls, const shared_ptr<Context>& context);
 
 		virtual string_view getType();
 
@@ -112,8 +115,6 @@ namespace pool {
 		virtual bool isVariable() const {
 			return false;
 		}
-
-		static shared_ptr<Object> create(const shared_ptr<Class> &cls, const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other);
 	};
 
 	class Class : public Object {
@@ -124,7 +125,7 @@ namespace pool {
 		string name;
 		shared_ptr<Class> super;
 
-		Class(string name, shared_ptr<Class> super, const shared_ptr<Context> &context);
+		Class(const shared_ptr<Context> &context, string name, shared_ptr<Class> super);
 
 		shared_ptr<Executable> getMethod(const string &methodName) const;
 
@@ -150,17 +151,16 @@ namespace pool {
 			return nullptr;
 		};
 
-		void addMethod(const string &methodName, const shared_ptr<Executable> &method);
-
-		void addMethod(const string &methodName, const method_t &method);
-
-		shared_ptr<Object> newInstance(const vector<shared_ptr<Object>> &other);
-
-		shared_ptr<Class> extend(const shared_ptr<Block> &other);
-
-		static shared_ptr<Class> create(const string &name, const shared_ptr<Class> &super, const shared_ptr<Context> &context = Context::global) {
-			return make_shared<Class>(name, super, context);
+		template<class T = Object, typename std::enable_if<std::is_base_of<Object, T>::value>::type * = nullptr, typename... Args>
+		shared_ptr<T> newInstance(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other = {}, Args &&... args) {
+			auto ptr = make_shared<T>(context, args...);
+			callInit(ptr, other);
+			return ptr;
 		}
+
+		shared_ptr<Class> extend(const string &className, const shared_ptr<Block> &other = nullptr);
+
+		static void callInit(const shared_ptr<Object> &ptr, const vector<shared_ptr<Object>> &other);
 	};
 
 	class Bool : public Object {
@@ -168,10 +168,10 @@ namespace pool {
 		bool value;
 		constexpr static const string_view TYPE = "Bool";
 
-		Bool(bool value, const shared_ptr<Context> &context) : Object(context, BoolClass), value(value) {}
+		Bool(const shared_ptr<Context> &context, bool value) : Object(BoolClass, context), value(value) {}
 
 		static shared_ptr<Bool> create(const bool &value, const shared_ptr<Context> &context) {
-			return make_shared<Bool>(value, context);
+			return make_shared<Bool>(context, value);
 		}
 	};
 
@@ -180,7 +180,7 @@ namespace pool {
 		int64_t value;
 		constexpr static const string_view TYPE = "Integer";
 
-		Integer(int64_t value, const shared_ptr<Context> &context) : Object(context, IntegerClass), value(value) {}
+		Integer(int64_t value, const shared_ptr<Context> &context) : Object(IntegerClass, context), value(value) {}
 
 		static shared_ptr<Integer> create(const int64_t &value, const shared_ptr<Context> &context) {
 			return make_shared<Integer>(value, context);
@@ -192,7 +192,7 @@ namespace pool {
 		double value;
 		constexpr static const string_view TYPE = "Decimal";
 
-		Decimal(double value, const shared_ptr<Context> &context) : Object(context, DecimalClass), value(value) {}
+		Decimal(double value, const shared_ptr<Context> &context) : Object(DecimalClass, context), value(value) {}
 
 		static shared_ptr<Decimal> create(const double &value, const shared_ptr<Context> &context) {
 			return make_shared<Decimal>(value, context);
@@ -204,12 +204,11 @@ namespace pool {
 		constexpr static const string_view TYPE = "String";
 		string value;
 
-		String(string value, const shared_ptr<Context> &context) : Object(context, StringClass), value(move(value)) {}
+		String(const shared_ptr<Context> &context, string value) : Object(StringClass, context), value(move(value)) {}
 
 		static shared_ptr<String> create(const string &value, const shared_ptr<Context> &context) {
-			return make_shared<String>(value, context);
+			return StringClass->newInstance<String>(context, {}, value);
 		}
-
 	};
 
 	class Callable {
@@ -270,6 +269,7 @@ namespace pool {
 		shared_ptr<Object> value;
 		bool immutable = false;
 	public:
+		constexpr static const string_view TYPE = "Variable";
 		const string name;
 
 		bool isImmutable() const {
@@ -311,7 +311,7 @@ namespace pool {
 		}
 
 		Variable(string name, shared_ptr<Object> value, const shared_ptr<Context> &context, bool immutable)
-				: Object(context, VariableClass), name(move(name)), value(move(value)), immutable(immutable) {
+				: Object(VariableClass, context), name(move(name)), value(move(value)), immutable(immutable) {
 		}
 
 		static shared_ptr<Variable> create(const string &name, const shared_ptr<Context> &context) {
@@ -324,7 +324,7 @@ namespace pool {
 		vector<string> params;
 
 		Executable(const vector<string> &params, const shared_ptr<Context> &context, const shared_ptr<Class> &cls)
-				: Object(context, cls), params(params) {}
+				: Object(cls, context), params(params) {}
 
 		virtual shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) = 0;
 	};
@@ -348,6 +348,7 @@ namespace pool {
 
 	class Fun : public Executable {
 	public:
+		constexpr static const string_view TYPE = "Fun";
 		vector<shared_ptr<Callable>> calls;
 
 		Fun(const vector<string> &params, vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
@@ -386,6 +387,7 @@ namespace pool {
 
 	class Block : public Executable, public Callable {
 	public:
+		constexpr static const string_view TYPE = "Block";
 		vector<shared_ptr<Callable>> calls;
 
 		Block(vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
@@ -409,6 +411,7 @@ namespace pool {
 
 	class Array : public Callable, public Executable {
 	public:
+		constexpr static const string_view TYPE = "Array";
 		vector<shared_ptr<Callable>> calls;
 		vector<shared_ptr<Object>> values;
 
@@ -424,8 +427,5 @@ namespace pool {
 		}
 	};
 
-	extern bool initialize() noexcept;
-
-	[[maybe_unused]]
-	extern const bool initialized;
+	extern void initialize();
 }

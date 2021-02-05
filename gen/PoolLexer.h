@@ -13,10 +13,10 @@ class  PoolLexer : public antlr4::Lexer {
 public:
   enum {
     WS = 1, COMMENT = 2, LINE_COMMENT = 3, SEMI = 4, LP = 5, RP = 6, LB = 7, 
-    RB = 8, LSB = 9, RSB = 10, DOT = 11, COMMA = 12, COLON = 13, TRUE = 14, 
-    FALSE = 15, NULL_ = 16, DECIMAL_INTEGER_LITERAL = 17, HEX_INTEGER_LITERAL = 18, 
-    BIN_INTEGER_LITERAL = 19, FLOAT_LITERAL = 20, STRING_LITERAL = 21, IDENTIFIER = 22, 
-    OPERATOR = 23
+    RB = 8, LSB = 9, RSB = 10, DOT = 11, COMMA = 12, COLON = 13, BACKTICK = 14, 
+    HASH = 15, AT = 16, QM = 17, DECIMAL_INTEGER_LITERAL = 18, HEX_INTEGER_LITERAL = 19, 
+    BIN_INTEGER_LITERAL = 20, FLOAT_LITERAL = 21, STRING_LITERAL = 22, IDENTIFIER = 23, 
+    OPERATOR = 24
   };
 
   explicit PoolLexer(antlr4::CharStream *input);

@@ -7,21 +7,24 @@ using namespace pool;
 size_t Class::COUNTER = 0;
 bool pool::debug = false;
 vector<shared_ptr<Object>> pool::arguments{};
-const shared_ptr<Context> Context::global = shared_ptr<Context>(new Context);
-const shared_ptr<Class> pool::ClassClass = Class::create(string(Class::TYPE), nullptr); //ObjectClass is null
-const shared_ptr<Class> pool::ObjectClass = Class::create("Object", nullptr);
-const shared_ptr<Class> pool::BoolClass = Class::create(string(Bool::TYPE), ObjectClass);
-const shared_ptr<Class> pool::IntegerClass = Class::create(string(Integer::TYPE), ObjectClass);
-const shared_ptr<Class> pool::DecimalClass = Class::create(string(Decimal::TYPE), ObjectClass);
-const shared_ptr<Class> pool::StringClass = Class::create(string(String::TYPE), ObjectClass);
-const shared_ptr<Class> pool::ArrayClass = Class::create("Array", ObjectClass);
-const shared_ptr<Class> pool::VariableClass = Class::create("Variable", ObjectClass);
-const shared_ptr<Class> pool::BlockClass = Class::create("Block", ObjectClass);
-const shared_ptr<Class> pool::FunClass = Class::create("Function", ObjectClass);
-const shared_ptr<Class> pool::VoidClass = Class::create("Void", ObjectClass);
-const shared_ptr<Class> pool::NothingClass = Class::create("Nothing", ObjectClass);
-const shared_ptr<Object> pool::Void = Object::create(VoidClass, Context::global, {});
-const shared_ptr<Object> pool::Null = Object::create(NothingClass, Context::global, {});
+unordered_map<string, shared_ptr<Object>> pool::natives{};
+const shared_ptr<Context> Context::global = Context::create(nullptr);
+shared_ptr<Class> pool::ClassClass = nullptr;
+shared_ptr<Class> pool::ObjectClass = nullptr;
+shared_ptr<Class> pool::BoolClass = nullptr;
+shared_ptr<Class> pool::IntegerClass = nullptr;
+shared_ptr<Class> pool::DecimalClass = nullptr;
+shared_ptr<Class> pool::StringClass = nullptr;
+shared_ptr<Class> pool::ArrayClass = nullptr;
+shared_ptr<Class> pool::VariableClass = nullptr;
+shared_ptr<Class> pool::BlockClass = nullptr;
+shared_ptr<Class> pool::FunClass = nullptr;
+shared_ptr<Class> pool::VoidClass = nullptr;
+shared_ptr<Class> pool::NothingClass = nullptr;
+shared_ptr<Object> pool::Void = nullptr;
+shared_ptr<Object> pool::Null = nullptr;
+shared_ptr<Bool> pool::True = nullptr;
+shared_ptr<Bool> pool::False = nullptr;
 
 template<>
 shared_ptr<Variable> Object::as() {
@@ -87,8 +90,8 @@ string Context::toString() const {
 	return ss.str();
 }
 
-Object::Object(shared_ptr<Context> context, shared_ptr<Class> cls)
-		: context(move(context)), cls(move(cls)), id(cls ? cls->instances++ : 0) {
+Object::Object(shared_ptr<Class> cls, const shared_ptr<Context> &context)
+		: context(context), cls(move(cls)), id(cls ? cls->instances++ : 0) {
 	if (this->cls) {
 		this->context->add("class", this->cls);
 	}
@@ -118,16 +121,8 @@ shared_ptr<Object> Object::getVariableValue() {
 	return reinterpret_pointer_cast<Variable>(shared_from_this())->getValue();
 }
 
-shared_ptr<Object> Object::create(const shared_ptr<Class> &cls, const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other) {
-	auto ptr = make_shared<Object>(Context::create(context), cls);
-	if (auto init = ptr->findMethod("init")) {
-		init->execute(ptr, other);
-	}
-	return ptr;
-}
-
-Class::Class(string name, shared_ptr<Class> super, const shared_ptr<Context> &context)
-		: Object(Context::create(context), ClassClass), name(move(name)), super(move(super)) {}
+Class::Class(const shared_ptr<Context> &context, string name, shared_ptr<Class> super)
+		: Object(ClassClass, Context::create(context)), name(move(name)), super(move(super)) {}
 
 shared_ptr<Executable> Class::getMethod(const string &methodName) const {
 	if (auto method = context->findMethod(methodName)) {
@@ -145,26 +140,30 @@ shared_ptr<Executable> Class::findMethod(const string &methodName) const {
 	} else return nullptr;
 }
 
-void Class::addMethod(const string &methodName, const method_t &method) {
-	addMethod(methodName, NativeFun::create(method));
-}
-
-void Class::addMethod(const string &methodName, const shared_ptr<Executable> &method) {
-	context->add(methodName, method);
-}
-
-shared_ptr<Object> Class::newInstance(const vector<shared_ptr<Object>> &other) {
-	return Object::create(this->as<Class>(), context, other);
-}
-
-shared_ptr<Class> Class::extend(const shared_ptr<Block> &other) {
-	other->invoke();
-	auto className = string(Class::TYPE) + to_string(Class::COUNTER++);
-	auto cls = Class::create(className, shared_from_this()->as<Class>(), context);
-	for (auto[name, value] : *other->context) {
-		cls->context->add(name, value->as<Object>());
+shared_ptr<Class> Class::extend(const string &className, const shared_ptr<Block> &other) {
+	auto self = this->as<Class>();
+	auto cls = ClassClass->newInstance<Class>(context, {}, className, self);
+	cls->context->set("super", self);
+	if (other) {
+		other->invoke();
+		for (auto[name, value] : *other->context) {
+			cls->context->add(name, value->as<Object>());
+		}
 	}
 	return cls;
+}
+
+void Class::callInit(const shared_ptr<Object> &ptr, const vector<shared_ptr<Object>> &other) {
+	if (auto init = ptr->findMethod("init")) {
+		init->execute(ptr, other);
+	}
+}
+
+template<>
+shared_ptr<Object> Class::newInstance<Object>(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other) {
+	auto ptr = make_shared<Object>(this->as<Class>(), context);
+	callInit(ptr, other);
+	return ptr;
 }
 
 shared_ptr<Object> Invocation::invoke() {
@@ -179,9 +178,11 @@ shared_ptr<Object> Invocation::invoke() {
 }
 
 shared_ptr<Object> Array::invoke() {
-	values.reserve(calls.size());
-	for (auto &call : calls) {
-		values.emplace_back(call->invoke());
+	if (values.size() != calls.size()) {
+		values.reserve(calls.size());
+		for (auto &call : calls) {
+			values.emplace_back(call->invoke());
+		}
 	}
 	return shared_from_this();
 }
@@ -199,24 +200,53 @@ shared_ptr<Object> Array::execute(const shared_ptr<Object> &self, const vector<s
 	} else throw execution_error("Array access needs an argument");
 }
 
-bool pool::initialize() noexcept try {
+void pool::initialize() {
+	natives["Class"] = ClassClass = make_shared<Class>(Context::global, string(Class::TYPE), nullptr); //ObjectClass is not yet created
+	natives["Object"] = ObjectClass = ClassClass->newInstance<Class>(Context::global, {}, string(Object::TYPE), nullptr);
 	ClassClass->super = ObjectClass;
-	ClassClass->addMethod("extend", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
-		if (other.size() == 1 && other[0]->getType() == "Block") {
-			return self->as<Class>()->extend(other[0]->as<Block>());
-		} else throw execution_error("Class extend argument must be a block");
+	natives["Bool"] = BoolClass = ObjectClass->extend(string(Bool::TYPE));
+	natives["Integer"] = IntegerClass = ObjectClass->extend(string(Integer::TYPE));
+	natives["Decimal"] = DecimalClass = ObjectClass->extend(string(Decimal::TYPE));
+	natives["String"] = StringClass = ObjectClass->extend(string(String::TYPE));
+	natives["Array"] = ArrayClass = ObjectClass->extend(string(Array::TYPE));
+	natives["Variable"] = VariableClass = ObjectClass->extend(string(Variable::TYPE));
+	natives["Block"] = BlockClass = ObjectClass->extend(string(Block::TYPE));
+	natives["Fun"] = FunClass = ObjectClass->extend(string(Fun::TYPE));
+	natives["Void"] = VoidClass = ObjectClass->extend("Void");
+	natives["Nothing"] = NothingClass = ObjectClass->extend("Nothing");
+	natives["void"] = Void = VoidClass->newInstance(Context::global);
+	natives["null"] = Null = NothingClass->newInstance(Context::global);
+	natives["true"] = True = BoolClass->newInstance<Bool>(Context::global, {}, true);
+	natives["false"] = False = BoolClass->newInstance<Bool>(Context::global, {}, false);
+	natives["Class.extend"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+		if (other.size() == 1) {
+			if (other[0]->getType() == Block::TYPE) {
+				auto name = string(Class::TYPE) + to_string(Class::COUNTER++);
+				return self->as<Class>()->extend(name, other[0]->as<Block>());
+			} else throw execution_error("Class.extend: first argument must be a block");
+		} else if (other.size() == 2) {
+			if (other[0]->getType() == String::TYPE) {
+				if (other[1]->getType() == Block::TYPE) {
+					auto name = other[0]->as<String>()->value;
+					return self->as<Class>()->extend(name, other[1]->as<Block>());
+				} else throw execution_error("Class.extend: second argument must be a block");
+			} else throw execution_error("Class.extend: first argument must be a string");
+		} else throw execution_error("Class.extend: invalid number of arguments");
 	});
-	ClassClass->addMethod("new", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Class.new"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto cls = self->as<Class>();
-		return cls->newInstance(other);
+		return cls->newInstance(Context::create(self->context), other);
 	});
-	ObjectClass->addMethod("toString", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
+	natives["Class.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
+		return String::create("Class:" + self->as<Class>()->name, self->context);
+	});
+	natives["Object.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
 		return String::create(self->toString(), self->context);
 	});
-	ObjectClass->addMethod("type", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
+	natives["Object.type"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
 		return String::create(self->as<Object>()->context->toString(), self->context);
 	});
-	ObjectClass->addMethod("println", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Object.println"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		shared_ptr<Object> var = self->as<Object>();
 		if (auto method = var->findMethod("toString")) {
 			auto result = method->execute(var, {});
@@ -226,35 +256,19 @@ bool pool::initialize() noexcept try {
 		}
 		return Void;
 	});
-	Context::global->add("Object", ObjectClass);
-	VoidClass->addMethod("toString", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Void.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		return String::create("void", self->context);
 	});
-	NothingClass->addMethod("toString", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Nothing.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		return String::create("null", self->context);
 	});
-	BoolClass->addMethod("toString", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Bool.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		return String::create(self->as<Bool>()->value ? "true" : "false", self->context);
 	});
-	BoolClass->addMethod("!", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Bool.!"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		return Bool::create(!self->as<Bool>()->value, self->context);
 	});
-	Context::global->add("Conditional");
-//	BoolClass->addMethod("then", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
-//		if (other.size() == 1 && other[0]->getType() == "Block") {
-//			bool condition = self->as<Bool>()->value;
-//			if (condition) {
-//				other[0]->as<Block>()->invoke();
-//			}
-//			auto conditional = self->context->find("Conditional");
-//			if (conditional)
-//				if (auto newF = conditional->findMethod("->")) {
-//					return newF->execute(conditional, {Bool::create(condition, self->context)});
-//				}
-//			throw execution_error("Method -> not found");
-//		} else return Null;
-//	});
-	IntegerClass->addMethod("+", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Integer.+"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto value = self->as<Integer>()->value;
 		if (other.size() != 1)
 			return Null;
@@ -267,7 +281,7 @@ bool pool::initialize() noexcept try {
 			return String::create(to_string(value) + par->as<String>()->value, self->context);
 		} else return Null;
 	});
-	IntegerClass->addMethod("-", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Integer.-"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto value = self->as<Integer>()->value;
 		if (other.size() != 1)
 			return Null;
@@ -278,15 +292,15 @@ bool pool::initialize() noexcept try {
 			return Decimal::create(value - par->as<Decimal>()->value, self->context);
 		} else return Null;
 	});
-	IntegerClass->addMethod("++", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Integer.++"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		self->as<Integer>()->value++;
 		return self;
 	});
-	IntegerClass->addMethod("--", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Integer.--"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		self->as<Integer>()->value--;
 		return self;
 	});
-	IntegerClass->addMethod("+=", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Integer.+="] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto ptr = self->as<Integer>();
 		if (other.size() != 1)
 			return Null;
@@ -298,7 +312,7 @@ bool pool::initialize() noexcept try {
 		} else return Null;
 		return self;
 	});
-	IntegerClass->addMethod("-=", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Integer.-="] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto ptr = self->as<Integer>();
 		if (other.size() != 1)
 			return Null;
@@ -310,10 +324,10 @@ bool pool::initialize() noexcept try {
 		} else return Null;
 		return self;
 	});
-	IntegerClass->addMethod("toString", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Integer.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		return String::create(to_string(self->as<Integer>()->value), self->context);
 	});
-	DecimalClass->addMethod("+", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Decimal.+"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto value = self->as<Decimal>()->value;
 		if (other.size() != 1)
 			return Null;
@@ -326,7 +340,7 @@ bool pool::initialize() noexcept try {
 			return String::create(to_string(value) + par->as<String>()->value, self->context);
 		} else return Null;
 	});
-	DecimalClass->addMethod("-", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Decimal.-"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto value = self->as<Decimal>()->value;
 		if (other.size() != 1)
 			return Null;
@@ -337,7 +351,7 @@ bool pool::initialize() noexcept try {
 			return Decimal::create(value - par->as<Decimal>()->value, self->context);
 		} else return Null;
 	});
-	DecimalClass->addMethod("+=", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Decimal.+="] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto ptr = self->as<Decimal>();
 		if (other.size() != 1)
 			return Null;
@@ -349,7 +363,7 @@ bool pool::initialize() noexcept try {
 		} else return Null;
 		return self;
 	});
-	DecimalClass->addMethod("-=", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Decimal.-="] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto ptr = self->as<Decimal>();
 		if (other.size() != 1)
 			return Null;
@@ -361,10 +375,10 @@ bool pool::initialize() noexcept try {
 		} else return Null;
 		return self;
 	});
-	DecimalClass->addMethod("toString", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Decimal.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		return String::create(to_string(self->as<Decimal>()->value), self->context);
 	});
-	StringClass->addMethod("+", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["String.+"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		if (other.size() == 1) {
 			shared_ptr<Object> var = other[0]->as<Object>();
 			if (auto method = var->findMethod("toString")) {
@@ -376,10 +390,10 @@ bool pool::initialize() noexcept try {
 		}
 		return Null;
 	});
-	StringClass->addMethod("toString", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["String.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		return self;
 	});
-	StringClass->addMethod("import", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["String.import"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto moduleName = self->as<String>()->value;
 		try {
 			Pool::execute(moduleName);
@@ -388,41 +402,18 @@ bool pool::initialize() noexcept try {
 		}
 		return Void;
 	});
-	VariableClass->addMethod("=", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Variable.="] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		const shared_ptr<Object> value = other.size() == 1 ? other[0] : Void;
 		self->as<Variable>()->setValue(value->as<Object>());
 		return self;
 	});
-	VariableClass->addMethod("=>", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Variable.=>"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		const shared_ptr<Object> value = other.size() == 1 ? other[0] : Void;
 		self->as<Variable>()->setValue(value->as<Object>());
 		self->as<Variable>()->setImmutable(true);
 		return self;
 	});
-	BlockClass->addMethod("toString", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
-		stringstream ss;
-		auto ctx = self->context;
-		ss << "{";
-		if (!ctx->empty()) {
-			for (auto &[name, value] : *ctx) {
-				shared_ptr<Object> var = value->as<Object>();
-				if (auto method = var->findMethod("toString")) {
-					auto result = method->execute(var, {});
-					ss << name << ":";
-					if (result->getType() == String::TYPE) {
-						ss << result->as<String>()->value;
-					} else {
-						ss << result;
-					}
-					ss << ",";
-				}
-			}
-			ss.seekp(-1, stringstream::cur); //remove last comma
-		}
-		ss << "}";
-		return String::create(ss.str(), ctx);
-	});
-	FunClass->addMethod("classmethod", [](const shared_ptr<Object> &fself, const vector<shared_ptr<Object>> &fother) -> shared_ptr<Object> {
+	natives["Fun.classmethod"] = NativeFun::create([](const shared_ptr<Object> &fself, const vector<shared_ptr<Object>> &fother) -> shared_ptr<Object> {
 		return NativeFun::create([fself](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 			if (self->getType() == Class::TYPE) {
 				return fself->as<Executable>()->execute(self->as<Object>(), other);
@@ -431,7 +422,7 @@ bool pool::initialize() noexcept try {
 			}
 		});
 	});
-	FunClass->addMethod("staticmethod", [](const shared_ptr<Object> &fself, const vector<shared_ptr<Object>> &fother) -> shared_ptr<Object> {
+	natives["Fun.staticmethod"] = NativeFun::create([](const shared_ptr<Object> &fself, const vector<shared_ptr<Object>> &fother) -> shared_ptr<Object> {
 		return NativeFun::create([fself](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 			if (self->getType() == Class::TYPE) {
 				return fself->as<Executable>()->execute(nullptr, other);
@@ -440,7 +431,7 @@ bool pool::initialize() noexcept try {
 			}
 		});
 	});
-	FunClass->addMethod("toString", [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+	natives["Fun.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		stringstream ss;
 		auto fun = self->as<Executable>();
 		ss << "Function@" << fun->id << "(";
@@ -453,11 +444,4 @@ bool pool::initialize() noexcept try {
 		ss << ")";
 		return String::create(ss.str(), fun->context);
 	});
-	return true;
-} catch (...) {
-	cerr << "Initialization error" << endl;
-	return false;
 }
-
-[[maybe_unused]]
-const bool pool::initialized = initialize();

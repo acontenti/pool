@@ -1,6 +1,7 @@
 #include <iostream>
 #include <filesystem>
 #include <chrono>
+#include <numeric>
 #include "poolstd.hpp"
 #include "pool.hpp"
 #include "../lib/termcolor.hpp"
@@ -13,6 +14,8 @@ namespace fs = filesystem;
 shared_ptr<Fun> parseProgram(PoolParser::ProgramContext *ast, const vector<string> &params, const shared_ptr<Context> &context);
 
 shared_ptr<Callable> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context);
+
+shared_ptr<Callable> parseNative(PoolParser::NativeContext *ast, const shared_ptr<Context> &context);
 
 std::string getExecutionTime(high_resolution_clock::time_point startTime, high_resolution_clock::time_point endTime) {
 	auto execution_time_ms = duration_cast<std::chrono::microseconds>(endTime - startTime).count();
@@ -29,6 +32,11 @@ std::string getExecutionTime(high_resolution_clock::time_point startTime, high_r
 	if (execution_time_ms > 0)
 		output << execution_time_ms % long(1E+3) << "ms";
 	return output.str();
+}
+
+void Pool::initialiaze() {
+	pool::initialize();
+	Pool::execute("std");
 }
 
 void Pool::setOptions(const Settings &settings) {
@@ -164,19 +172,17 @@ vector<shared_ptr<Callable>> parseStatements(const vector<PoolParser::StatementC
 	vector<shared_ptr<Callable>> result;
 	result.reserve(statements.size());
 	for (auto ast : statements) {
-		auto call = parseCall(ast->call(), context);
-		result.emplace_back(call);
+		if (ast->c)
+			result.emplace_back(parseCall(ast->c, context));
+		else if (ast->n)
+			result.emplace_back(parseNative(ast->n, context));
 	}
 	return result;
 }
 
-shared_ptr<Bool> parseBool(PoolParser::BooleanContext *ast, const shared_ptr<Context> &context) {
-	return Bool::create(ast->value, context);
-}
-
 shared_ptr<String> parseString(PoolParser::StringContext *ast, const shared_ptr<Context> &context) {
 	auto value = ast->STRING_LITERAL()->getText();
-	value = unescapeString( value.substr(1, value.size() - 2));
+	value = unescapeString(value.substr(1, value.size() - 2));
 	return String::create(value, context);
 }
 
@@ -210,12 +216,8 @@ shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<C
 
 shared_ptr<Callable> parseTerm(PoolParser::TermContext *ast, const shared_ptr<Context> &context) {
 	switch (ast->type) {
-		case PoolParser::TermContext::NIL:
-			return Identity::create(Null);
 		case PoolParser::TermContext::NUM:
 			return Identity::create(parseNum(ast->num(), context));
-		case PoolParser::TermContext::BLN:
-			return Identity::create(parseBool(ast->boolean(), context));
 		case PoolParser::TermContext::STR:
 			return Identity::create(parseString(ast->string(), context));
 		case PoolParser::TermContext::FUN:
@@ -227,7 +229,7 @@ shared_ptr<Callable> parseTerm(PoolParser::TermContext *ast, const shared_ptr<Co
 		case PoolParser::TermContext::BLK:
 			return Identity::create(parseBlock(ast->block(), context));
 		case PoolParser::TermContext::IDT:
-			return Identity::create(parseIdentifier(ast->id()->IDENTIFIER(), context));
+			return Identity::create(parseIdentifier(ast->IDENTIFIER(), context));
 		default:
 			throw execution_error("Invalid execution point");
 	}
@@ -293,19 +295,45 @@ shared_ptr<Callable> parseCall(PoolParser::CallContext *ast, const shared_ptr<Co
 	} else return Identity::create(Void);
 }
 
+shared_ptr<Callable> parseNative(PoolParser::NativeContext *ast, const shared_ptr<Context> &context) {
+	auto ids = ast->IDENTIFIER();
+	auto path = accumulate(ids.begin(), ids.end(), string(), [](const string &acc, tree::TerminalNode *node) {
+		return acc + "." + getId(node);
+	}).substr(1);
+	auto iterator = natives.find(path);
+	if (iterator != natives.end()) {
+		if (ids.size() == 1) {
+			shared_ptr<Object> ptr = parseIdentifier(ids[0], context);
+			if (ptr->isVariable()) {
+				ptr->as<Variable>()->setValue(iterator->second);
+				ptr->as<Variable>()->setImmutable(true);
+			} else throw execution_error("Something wrong happened");
+		} else if (ids.size() == 2) {
+			shared_ptr<Object> caller = parseIdentifier(ids[0], context)->as<Object>();
+			caller->context->set(getId(ids[1]), iterator->second);
+		} else throw Pool::compile_fatal("Maximum access depth is 1", ids[3]->getSymbol());
+	} else throw Pool::compile_fatal("Native symbol not found", ast->getStart());
+	return Identity::create(Void);
+}
+
 shared_ptr<Fun> parseProgram(PoolParser::ProgramContext *ast, const vector<string> &params, const shared_ptr<Context> &context) {
 	auto statements = parseStatements(ast->statement(), context);
 	return Fun::create(params, statements, context);
 }
 
-size_t getNextLineToken(Token *token, Token *original = nullptr) {
-	if (!original)
-		original = token;
-	if (token) {
-		if (token->getLine() > original->getLine()) {
-			return token->getStartIndex() - token->getCharPositionInLine() - 1;
-		} else return getNextLineToken(token->getTokenSource()->nextToken().get(), original);
-	} else return original->getStopIndex();
+size_t getNextLineToken(unique_ptr<Token> &&token, Token *original = nullptr) {
+	auto &t = token;
+	while (t) {
+		if (t->getLine() > original->getLine()) {
+			return t->getStartIndex() - t->getCharPositionInLine() - 1;
+		} else {
+			auto orig = t->getStartIndex();
+			t = t->getTokenSource()->nextToken();
+			if (t && t->getStartIndex() == orig)
+				break;
+		}
+	}
+	return original->getStopIndex();
 }
 
 void Pool::compile_error(const std::string &message, Token *token, ostream &stream) noexcept {
@@ -318,7 +346,8 @@ void Pool::compile_error(const string &message, Token *token, size_t line, size_
 	}
 	stream << termcolor::red << termcolor::bold << "ERROR: " << termcolor::reset << message << std::endl;
 	if (token) {
-		misc::Interval interval(token->getStartIndex() - token->getCharPositionInLine(), getNextLineToken(token));
+		misc::Interval interval(token->getStartIndex() -
+								token->getCharPositionInLine(), getNextLineToken(token->getTokenSource()->nextToken(), token));
 		auto code = token->getInputStream()->getText(interval);
 		code = rtrim(code.substr(0, code.find_first_of('\n')));
 		stream << "  " << termcolor::red << code << termcolor::reset << endl;

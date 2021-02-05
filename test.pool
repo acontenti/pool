@@ -53,13 +53,14 @@ $z println;
 $z.$c = 5;
 $z.$c println;
 $z println;
-$Test = ($Object extend {
+$Test => $Object extend ("Test", {
 	$init = ($this, $who) : {
 		$this.$long = 0;
 		$this.$int = 0;
-		//("init: this = " + $this) println;
-		//("init: class = " + $this.$class) println;
-		//("init: who = " + $who) println;
+		("init: this = " + $this) println;
+		("init: class = " + $this.$class) println;
+		("init: super = " + $this.$class.$super) println;
+		("init: who = " + $who) println;
 	};
 	$++ = ($this) : {
 		("++: this = " + $this) println;
@@ -70,6 +71,9 @@ $Test = ($Object extend {
 		("print: this = " + $this) println;
 		("print: class = " + $this.$class) println;
 		$this.$long println;
+	};
+	$toString = ($this) : {
+		"This is an instance of class Test, " + $this.$class.$toString();
 	};
 	$number = 0;
 	$no = ($class, $who) : {
@@ -87,8 +91,11 @@ $Test = ($Object extend {
 $n = $Test new "yes";
 ("$n: " + $n) println;
 ("$Test.$class: " + $Test.$class) println;
+("$Test.$class.$super = " + $Test.$class.$super) println;
 ("$Test: " + $Test) println;
+("$Test.$super = " + $Test.$super) println;
 ("$n.$class: " + $n.$class) println;
+("$n.$class.$super = " + $n.$class.$super) println;
 ("$Object.$class: " + $Object.$class) println;
 $Test no "you";
 $n no "me";
@@ -99,7 +106,7 @@ $n maybe "me";
 ("prop test: " + ($Test type)) println;
 $z.$c ++;
 $z.$c.$d.$e println;
-($x = true !) println;
+($x = $true !) println;
 $abc = {$a = $x;}();
 $abc println;
 $x = 1;

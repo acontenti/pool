@@ -1,20 +1,57 @@
-$Conditional = ($Object extend {
-	$init = ($this, $condition) : {
-		$this.$condition = $condition;
-	};
-	$elif = ($this, $condition) : {
-		$return;
-		(! $this.$condition) then {
-			$return = $condition;
-		};
-		($this.$condition) then {
-        	$return = false;
-        };
-        $return;
-	};
-	$else = ($this, $action) : {
-		(! $this.$condition) then {
-			$action();
-		};
-	};
-});
+`$Class`;
+`$Class.$extend`;
+`$Class.$new`;
+`$Class.$toString`;
+
+`$Object`;
+`$Object.$toString`;
+`$Object.$type`;
+`$Object.$println`;
+
+`$Bool`;
+`$Bool.$toString`;
+`$Bool.$!`;
+`$true`;
+`$false`;
+
+`$Integer`;
+`$Integer.$+`;
+`$Integer.$-`;
+`$Integer.$++`;
+`$Integer.$--`;
+`$Integer.$+=`;
+`$Integer.$-=`;
+`$Integer.$toString`;
+
+`$String`;
+`$String.$+`;
+`$String.$toString`;
+`$String.$import`;
+
+`$Decimal`;
+`$Decimal.$+`;
+`$Decimal.$-`;
+`$Decimal.$+=`;
+`$Decimal.$-=`;
+`$Decimal.$toString`;
+
+`$Array`;
+
+`$Variable`;
+`$Variable.$=`;
+`$Variable.$=>`;
+
+`$Block`;
+
+`$Fun`;
+`$Fun.$classmethod`;
+`$Fun.$staticmethod`;
+`$Fun.$toString`;
+
+`$Void`;
+`$Void.$toString`;
+`$void`;
+
+`$Nothing`;
+`$Nothing.$toString`;
+`$null`;
