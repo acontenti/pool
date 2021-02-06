@@ -25,7 +25,7 @@ $Integer::$toString => `Integer.toString`;
 
 $String => `String`;
 $String::$+ => `String.+`;
-$String::$toString => `String.toString`;
+$String::$toString => ($this) : {$this;};
 $String::$import => `String.import`;
 
 $Decimal => `Decimal`;
@@ -47,9 +47,9 @@ $Fun::$staticmethod => `Fun.staticmethod`;
 $Fun::$toString => `Fun.toString`;
 
 $Void => `Void`;
-$Void::$toString => `Void.toString`;
+$Void::$toString => ($this) : {"void";};
 $void => `void`;
 
 $Nothing => `Nothing`;
-$Nothing::$toString => `Nothing.toString`;
+$Nothing::$toString => ($this) : {"null";};
 $null => `null`;

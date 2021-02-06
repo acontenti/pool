@@ -39,7 +39,7 @@ block: LB statement* RB;
 
 array: LSB call? (COMMA + call)* RSB;
 
-fun: (IDENTIFIER | (LP IDENTIFIER? (COMMA IDENTIFIER)* RP)) COLON LB statement* RB;
+fun: LP IDENTIFIER? (COMMA IDENTIFIER)* RP COLON LB statement* RB;
 
 num returns [enum Type {DEC,HEX,BIN,FLT} type]:
 	DECIMAL_INTEGER_LITERAL {$type=NumContext::DEC;} |

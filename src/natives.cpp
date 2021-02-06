@@ -88,12 +88,6 @@ void pool::initialize() {
 		}
 		return Void;
 	});
-	natives["Void.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
-		return String::create("void", self->context);
-	});
-	natives["Nothing.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
-		return String::create("null", self->context);
-	});
 	natives["Bool.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		return String::create(self->as<Bool>()->value ? "true" : "false", self->context);
 	});
@@ -221,9 +215,6 @@ void pool::initialize() {
 			}
 		}
 		return Null;
-	});
-	natives["String.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
-		return self;
 	});
 	natives["String.import"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto moduleName = self->as<String>()->value;

@@ -20,8 +20,6 @@ namespace pool {
 
 	class Executable;
 
-	using method_t = function<shared_ptr<Object>(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other)>;
-
 	extern bool debug;
 	extern vector<shared_ptr<Object>> arguments;
 	extern unordered_map<string, shared_ptr<Object>> natives;
@@ -234,6 +232,8 @@ namespace pool {
 
 		virtual shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) = 0;
 	};
+
+	using method_t = function<shared_ptr<Object>(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other)>;
 
 	class NativeFun : public Executable {
 	public:
