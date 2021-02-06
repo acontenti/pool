@@ -32,10 +32,10 @@ $z = {
 };
 $empty = ():{};
 $empty() println;
-():{}() println;
+(():{})() println;
 $empty = {};
 $empty() println;
-{}() println;
+({})() println;
 $fun println;
 $fun.$b println;
 $res = $fun(100, 100);
@@ -80,7 +80,7 @@ $Test => $Object extend ("Test", {
 		("no: class = " + $class) println;
 		("no: who = " + $who) println;
 	} classmethod;
-	$yes = ($this, $who) : {
+	$yes = ($who) : {
 		("yes: who = " + $who) println;
 	} staticmethod;
 	$maybe = ($this, $who) : {
@@ -107,13 +107,13 @@ $n maybe "me";
 $z.$c ++;
 $z.$c.$d.$e println;
 ($x = $true !) println;
-$abc = {$a = $x;}();
+$abc = ({$a = $x;})();
 $abc println;
 $x = 1;
-$b = {
+$b = ({
 	$x ++;
-	$a = {$f = $x;}();
-}();
+	$a = ({$f = $x;})();
+})();
 $b.$a.$f println;
 
 "mod" import;

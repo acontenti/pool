@@ -22,9 +22,6 @@ public:
   virtual void enterStatement(PoolParser::StatementContext * /*ctx*/) override { }
   virtual void exitStatement(PoolParser::StatementContext * /*ctx*/) override { }
 
-  virtual void enterNative(PoolParser::NativeContext * /*ctx*/) override { }
-  virtual void exitNative(PoolParser::NativeContext * /*ctx*/) override { }
-
   virtual void enterCall(PoolParser::CallContext * /*ctx*/) override { }
   virtual void exitCall(PoolParser::CallContext * /*ctx*/) override { }
 

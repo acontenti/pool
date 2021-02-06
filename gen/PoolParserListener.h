@@ -20,9 +20,6 @@ public:
   virtual void enterStatement(PoolParser::StatementContext *ctx) = 0;
   virtual void exitStatement(PoolParser::StatementContext *ctx) = 0;
 
-  virtual void enterNative(PoolParser::NativeContext *ctx) = 0;
-  virtual void exitNative(PoolParser::NativeContext *ctx) = 0;
-
   virtual void enterCall(PoolParser::CallContext *ctx) = 0;
   virtual void exitCall(PoolParser::CallContext *ctx) = 0;
 

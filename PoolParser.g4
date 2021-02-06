@@ -7,28 +7,30 @@ options {
 
 program: statement* EOF;
 
-statement: (c=call | n=native)? SEMI;
+statement: (call)? SEMI;
 
-native: BACKTICK IDENTIFIER (DOT IDENTIFIER)* BACKTICK;
-
-call returns [enum Type {T,TA,TI,TIA,TO,TOC,TOA} type]:
-	callee=call DOT IDENTIFIER args {$type=CallContext::TIA;} |
-	callee=call DOT IDENTIFIER {$type=CallContext::TI;} |
-    <assoc=right> callee=call args {$type=CallContext::TA;} |
-	<assoc=right> callee=call OPERATOR args {$type=CallContext::TOA;} |
-	<assoc=right> callee=call OPERATOR arg=call {$type=CallContext::TOC;} |
-	<assoc=right> callee=call OPERATOR {$type=CallContext::TO;} |
+call returns [enum Type {AA,A,LAA,LA,IA,PA,O,OA,OC,T} type]:
+	callee=call DOT IDENTIFIER args {$type=CallContext::AA;} |
+	callee=call DOT IDENTIFIER {$type=CallContext::A;} |
+	callee=call SQ IDENTIFIER args {$type=CallContext::LAA;} |
+	callee=call SQ IDENTIFIER {$type=CallContext::LA;} |
+    <assoc=right> IDENTIFIER args {$type=CallContext::IA;} |
+    <assoc=right> LP callee=call RP args {$type=CallContext::PA;} |
+	<assoc=right> callee=call OPERATOR {$type=CallContext::O;} |
+	<assoc=right> callee=call OPERATOR args {$type=CallContext::OA;} |
+	<assoc=right> callee=call OPERATOR arg=call {$type=CallContext::OC;} |
 	term {$type=CallContext::T;};
 
 args: LP call? (COMMA call)* RP;
 
-term returns [enum Type {NUM,STR,FUN,ARR,PAR,BLK,IDT} type]:
+term returns [enum Type {NUM,STR,FUN,ARR,PAR,BLK,NSM,IDT} type]:
 	num {$type=TermContext::NUM;} |
 	string {$type=TermContext::STR;} |
 	fun {$type=TermContext::FUN;} |
 	array {$type=TermContext::ARR;} |
 	par {$type=TermContext::PAR;} |
 	block {$type=TermContext::BLK;} |
+	NATIVE_SYMBOL {$type=TermContext::NSM;} |
 	IDENTIFIER {$type=TermContext::IDT;};
 
 par: LP call? RP;

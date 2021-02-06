@@ -15,8 +15,6 @@ shared_ptr<Fun> parseProgram(PoolParser::ProgramContext *ast, const vector<strin
 
 shared_ptr<Callable> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context);
 
-shared_ptr<Callable> parseNative(PoolParser::NativeContext *ast, const shared_ptr<Context> &context);
-
 std::string getExecutionTime(high_resolution_clock::time_point startTime, high_resolution_clock::time_point endTime) {
 	auto execution_time_ms = duration_cast<std::chrono::microseconds>(endTime - startTime).count();
 	auto execution_time_sec = duration_cast<std::chrono::seconds>(endTime - startTime).count();
@@ -172,10 +170,7 @@ vector<shared_ptr<Callable>> parseStatements(const vector<PoolParser::StatementC
 	vector<shared_ptr<Callable>> result;
 	result.reserve(statements.size());
 	for (auto ast : statements) {
-		if (ast->c)
-			result.emplace_back(parseCall(ast->c, context));
-		else if (ast->n)
-			result.emplace_back(parseNative(ast->n, context));
+		result.emplace_back(parseCall(ast->call(), context));
 	}
 	return result;
 }
@@ -214,6 +209,14 @@ shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<C
 	return Fun::create(params, statements, context);
 }
 
+shared_ptr<Callable> parseNative(tree::TerminalNode *ast, const shared_ptr<Context> &context) {
+	auto id = ast->getText().substr(1, ast->getText().length() - 2);
+	auto iterator = natives.find(id);
+	if (iterator != natives.end()) {
+		return Identity::create(iterator->second);
+	} else throw Pool::compile_fatal("Native symbol not found", ast->getSymbol());
+}
+
 shared_ptr<Callable> parseTerm(PoolParser::TermContext *ast, const shared_ptr<Context> &context) {
 	switch (ast->type) {
 		case PoolParser::TermContext::NUM:
@@ -228,6 +231,8 @@ shared_ptr<Callable> parseTerm(PoolParser::TermContext *ast, const shared_ptr<Co
 			return parseCall(ast->par()->call(), context);
 		case PoolParser::TermContext::BLK:
 			return Identity::create(parseBlock(ast->block(), context));
+		case PoolParser::TermContext::NSM:
+			return parseNative(ast->NATIVE_SYMBOL(), context);
 		case PoolParser::TermContext::IDT:
 			return Identity::create(parseIdentifier(ast->IDENTIFIER(), context));
 		default:
@@ -252,37 +257,55 @@ shared_ptr<Callable> parseCall(PoolParser::CallContext *ast, const shared_ptr<Co
 				auto caller = parseTerm(ast->term(), context);
 				return caller;
 			}
-			case PoolParser::CallContext::TA: {
+			case PoolParser::CallContext::PA: {
 				auto caller = parseCall(ast->callee, context);
 				auto callee = parseArgs(ast->args(), context);
 				return Invocation::create(caller, caller, callee);
 			}
-			case PoolParser::CallContext::TI: {
+			case PoolParser::CallContext::IA: {
+				auto id = parseIdentifier(ast->IDENTIFIER(), context);
+				auto access = Identity::create(id);
+				auto callee = parseArgs(ast->args(), context);
+				return Invocation::create(access, access, callee);
+			}
+			case PoolParser::CallContext::A: {
 				auto caller = parseCall(ast->callee, context);
 				auto id = getId(ast->IDENTIFIER());
 				return Access::create(caller, id);
 			}
-			case PoolParser::CallContext::TIA: {
+			case PoolParser::CallContext::AA: {
 				auto caller = parseCall(ast->callee, context);
 				auto id = getId(ast->IDENTIFIER());
 				auto access = Access::create(caller, id);
 				auto callee = parseArgs(ast->args(), context);
 				return Invocation::create(caller, access, callee);
 			}
-			case PoolParser::CallContext::TO: {
+			case PoolParser::CallContext::LA: {
+				auto caller = parseCall(ast->callee, context);
+				auto id = getId(ast->IDENTIFIER());
+				return LocalAccess::create(caller, id);
+			}
+			case PoolParser::CallContext::LAA: {
+				auto caller = parseCall(ast->callee, context);
+				auto id = getId(ast->IDENTIFIER());
+				auto access = LocalAccess::create(caller, id);
+				auto callee = parseArgs(ast->args(), context);
+				return Invocation::create(caller, access, callee);
+			}
+			case PoolParser::CallContext::O: {
 				auto caller = parseCall(ast->callee, context);
 				auto id = ast->OPERATOR()->getText();
 				auto access = Access::create(caller, id);
 				return Invocation::create(caller, access, {});
 			}
-			case PoolParser::CallContext::TOC: {
+			case PoolParser::CallContext::OC: {
 				auto caller = parseCall(ast->callee, context);
 				auto id = ast->OPERATOR()->getText();
 				auto callee = parseCall(ast->arg, context);
 				auto access = Access::create(caller, id);
 				return Invocation::create(caller, access, {callee});
 			}
-			case PoolParser::CallContext::TOA: {
+			case PoolParser::CallContext::OA: {
 				auto caller = parseCall(ast->callee, context);
 				auto id = ast->OPERATOR()->getText();
 				auto access = Access::create(caller, id);
@@ -293,27 +316,6 @@ shared_ptr<Callable> parseCall(PoolParser::CallContext *ast, const shared_ptr<Co
 				throw Pool::compile_fatal("invalid call", ast->getStart());
 		}
 	} else return Identity::create(Void);
-}
-
-shared_ptr<Callable> parseNative(PoolParser::NativeContext *ast, const shared_ptr<Context> &context) {
-	auto ids = ast->IDENTIFIER();
-	auto path = accumulate(ids.begin(), ids.end(), string(), [](const string &acc, tree::TerminalNode *node) {
-		return acc + "." + getId(node);
-	}).substr(1);
-	auto iterator = natives.find(path);
-	if (iterator != natives.end()) {
-		if (ids.size() == 1) {
-			shared_ptr<Object> ptr = parseIdentifier(ids[0], context);
-			if (ptr->isVariable()) {
-				ptr->as<Variable>()->setValue(iterator->second);
-				ptr->as<Variable>()->setImmutable(true);
-			} else throw execution_error("Something wrong happened");
-		} else if (ids.size() == 2) {
-			shared_ptr<Object> caller = parseIdentifier(ids[0], context)->as<Object>();
-			caller->context->set(getId(ids[1]), iterator->second);
-		} else throw Pool::compile_fatal("Maximum access depth is 1", ids[3]->getSymbol());
-	} else throw Pool::compile_fatal("Native symbol not found", ast->getStart());
-	return Identity::create(Void);
 }
 
 shared_ptr<Fun> parseProgram(PoolParser::ProgramContext *ast, const vector<string> &params, const shared_ptr<Context> &context) {

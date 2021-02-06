@@ -32,11 +32,20 @@ shared_ptr<Variable> Object::as() {
 }
 
 shared_ptr<Object> Context::find(const string &name) const {
+	if (name == "=") return natives["Variable.="];
+	if (name == "=>") return natives["Variable.=>"];
 	auto iterator = heap.find(name);
 	if (iterator != heap.end()) {
 		return iterator->second;
 	} else if (parent) {
 		return parent->find(name);
+	} else return nullptr;
+}
+
+shared_ptr<Object> Context::findLocal(const string &name) const {
+	auto iterator = heap.find(name);
+	if (iterator != heap.end()) {
+		return iterator->second;
 	} else return nullptr;
 }
 
@@ -68,15 +77,6 @@ void Context::set(const string &name, const shared_ptr<Object> &value) {
 	heap[name] = value;
 }
 
-shared_ptr<Executable> Context::findMethod(const string &name) const {
-	if (auto object = find(name)) {
-		if (auto executable = dynamic_pointer_cast<Executable>(object->as<Object>())) {
-			return executable;
-		}
-	}
-	return nullptr;
-}
-
 string Context::toString() const {
 	stringstream ss;
 	ss << "{";
@@ -103,8 +103,13 @@ string_view Object::getType() {
 
 shared_ptr<Executable> Object::findMethod(const string &methodName) const {
 	if (cls) {
-		return cls->getMethod(methodName);
-	} else return nullptr;
+		if (auto object = cls->findInClass(methodName)) {
+			if (auto executable = dynamic_pointer_cast<Executable>(object->as<Object>())) {
+				return executable;
+			}
+		}
+	}
+	return nullptr;
 }
 
 shared_ptr<Object> Object::find(const string &name) const {
@@ -112,9 +117,13 @@ shared_ptr<Object> Object::find(const string &name) const {
 		return local;
 	}
 	if (cls) {
-		return cls->findLocal(name);
+		return cls->findInClass(name);
 	}
 	return nullptr;
+}
+
+shared_ptr<Object> Object::findLocal(const string &name) const {
+	return context->findLocal(name);
 }
 
 shared_ptr<Object> Object::getVariableValue() {
@@ -123,22 +132,6 @@ shared_ptr<Object> Object::getVariableValue() {
 
 Class::Class(const shared_ptr<Context> &context, string name, shared_ptr<Class> super)
 		: Object(ClassClass, Context::create(context)), name(move(name)), super(move(super)) {}
-
-shared_ptr<Executable> Class::getMethod(const string &methodName) const {
-	if (auto method = context->findMethod(methodName)) {
-		return method;
-	} else if (super) {
-		return super->getMethod(methodName);
-	} else return nullptr;
-}
-
-shared_ptr<Executable> Class::findMethod(const string &methodName) const {
-	if (auto executable = Object::findMethod(methodName)) {
-		return executable;
-	} else if (auto method = getMethod(methodName)) {
-		return method;
-	} else return nullptr;
-}
 
 shared_ptr<Class> Class::extend(const string &className, const shared_ptr<Block> &other) {
 	auto self = this->as<Class>();
@@ -201,6 +194,17 @@ shared_ptr<Object> Array::execute(const shared_ptr<Object> &self, const vector<s
 }
 
 void pool::initialize() {
+	natives["Variable.="] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+		const shared_ptr<Object> value = other.size() == 1 ? other[0] : Void;
+		self->as<Variable>()->setValue(value->as<Object>());
+		return self;
+	});
+	natives["Variable.=>"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+		const shared_ptr<Object> value = other.size() == 1 ? other[0] : Void;
+		self->as<Variable>()->setValue(value->as<Object>());
+		self->as<Variable>()->setImmutable(true);
+		return self;
+	});
 	natives["Class"] = ClassClass = make_shared<Class>(Context::global, string(Class::TYPE), nullptr); //ObjectClass is not yet created
 	natives["Object"] = ObjectClass = ClassClass->newInstance<Class>(Context::global, {}, string(Object::TYPE), nullptr);
 	ClassClass->super = ObjectClass;
@@ -401,17 +405,6 @@ void pool::initialize() {
 			throw Pool::compile_fatal("Cannot import module \"" + moduleName + "\": " + string(e));
 		}
 		return Void;
-	});
-	natives["Variable.="] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
-		const shared_ptr<Object> value = other.size() == 1 ? other[0] : Void;
-		self->as<Variable>()->setValue(value->as<Object>());
-		return self;
-	});
-	natives["Variable.=>"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
-		const shared_ptr<Object> value = other.size() == 1 ? other[0] : Void;
-		self->as<Variable>()->setValue(value->as<Object>());
-		self->as<Variable>()->setImmutable(true);
-		return self;
 	});
 	natives["Fun.classmethod"] = NativeFun::create([](const shared_ptr<Object> &fself, const vector<shared_ptr<Object>> &fother) -> shared_ptr<Object> {
 		return NativeFun::create([fself](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {

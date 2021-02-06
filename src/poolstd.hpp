@@ -55,7 +55,7 @@ namespace pool {
 
 		shared_ptr<Object> find(const string &name) const;
 
-		shared_ptr<Executable> findMethod(const string &name) const;
+		shared_ptr<Object> findLocal(const string &name) const;
 
 		shared_ptr<Object> add(const string &name);
 
@@ -93,7 +93,7 @@ namespace pool {
 		const shared_ptr<Class> cls;
 		const shared_ptr<Context> context;
 
-		Object(shared_ptr<Class> cls, const shared_ptr<Context>& context);
+		Object(shared_ptr<Class> cls, const shared_ptr<Context> &context);
 
 		virtual string_view getType();
 
@@ -112,6 +112,8 @@ namespace pool {
 
 		virtual shared_ptr<Object> find(const string &name) const;
 
+		virtual shared_ptr<Object> findLocal(const string &id) const;
+
 		virtual bool isVariable() const {
 			return false;
 		}
@@ -127,12 +129,8 @@ namespace pool {
 
 		Class(const shared_ptr<Context> &context, string name, shared_ptr<Class> super);
 
-		shared_ptr<Executable> getMethod(const string &methodName) const;
-
-		shared_ptr<Executable> findMethod(const string &methodName) const override;
-
 		shared_ptr<Object> find(const string &id) const override {
-			if (auto local = findLocal(id)) {
+			if (auto local = findInClass(id)) {
 				return local;
 			}
 			if (cls) {
@@ -141,12 +139,12 @@ namespace pool {
 			return nullptr;
 		}
 
-		shared_ptr<Object> findLocal(const string &id) const {
+		shared_ptr<Object> findInClass(const string &id) const {
 			if (auto local = context->find(id)) {
 				return local;
 			}
 			if (super) {
-				return super->findLocal(id);
+				return super->findInClass(id);
 			}
 			return nullptr;
 		};
@@ -226,11 +224,29 @@ namespace pool {
 		shared_ptr<Object> invoke() override {
 			auto ptr = caller->invoke();
 			auto result = ptr->find(id);
-			return result ? result : ptr->context->add(id);
+			return result ? result : ptr->as<Object>()->context->add(id);
 		}
 
 		static shared_ptr<Access> create(const shared_ptr<Callable> &caller, const string &id) {
 			return make_shared<Access>(caller, id);
+		}
+	};
+
+	class LocalAccess : public Callable {
+		shared_ptr<Callable> caller;
+		string id;
+	public:
+
+		LocalAccess(shared_ptr<Callable> caller, string id) : caller(move(caller)), id(move(id)) {}
+
+		shared_ptr<Object> invoke() override {
+			auto ptr = caller->invoke();
+			auto result = ptr->findLocal(id);
+			return result ? result : ptr->as<Object>()->context->add(id);
+		}
+
+		static shared_ptr<LocalAccess> create(const shared_ptr<Callable> &caller, const string &id) {
+			return make_shared<LocalAccess>(caller, id);
 		}
 	};
 
@@ -301,6 +317,13 @@ namespace pool {
 				return result;
 			} else return Object::find(id);
 		}
+
+		shared_ptr<Object> findLocal(const string &id) const override {
+			if (auto result = value->findLocal(id)) {
+				return result;
+			} else return Object::findLocal(id);
+		}
+
 
 		string_view getType() override {
 			return value->getType();

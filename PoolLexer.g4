@@ -18,7 +18,7 @@ RSB:']';
 DOT:'.';
 COMMA:',';
 COLON:':';
-BACKTICK:'`';
+SQ:'::';
 HASH:'#';
 AT:'@';
 QM:'?';
@@ -34,7 +34,9 @@ FLOAT_LITERAL: (DIGIT* '.')? DIGIT+;
 
 fragment ESCAPE: '\\' ('"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't' | ('u' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT));
 
-STRING_LITERAL : '"' (~["\\\r\n] | ESCAPE)* '"';
+STRING_LITERAL: '"' (~["\\\r\n] | ESCAPE)* '"';
+
+NATIVE_SYMBOL: '`' ID (DOT ID)* '`';
 
 IDENTIFIER: '$' ID;
 OPERATOR: ID;

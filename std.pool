@@ -1,57 +1,55 @@
-`$Class`;
-`$Class.$extend`;
-`$Class.$new`;
-`$Class.$toString`;
+$Class => `Class`;
+$Class::$extend => `Class.extend`;
+$Class::$new => `Class.new`;
+$Class::$toString => `Class.toString`;
 
-`$Object`;
-`$Object.$toString`;
-`$Object.$type`;
-`$Object.$println`;
+$Object => `Object`;
+$Object::$toString => `Object.toString`;
+$Object::$type => `Object.type`;
+$Object::$println => `Object.println`;
 
-`$Bool`;
-`$Bool.$toString`;
-`$Bool.$!`;
-`$true`;
-`$false`;
+$Bool => `Bool`;
+$Bool::$toString => `Bool.toString`;
+$Bool::$! => `Bool.!`;
+$true => `true`;
+$false => `false`;
 
-`$Integer`;
-`$Integer.$+`;
-`$Integer.$-`;
-`$Integer.$++`;
-`$Integer.$--`;
-`$Integer.$+=`;
-`$Integer.$-=`;
-`$Integer.$toString`;
+$Integer => `Integer`;
+$Integer::$+ => `Integer.+`;
+$Integer::$- => `Integer.-`;
+$Integer::$++ => `Integer.++`;
+$Integer::$-- => `Integer.--`;
+$Integer::$+= => `Integer.+=`;
+$Integer::$-= => `Integer.-=`;
+$Integer::$toString => `Integer.toString`;
 
-`$String`;
-`$String.$+`;
-`$String.$toString`;
-`$String.$import`;
+$String => `String`;
+$String::$+ => `String.+`;
+$String::$toString => `String.toString`;
+$String::$import => `String.import`;
 
-`$Decimal`;
-`$Decimal.$+`;
-`$Decimal.$-`;
-`$Decimal.$+=`;
-`$Decimal.$-=`;
-`$Decimal.$toString`;
+$Decimal => `Decimal`;
+$Decimal::$+ => `Decimal.+`;
+$Decimal::$- => `Decimal.-`;
+$Decimal::$+= => `Decimal.+=`;
+$Decimal::$-= => `Decimal.-=`;
+$Decimal::$toString => `Decimal.toString`;
 
-`$Array`;
+$Array => `Array`;
 
-`$Variable`;
-`$Variable.$=`;
-`$Variable.$=>`;
+$Variable => `Variable`;
 
-`$Block`;
+$Block => `Block`;
 
-`$Fun`;
-`$Fun.$classmethod`;
-`$Fun.$staticmethod`;
-`$Fun.$toString`;
+$Fun => `Fun`;
+$Fun::$classmethod => `Fun.classmethod`;
+$Fun::$staticmethod => `Fun.staticmethod`;
+$Fun::$toString => `Fun.toString`;
 
-`$Void`;
-`$Void.$toString`;
-`$void`;
+$Void => `Void`;
+$Void::$toString => `Void.toString`;
+$void => `void`;
 
-`$Nothing`;
-`$Nothing.$toString`;
-`$null`;
+$Nothing => `Nothing`;
+$Nothing::$toString => `Nothing.toString`;
+$null => `null`;
