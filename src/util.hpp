@@ -1,53 +1,57 @@
 #pragma once
 
+#include <iostream>
 #include <utility>
+#include <string>
 
-class execution_error : public std::runtime_error {
+using namespace std;
+
+class execution_error : public runtime_error {
 public:
-	execution_error(const std::string &file, int line, const std::string &message) :
-			runtime_error(file + ":" + std::to_string(line) + ": " + message) {}
+	execution_error(const string &file, int line, const string &message) :
+			runtime_error(file + ":" + to_string(line) + ": " + message) {}
 };
 
 #define execution_error(message) execution_error(__FILE__, __LINE__, message)
 
-class compile_error : public std::runtime_error {
+class compile_error : public runtime_error {
 public:
-	explicit compile_error(const std::string &message) : runtime_error(message) {}
+	explicit compile_error(const string &message) : runtime_error(message) {}
 
-	inline explicit operator std::string() const {
+	inline explicit operator string() const {
 		return what();
 	}
 };
 
-inline std::ostream &operator<<(std::ostream &stream, const compile_error &error) noexcept {
+inline ostream &operator<<(ostream &stream, const compile_error &error) noexcept {
 	stream << error.what();
 	return stream;
 }
 
-static constexpr inline bool endsWith(std::string_view str, std::string_view suffix) {
+static constexpr inline bool endsWith(string_view str, string_view suffix) {
 	return str.size() >= suffix.size() && 0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
 }
 
-static constexpr inline bool startsWith(std::string_view str, std::string_view prefix) {
+static constexpr inline bool startsWith(string_view str, string_view prefix) {
 	return str.size() >= prefix.size() && 0 == str.compare(0, prefix.size(), prefix);
 }
 
-static inline std::string ltrim(std::string s) {
-	s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int c) { return !std::isspace(c); }));
+static inline string ltrim(string s) {
+	s.erase(s.begin(), find_if(s.begin(), s.end(), [](int c) { return !isspace(c); }));
 	return s;
 }
 
-static inline std::string rtrim(std::string s) {
-	s.erase(std::find_if(s.rbegin(), s.rend(), [](int c) { return !std::isspace(c); }).base(), s.end());
+static inline string rtrim(string s) {
+	s.erase(find_if(s.rbegin(), s.rend(), [](int c) { return !isspace(c); }).base(), s.end());
 	return s;
 }
 
-static inline std::string trim(std::string s) {
+static inline string trim(string s) {
 	return ltrim(rtrim(move(s)));
 }
 
 namespace internal {
-	static int get_codepoint(std::string::const_iterator &iterator) {
+	static int get_codepoint(string::const_iterator &iterator) {
 		// this function only makes sense after reading `\u`
 		int codepoint = 0;
 		const auto factors = {12u, 8u, 4u, 0u};
@@ -64,19 +68,19 @@ namespace internal {
 			}
 		}
 		if (codepoint < 0x0000 || codepoint > 0xFFFF)
-			throw std::runtime_error("invalid codepoint");
+			throw runtime_error("invalid codepoint");
 		return codepoint;
 	}
 }
 
-static std::string unescapeString(const std::string &input) noexcept(false) {
-	std::string result;
+static string unescapeString(const string &input) noexcept(false) {
+	string result;
 	auto current = input.begin();
 	while (current != input.end()) {
 		if (*current == '\\') {
 			current++;
 			if (current == input.end()) {
-				throw std::runtime_error("invalid string: no character after backslash");
+				throw runtime_error("invalid string: no character after backslash");
 			}
 			switch (*current) {
 				// quotation mark
@@ -117,9 +121,9 @@ static std::string unescapeString(const std::string &input) noexcept(false) {
 					int codepoint = codepoint1; // start with codepoint1
 
 					if (codepoint1 == -1) {
-						throw std::runtime_error("invalid string: '\\u' must be followed by 4 hex digits");
+						throw runtime_error("invalid string: '\\u' must be followed by 4 hex digits");
 					}
-					using char_int_type = std::string::value_type;
+					using char_int_type = string::value_type;
 					// translate codepoint into bytes
 					if (codepoint < 0x80) {
 						// 1-byte characters: 0xxxxxxx (ASCII)
@@ -146,7 +150,7 @@ static std::string unescapeString(const std::string &input) noexcept(false) {
 					break;
 				}
 				default:
-					throw std::runtime_error("invalid string: forbidden character after backslash");
+					throw runtime_error("invalid string: forbidden character after backslash");
 			}
 		} else {
 			result += *current;

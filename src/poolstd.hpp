@@ -1,12 +1,9 @@
 #pragma once
 
-#include <sstream>
-#include <utility>
-#include <vector>
-#include <memory>
-#include <unordered_map>
 #include <functional>
 #include "util.hpp"
+#include "callable.hpp"
+#include "context.hpp"
 
 using namespace std;
 
@@ -45,45 +42,6 @@ namespace pool {
 	extern shared_ptr<Bool> True;
 	extern shared_ptr<Bool> False;
 
-	class Context : public enable_shared_from_this<Context> {
-		unordered_map<string, shared_ptr<Object>> heap;
-		const shared_ptr<Context> parent;
-	public:
-		static const shared_ptr<Context> global;
-
-		explicit Context(shared_ptr<Context> parent) : parent(move(parent)) {}
-
-		shared_ptr<Object> find(const string &name) const;
-
-		shared_ptr<Object> findLocal(const string &name) const;
-
-		shared_ptr<Object> add(const string &name);
-
-		shared_ptr<Object> add(const string &name, const shared_ptr<Object> &var);
-
-		void set(const string &name, const shared_ptr<Object> &value);
-
-		void associate(const vector<string> &params, const vector<shared_ptr<Object>> &args);
-
-		string toString() const;
-
-		inline auto begin() const {
-			return heap.begin();
-		}
-
-		inline auto end() const {
-			return heap.end();
-		}
-
-		inline auto empty() const {
-			return heap.empty();
-		}
-
-		static shared_ptr<Context> create(const shared_ptr<Context> &parent) {
-			return make_shared<Context>(parent);
-		}
-	};
-
 	class Object : public enable_shared_from_this<Object> {
 		shared_ptr<Object> getVariableValue();
 
@@ -104,7 +62,7 @@ namespace pool {
 		template<class T>
 		shared_ptr<T> as() {
 			if (isVariable())
-				return getVariableValue()->as<T>();
+				return reinterpret_pointer_cast<T>(getVariableValue());
 			return reinterpret_pointer_cast<T>(shared_from_this());
 		}
 
@@ -118,6 +76,9 @@ namespace pool {
 			return false;
 		}
 	};
+
+	template<>
+	shared_ptr<Variable> Object::as<Variable>();
 
 	class Class : public Object {
 	public:
@@ -149,7 +110,7 @@ namespace pool {
 			return nullptr;
 		};
 
-		template<class T = Object, typename std::enable_if<std::is_base_of<Object, T>::value>::type * = nullptr, typename... Args>
+		template<class T, typename std::enable_if<std::is_base_of<Object, T>::value>::type * = nullptr, typename... Args>
 		shared_ptr<T> newInstance(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other = {}, Args &&... args) {
 			auto ptr = make_shared<T>(context, args...);
 			callInit(ptr, other);
@@ -160,6 +121,9 @@ namespace pool {
 
 		static void callInit(const shared_ptr<Object> &ptr, const vector<shared_ptr<Object>> &other);
 	};
+
+	template<>
+	shared_ptr<Object> Class::newInstance<Object>(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other);
 
 	class Bool : public Object {
 	public:
@@ -209,77 +173,6 @@ namespace pool {
 		}
 	};
 
-	class Callable {
-	public:
-		virtual shared_ptr<Object> invoke() = 0;
-	};
-
-	class Access : public Callable {
-		shared_ptr<Callable> caller;
-		string id;
-	public:
-
-		Access(shared_ptr<Callable> caller, string id) : caller(move(caller)), id(move(id)) {}
-
-		shared_ptr<Object> invoke() override {
-			auto ptr = caller->invoke();
-			auto result = ptr->find(id);
-			return result ? result : ptr->as<Object>()->context->add(id);
-		}
-
-		static shared_ptr<Access> create(const shared_ptr<Callable> &caller, const string &id) {
-			return make_shared<Access>(caller, id);
-		}
-	};
-
-	class LocalAccess : public Callable {
-		shared_ptr<Callable> caller;
-		string id;
-	public:
-
-		LocalAccess(shared_ptr<Callable> caller, string id) : caller(move(caller)), id(move(id)) {}
-
-		shared_ptr<Object> invoke() override {
-			auto ptr = caller->invoke();
-			auto result = ptr->findLocal(id);
-			return result ? result : ptr->as<Object>()->context->add(id);
-		}
-
-		static shared_ptr<LocalAccess> create(const shared_ptr<Callable> &caller, const string &id) {
-			return make_shared<LocalAccess>(caller, id);
-		}
-	};
-
-	class Invocation : public Callable {
-		shared_ptr<Callable> self;
-		shared_ptr<Callable> caller;
-		vector<shared_ptr<Callable>> callee;
-	public:
-
-		Invocation(const shared_ptr<Callable> &self, shared_ptr<Callable> caller, const vector<shared_ptr<Callable>> &callee)
-				: self(self), caller(move(caller)), callee(callee) {}
-
-		shared_ptr<Object> invoke() override;
-
-		static shared_ptr<Invocation> create(const shared_ptr<Callable> &self, const shared_ptr<Callable> &caller, const vector<shared_ptr<Callable>> &callee) {
-			return make_shared<Invocation>(self, caller, callee);
-		}
-	};
-
-	class Identity : public Callable {
-		shared_ptr<Object> object;
-	public:
-		explicit Identity(const shared_ptr<Object> &object) : object(object) {}
-
-		shared_ptr<Object> invoke() override {
-			return object;
-		};
-
-		static shared_ptr<Callable> create(const shared_ptr<Object> &caller) {
-			return make_shared<Identity>(caller);
-		}
-	};
-
 
 	class Variable : public Object {
 		shared_ptr<Object> value;
@@ -288,12 +181,8 @@ namespace pool {
 		constexpr static const string_view TYPE = "Variable";
 		const string name;
 
-		bool isImmutable() const {
-			return immutable;
-		}
-
 		void setImmutable(bool _immutable) {
-			Variable::immutable = _immutable;
+			immutable = _immutable;
 		}
 
 		const shared_ptr<Object> &getValue() const {
@@ -307,21 +196,15 @@ namespace pool {
 		}
 
 		shared_ptr<Executable> findMethod(const string &methodName) const override {
-			if (auto method = value->findMethod(methodName)) {
-				return method;
-			} else return Object::findMethod(methodName);
+			return value->findMethod(methodName);
 		}
 
 		shared_ptr<Object> find(const string &id) const override {
-			if (auto result = value->find(id)) {
-				return result;
-			} else return Object::find(id);
+			return value->find(id);
 		}
 
 		shared_ptr<Object> findLocal(const string &id) const override {
-			if (auto result = value->findLocal(id)) {
-				return result;
-			} else return Object::findLocal(id);
+			return value->findLocal(id);
 		}
 
 

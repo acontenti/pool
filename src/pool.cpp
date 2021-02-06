@@ -1,7 +1,6 @@
 #include <iostream>
 #include <filesystem>
 #include <chrono>
-#include <numeric>
 #include "poolstd.hpp"
 #include "pool.hpp"
 #include "../lib/termcolor.hpp"
