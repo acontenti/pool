@@ -7,18 +7,24 @@ options {
 
 program: statement* EOF;
 
-statement: (call)? SEMI;
+statement: expression? SEMI;
 
-call returns [enum Type {AA,A,LAA,LA,IA,PA,O,OA,OC,T} type]:
-	callee=call DOT IDENTIFIER args {$type=CallContext::AA;} |
-	callee=call DOT IDENTIFIER {$type=CallContext::A;} |
-	callee=call SQ IDENTIFIER args {$type=CallContext::LAA;} |
-	callee=call SQ IDENTIFIER {$type=CallContext::LA;} |
-    <assoc=right> IDENTIFIER args {$type=CallContext::IA;} |
-    <assoc=right> LP callee=call RP args {$type=CallContext::PA;} |
-	<assoc=right> callee=call OPERATOR {$type=CallContext::O;} |
-	<assoc=right> callee=call OPERATOR args {$type=CallContext::OA;} |
-	<assoc=right> callee=call OPERATOR arg=call {$type=CallContext::OC;} |
+expression: a=assignment | c=call;
+
+assignment returns [enum Type {V,C} type]:
+	<assoc=right> assignee=access EQ value=call {$type=AssignmentContext::V;} |
+	<assoc=right> assignee=access CEQ value=call {$type=AssignmentContext::C;};
+
+access returns [enum Type {G,L,I} type]:
+	callee=call DOT ID {$type=AccessContext::G;} |
+	callee=call SQ ID {$type=AccessContext::L;} |
+	ID {$type=AccessContext::I;};
+
+call returns [enum Type {A,IA,DI,DIA,T} type]:
+	callee=call DOT ID args {$type=CallContext::DIA;} |
+	callee=call DOT ID {$type=CallContext::DI;} |
+    callee=call args {$type=CallContext::A;} |
+    ID args {$type=CallContext::IA;} |
 	term {$type=CallContext::T;};
 
 args: LP call? (COMMA call)* RP;
@@ -27,19 +33,19 @@ term returns [enum Type {NUM,STR,FUN,ARR,PAR,BLK,NSM,IDT} type]:
 	num {$type=TermContext::NUM;} |
 	string {$type=TermContext::STR;} |
 	fun {$type=TermContext::FUN;} |
-	array {$type=TermContext::ARR;} |
+	arr {$type=TermContext::ARR;} |
 	par {$type=TermContext::PAR;} |
 	block {$type=TermContext::BLK;} |
 	NATIVE_SYMBOL {$type=TermContext::NSM;} |
-	IDENTIFIER {$type=TermContext::IDT;};
+	ID {$type=TermContext::IDT;};
 
-par: LP call? RP;
+par: LP expression RP;
 
 block: LB statement* RB;
 
-array: LSB call? (COMMA + call)* RSB;
+arr: LSB call? (COMMA call)* RSB;
 
-fun: LP IDENTIFIER? (COMMA IDENTIFIER)* RP COLON LB statement* RB;
+fun: LP ID? (COMMA ID)* RP COLON LB statement* RB;
 
 num returns [enum Type {DEC,HEX,BIN,FLT} type]:
 	DECIMAL_INTEGER_LITERAL {$type=NumContext::DEC;} |

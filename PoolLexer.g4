@@ -17,8 +17,10 @@ LSB:'[';
 RSB:']';
 DOT:'.';
 COMMA:',';
-COLON:':';
+EQ:':=';
+CEQ:'::=';
 SQ:'::';
+COLON:':';
 HASH:'#';
 AT:'@';
 QM:'?';
@@ -38,7 +40,5 @@ STRING_LITERAL: '"' (~["\\\r\n] | ESCAPE)* '"';
 
 NATIVE_SYMBOL: '`' ID (DOT ID)* '`';
 
-IDENTIFIER: '$' ID;
-OPERATOR: ID;
-fragment ID: ([A-Za-z] | SYMBOL) ([A-Za-z0-9] | SYMBOL)*;
+ID: ([A-Za-z] | SYMBOL) ([A-Za-z0-9] | SYMBOL)*;
 fragment SYMBOL: '_' | '!' | '%' | '&' | '*' | '+' | '-' | '/' | '<' | '>' | '=' | '^' | '|' | '~';

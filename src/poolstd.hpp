@@ -4,6 +4,7 @@
 #include "util.hpp"
 #include "callable.hpp"
 #include "context.hpp"
+#include "parser.hpp"
 
 using namespace std;
 
@@ -300,10 +301,11 @@ namespace pool {
 				: Executable({}, context, BlockClass), calls(move(calls)) {}
 
 		shared_ptr<Object> invoke() override {
+			shared_ptr<Object> returnValue = Void;
 			for (auto &call: calls) {
 				call->invoke();
 			}
-			return shared_from_this();
+			return returnValue;
 		}
 
 		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override {
@@ -315,16 +317,14 @@ namespace pool {
 		}
 	};
 
-	class Array : public Callable, public Executable {
+	class Array : public Object, public Callable {
 	public:
 		constexpr static const string_view TYPE = "Array";
 		vector<shared_ptr<Callable>> calls;
 		vector<shared_ptr<Object>> values;
 
 		Array(vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
-				: Executable({"index"}, context, ArrayClass), calls(move(calls)) {}
-
-		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override;
+				: Object(ArrayClass, context), calls(move(calls)) {}
 
 		shared_ptr<Object> invoke() override;
 

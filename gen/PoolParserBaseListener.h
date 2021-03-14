@@ -22,6 +22,15 @@ public:
   virtual void enterStatement(PoolParser::StatementContext * /*ctx*/) override { }
   virtual void exitStatement(PoolParser::StatementContext * /*ctx*/) override { }
 
+  virtual void enterExpression(PoolParser::ExpressionContext * /*ctx*/) override { }
+  virtual void exitExpression(PoolParser::ExpressionContext * /*ctx*/) override { }
+
+  virtual void enterAssignment(PoolParser::AssignmentContext * /*ctx*/) override { }
+  virtual void exitAssignment(PoolParser::AssignmentContext * /*ctx*/) override { }
+
+  virtual void enterAccess(PoolParser::AccessContext * /*ctx*/) override { }
+  virtual void exitAccess(PoolParser::AccessContext * /*ctx*/) override { }
+
   virtual void enterCall(PoolParser::CallContext * /*ctx*/) override { }
   virtual void exitCall(PoolParser::CallContext * /*ctx*/) override { }
 
@@ -37,8 +46,8 @@ public:
   virtual void enterBlock(PoolParser::BlockContext * /*ctx*/) override { }
   virtual void exitBlock(PoolParser::BlockContext * /*ctx*/) override { }
 
-  virtual void enterArray(PoolParser::ArrayContext * /*ctx*/) override { }
-  virtual void exitArray(PoolParser::ArrayContext * /*ctx*/) override { }
+  virtual void enterArr(PoolParser::ArrContext * /*ctx*/) override { }
+  virtual void exitArr(PoolParser::ArrContext * /*ctx*/) override { }
 
   virtual void enterFun(PoolParser::FunContext * /*ctx*/) override { }
   virtual void exitFun(PoolParser::FunContext * /*ctx*/) override { }

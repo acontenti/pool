@@ -2,8 +2,7 @@
 
 #include <vector>
 #include <memory>
-#include "PoolParserBaseListener.h"
-#include "PoolLexer.h"
+#include "Token.h"
 #include "util.hpp"
 
 using namespace std;
@@ -15,7 +14,7 @@ namespace pool {
 		const vector<string> &args;
 	};
 
-	class Pool : PoolParserBaseListener {
+	class Pool {
 		explicit Pool(const string &file);
 
 	public:

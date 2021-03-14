@@ -1,119 +1,113 @@
-$f.$=(($x) : {
-	$x.$println();
-});
-$f("x");
-
-$f = ($x) : {
-	$x println;
+f := (x) : {
+	x.println();
 };
-$f("x");
+f("x");
 
-$a.$=([0, 1, 2, 3]);
-$b.$=(1.$+($a.$size));
-$b.$println();
+a := [0, 1, 2, 3];
+b := 1.+(a.size);
+b.println();
 
-$a = [0, 1, 2, 3];
-$b = 1 + ($a.$size);
-$b println;
-
-
-$fun = ($x) : {$x;};
-$fun = ($x, $y) : {
-  	$b = ($x + $y);
-  	$c = {
-  		$d = 2;
+fun := (x) : {x;};
+fun := (x, y) : {
+  	b := x.+(y);
+  	c := {
+  		d := 2;
 	};
 };
-$z = {
-	$b = 300;
-	$c = {
-		$d = 2;
+z := {
+	b := 300;
+	c := {
+		d := 2;
 	};;
 };
-$empty = ():{};
-$empty() println;
-(():{})() println;
-$empty = {};
-$empty() println;
-({})() println;
-$fun println;
-$fun.$b println;
-$res = $fun(100, 100);
-$fun println;
-$fun.$b println;
-$res println;
-$z println;
-$z.$b println;
-$res = $z();
-$z println;
-$z.$b println;
-$z.$c.$d println;
-$args println;
-$z println;
-$z.$c = 5;
-$z.$c println;
-$z println;
-$Test => $Object extend ("Test", {
-	$init = ($this, $who) : {
-		$this.$long = 0;
-		$this.$int = 0;
-		("init: this = " + $this) println;
-		("init: class = " + $this.$class) println;
-		("init: super = " + $this.$class.$super) println;
-		("init: who = " + $who) println;
+empty := ():{};
+empty().println();
+():{}().println();
+empty := {};
+empty().println();
+{}().println();
+fun.println();
+fun.b.println();
+res := fun(100, 100);
+fun.println();
+fun.b.println();
+res.println();
+z.println();
+z.b.println();
+res := z();
+z.println();
+z.b.println();
+z.c.d.println();
+args.println();
+z.println();
+z.c := 5;
+z.c.println();
+z.println();
+Test ::= Object.extend("Test", {
+	init := (this, who) : {
+		this.long := 0;
+		this.int := 0;
+		"init: this := ".+(this).println();
+		"init: class := ".+(this.class).println();
+		"init: super := ".+(this.class.super).println();
+		"init: who := ".+(who).println();
 	};
-	$++ = ($this) : {
-		("++: this = " + $this) println;
-		("++: class = " + $this.$class) println;
-		$this.$long += 10;
+	++ := (this) : {
+		"++: this := ".+(this).println();
+		"++: class := ".+(this.class).println();
+		this.long := this.long.+(10);
 	};
-	$print = ($this) : {
-		("print: this = " + $this) println;
-		("print: class = " + $this.$class) println;
-		$this.$long println;
+	print := (this) : {
+		"print: this := ".+(this).println();
+		"print: class := ".+(this.class).println();
+		this.long.println();
 	};
-	$toString = ($this) : {
-		"This is an instance of class Test, " + $this.$class.$toString();
+	toString := (this) : {
+		"This is an instance of class Test, ".+(this.class.toString());
 	};
-	$number = 0;
-	$no = ($class, $who) : {
-		("no: class = " + $class) println;
-		("no: who = " + $who) println;
-	} classmethod;
-	$yes = ($who) : {
-		("yes: who = " + $who) println;
-	} staticmethod;
-	$maybe = ($this, $who) : {
-		("maybe: this = " + $this) println;
-		("maybe: who = " + $who) println;
+	number := 0;
+	no := (class, who) : {
+		"no: class := ".+(class).println();
+		"no: who := ".+(who).println();
+	}.classmethod();
+	yes := (who) : {
+		"yes: who := ".+(who).println();
+	}.staticmethod();
+	maybe := (this, who) : {
+		"maybe: this := ".+(this).println();
+		"maybe: who := ".+(who).println();
 	};
 });
-$n = $Test new "yes";
-("$n: " + $n) println;
-("$Test.$class: " + $Test.$class) println;
-("$Test.$class.$super = " + $Test.$class.$super) println;
-("$Test: " + $Test) println;
-("$Test.$super = " + $Test.$super) println;
-("$n.$class: " + $n.$class) println;
-("$n.$class.$super = " + $n.$class.$super) println;
-("$Object.$class: " + $Object.$class) println;
-$Test no "you";
-$n no "me";
-$Test yes "you";
-$n yes "me";
-$Test maybe "you";
-$n maybe "me";
-("prop test: " + ($Test type)) println;
-$z.$c ++;
-$z.$c.$d.$e println;
-($x = $true !) println;
-$abc = ({$a = $x;})();
-$abc println;
-$x = 1;
-$b = ({
-	$x ++;
-	$a = ({$f = $x;})();
-})();
-$b.$a.$f println;
-
-"mod" import;
+n := Test.new("yes");
+"n: ".+(n).println();
+"Test.class: ".+(Test.class).println();
+"Test.class.super := ".+(Test.class.super).println();
+"Test: ".+(Test).println();
+"Test.super := ".+(Test.super).println();
+"n.class: ".+(n.class).println();
+"n.class.super := ".+(n.class.super).println();
+"Object.class: ".+(Object.class).println();
+Test.no("you");
+n.no("me");
+Test.yes("you");
+n.yes("me");
+Test.maybe("you");
+n.maybe("me");
+"prop test: ".+(Test.type()).println();
+z.c.d.e.println();
+(x := true.!()).println();
+abc := {a := x;}();
+abc.println();
+x := 1;
+b := {
+	x := x.+(123);
+	a := {f := x;};
+	a();
+	;
+};
+b();
+b.a.f.println();
+[0,1,2,3,4,5,6,8,9].forEach((it) : {
+	"i: ".+(it).println();
+});
+"mod".import();

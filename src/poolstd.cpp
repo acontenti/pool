@@ -89,16 +89,3 @@ shared_ptr<Object> Array::invoke() {
 	}
 	return shared_from_this();
 }
-
-shared_ptr<Object> Array::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
-	if (other.size() == params.size()) {
-		auto arg = other[0];
-		if (arg->getType() == Integer::TYPE) {
-			auto index = arg->as<Integer>()->value;
-			if (index >= 0 && index < calls.size()) {
-				invoke();
-				return values[index];
-			} else throw execution_error("Array access index out of range");
-		} else throw execution_error("Array access argument must be an integer");
-	} else throw execution_error("Array access needs an argument");
-}
