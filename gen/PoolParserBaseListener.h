@@ -46,9 +46,6 @@ public:
   virtual void enterBlock(PoolParser::BlockContext * /*ctx*/) override { }
   virtual void exitBlock(PoolParser::BlockContext * /*ctx*/) override { }
 
-  virtual void enterArr(PoolParser::ArrContext * /*ctx*/) override { }
-  virtual void exitArr(PoolParser::ArrContext * /*ctx*/) override { }
-
   virtual void enterFun(PoolParser::FunContext * /*ctx*/) override { }
   virtual void exitFun(PoolParser::FunContext * /*ctx*/) override { }
 

@@ -20,20 +20,17 @@ access returns [enum Type {G,L,I} type]:
 	callee=call SQ ID {$type=AccessContext::L;} |
 	ID {$type=AccessContext::I;};
 
-call returns [enum Type {A,IA,DI,DIA,T} type]:
-	callee=call DOT ID args {$type=CallContext::DIA;} |
-	callee=call DOT ID {$type=CallContext::DI;} |
-    callee=call args {$type=CallContext::A;} |
-    ID args {$type=CallContext::IA;} |
+call returns [enum Type {IA,A,T} type]:
+	callee=call DOT ID a=args? {$type=CallContext::IA;} |
+    callee=call a=args {$type=CallContext::A;} |
 	term {$type=CallContext::T;};
 
 args: LP call? (COMMA call)* RP;
 
-term returns [enum Type {NUM,STR,FUN,ARR,PAR,BLK,NSM,IDT} type]:
+term returns [enum Type {NUM,STR,FUN,PAR,BLK,NSM,IDT} type]:
 	num {$type=TermContext::NUM;} |
 	string {$type=TermContext::STR;} |
 	fun {$type=TermContext::FUN;} |
-	arr {$type=TermContext::ARR;} |
 	par {$type=TermContext::PAR;} |
 	block {$type=TermContext::BLK;} |
 	NATIVE_SYMBOL {$type=TermContext::NSM;} |
@@ -42,8 +39,6 @@ term returns [enum Type {NUM,STR,FUN,ARR,PAR,BLK,NSM,IDT} type]:
 par: LP expression RP;
 
 block: LB statement* RB;
-
-arr: LSB call? (COMMA call)* RSB;
 
 fun: LP ID? (COMMA ID)* RP COLON LB statement* RB;
 

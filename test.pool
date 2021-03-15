@@ -3,7 +3,7 @@ f := (x) : {
 };
 f("x");
 
-a := [0, 1, 2, 3];
+a := Array.new(0, 1, 2, 3);
 b := 1.+(a.size);
 b.println();
 
@@ -107,7 +107,7 @@ b := {
 };
 b();
 b.a.f.println();
-[0,1,2,3,4,5,6,8,9].forEach((it) : {
+Array.new(0,1,2,3,4,5,6,8,9).forEach((it) : {
 	"i: ".+(it).println();
 });
 "mod".import();

@@ -22,7 +22,7 @@ public:
   enum {
     RuleProgram = 0, RuleStatement = 1, RuleExpression = 2, RuleAssignment = 3, 
     RuleAccess = 4, RuleCall = 5, RuleArgs = 6, RuleTerm = 7, RulePar = 8, 
-    RuleBlock = 9, RuleArr = 10, RuleFun = 11, RuleNum = 12, RuleString = 13
+    RuleBlock = 9, RuleFun = 10, RuleNum = 11, RuleString = 12
   };
 
   explicit PoolParser(antlr4::TokenStream *input);
@@ -45,7 +45,6 @@ public:
   class TermContext;
   class ParContext;
   class BlockContext;
-  class ArrContext;
   class FunContext;
   class NumContext;
   class StringContext; 
@@ -134,15 +133,16 @@ public:
 
   class  CallContext : public antlr4::ParserRuleContext {
   public:
-    enum Type {A,IA,DI,DIA,T} type;
+    enum Type {IA,A,T} type;
     PoolParser::CallContext *callee = nullptr;
+    PoolParser::ArgsContext *a = nullptr;
     CallContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *ID();
-    ArgsContext *args();
     TermContext *term();
     antlr4::tree::TerminalNode *DOT();
+    antlr4::tree::TerminalNode *ID();
     CallContext *call();
+    ArgsContext *args();
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -171,13 +171,12 @@ public:
 
   class  TermContext : public antlr4::ParserRuleContext {
   public:
-    enum Type {NUM,STR,FUN,ARR,PAR,BLK,NSM,IDT} type;
+    enum Type {NUM,STR,FUN,PAR,BLK,NSM,IDT} type;
     TermContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     NumContext *num();
     StringContext *string();
     FunContext *fun();
-    ArrContext *arr();
     ParContext *par();
     BlockContext *block();
     antlr4::tree::TerminalNode *NATIVE_SYMBOL();
@@ -220,24 +219,6 @@ public:
   };
 
   BlockContext* block();
-
-  class  ArrContext : public antlr4::ParserRuleContext {
-  public:
-    ArrContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *LSB();
-    antlr4::tree::TerminalNode *RSB();
-    std::vector<CallContext *> call();
-    CallContext* call(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> COMMA();
-    antlr4::tree::TerminalNode* COMMA(size_t i);
-
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
-  };
-
-  ArrContext* arr();
 
   class  FunContext : public antlr4::ParserRuleContext {
   public:

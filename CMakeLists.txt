@@ -28,6 +28,10 @@ find_package(ANTLR REQUIRED)
 antlr_target(PoolLexer PoolLexer.g4 LEXER OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/gen)
 antlr_target(PoolParser PoolParser.g4 PARSER OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/gen LISTENER DEPENDS_ANTLR PoolLexer)
 
+# POOL STD RESOURCES
+include(ResourceEmbed)
+create_resources(std src)
+
 # POOL
 include_directories(${ANTLR_PoolLexer_OUTPUT_DIR} ${ANTLR_PoolParser_OUTPUT_DIR} ${ANTLR4_INCLUDE_DIRS})
 add_compile_definitions(POOL_VERSION="${PROJECT_VERSION}")

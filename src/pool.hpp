@@ -15,7 +15,7 @@ namespace pool {
 	};
 
 	class Pool {
-		explicit Pool(const string &file);
+		Pool(const string &filename, istream &stream);
 
 	public:
 		constexpr static const string_view VERSION = POOL_VERSION;

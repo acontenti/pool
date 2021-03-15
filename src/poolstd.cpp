@@ -6,7 +6,7 @@ size_t Class::COUNTER = 0;
 bool pool::debug = false;
 vector<shared_ptr<Object>> pool::arguments{};
 
-Object::Object(shared_ptr<Class> cls, const shared_ptr<Context> &context)
+Object::Object(const shared_ptr<Context> &context, shared_ptr<Class> cls)
 		: context(context), cls(move(cls)), id(cls ? cls->instances++ : 0) {
 	if (this->cls) {
 		this->context->add("class", this->cls);
@@ -51,12 +51,12 @@ shared_ptr<Variable> Object::as<Variable>() {
 	return reinterpret_pointer_cast<Variable>(shared_from_this());
 }
 
-Class::Class(const shared_ptr<Context> &context, string name, shared_ptr<Class> super)
-		: Object(ClassClass, Context::create(context)), name(move(name)), super(move(super)) {}
+Class::Class(const shared_ptr<Context> &context, creator_t creator, string name, shared_ptr<Class> super)
+		: Object(Context::create(context), ClassClass), creator(creator), name(move(name)), super(move(super)) {}
 
-shared_ptr<Class> Class::extend(const string &className, const shared_ptr<Block> &other) {
+shared_ptr<Class> Class::extend(creator_t _creator, const string &className, const shared_ptr<Block> &other) {
 	auto self = this->as<Class>();
-	auto cls = ClassClass->newInstance<Class>(context, {}, className, self);
+	auto cls = ClassClass->newInstance(context, {}, _creator ? _creator : creator, className, self)->as<Class>();
 	cls->context->set("super", self);
 	if (other) {
 		other->invoke();
@@ -71,21 +71,4 @@ void Class::callInit(const shared_ptr<Object> &ptr, const vector<shared_ptr<Obje
 	if (auto init = ptr->findMethod("init")) {
 		init->execute(ptr, other);
 	}
-}
-
-template<>
-shared_ptr<Object> Class::newInstance<Object>(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other) {
-	auto ptr = make_shared<Object>(this->as<Class>(), context);
-	callInit(ptr, other);
-	return ptr;
-}
-
-shared_ptr<Object> Array::invoke() {
-	if (values.size() != calls.size()) {
-		values.reserve(calls.size());
-		for (auto &call : calls) {
-			values.emplace_back(call->invoke());
-		}
-	}
-	return shared_from_this();
 }

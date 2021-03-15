@@ -22,50 +22,50 @@ shared_ptr<Bool> pool::True = nullptr;
 shared_ptr<Bool> pool::False = nullptr;
 
 void pool::initialize() {
-	natives["Class"] = ClassClass = make_shared<Class>(Context::global, string(Class::TYPE), nullptr); //ObjectClass is not yet created
-	natives["Object"] = ObjectClass = ClassClass->newInstance<Class>(Context::global, {}, string(Object::TYPE), nullptr);
+	natives["Class"] = ClassClass = Class::make(Context::global, Class::make, string(Class::TYPE), nullptr)->as<Class>(); //ObjectClass is not yet created
+	natives["Object"] = ObjectClass = ClassClass->newInstance(Context::global, {}, Object::make, string(Object::TYPE))->as<Class>();
 	ClassClass->super = ObjectClass;
-	natives["Bool"] = BoolClass = ObjectClass->extend(string(Bool::TYPE));
-	natives["Integer"] = IntegerClass = ObjectClass->extend(string(Integer::TYPE));
-	natives["Decimal"] = DecimalClass = ObjectClass->extend(string(Decimal::TYPE));
-	natives["String"] = StringClass = ObjectClass->extend(string(String::TYPE));
-	natives["Array"] = ArrayClass = ObjectClass->extend(string(Array::TYPE));
-	natives["Variable"] = VariableClass = ObjectClass->extend(string(Variable::TYPE));
-	natives["Block"] = BlockClass = ObjectClass->extend(string(Block::TYPE));
-	natives["Fun"] = FunClass = ObjectClass->extend(string(Fun::TYPE));
-	natives["Void"] = VoidClass = ObjectClass->extend("Void");
-	natives["Nothing"] = NothingClass = ObjectClass->extend("Nothing");
-	natives["void"] = Void = VoidClass->newInstance<Object>(Context::global);
-	natives["null"] = Null = NothingClass->newInstance<Object>(Context::global);
-	natives["true"] = True = BoolClass->newInstance<Bool>(Context::global, {}, true);
-	natives["false"] = False = BoolClass->newInstance<Bool>(Context::global, {}, false);
+	natives["Bool"] = BoolClass = ObjectClass->extend(Bool::make, string(Bool::TYPE));
+	natives["Integer"] = IntegerClass = ObjectClass->extend(Integer::make, string(Integer::TYPE));
+	natives["Decimal"] = DecimalClass = ObjectClass->extend(Decimal::make, string(Decimal::TYPE));
+	natives["String"] = StringClass = ObjectClass->extend(String::make, string(String::TYPE));
+	natives["Array"] = ArrayClass = ObjectClass->extend(Array::make, string(Array::TYPE));
+	natives["Variable"] = VariableClass = ObjectClass->extend(Variable::make, string(Variable::TYPE));
+	natives["Block"] = BlockClass = ObjectClass->extend(Block::make, string(Block::TYPE));
+	natives["Fun"] = FunClass = ObjectClass->extend(Fun::make, string(Fun::TYPE));
+	natives["Void"] = VoidClass = ObjectClass->extend(nullptr, "Void");
+	natives["Nothing"] = NothingClass = ObjectClass->extend(nullptr, "Nothing");
+	natives["void"] = Void = VoidClass->newInstance(Context::global, {}, VoidClass);
+	natives["null"] = Null = NothingClass->newInstance(Context::global, {}, VoidClass);
+	natives["true"] = True = BoolClass->newInstance(Context::global, {}, true)->as<Bool>();
+	natives["false"] = False = BoolClass->newInstance(Context::global, {}, false)->as<Bool>();
 	natives["Class.extend"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		if (other.size() == 1) {
 			if (other[0]->getType() == Block::TYPE) {
 				auto name = string(Class::TYPE) + to_string(Class::COUNTER++);
-				return self->as<Class>()->extend(name, other[0]->as<Block>());
+				return self->as<Class>()->extend(nullptr, name, other[0]->as<Block>());
 			} else throw execution_error("Class.extend: first argument must be a block");
 		} else if (other.size() == 2) {
 			if (other[0]->getType() == String::TYPE) {
 				if (other[1]->getType() == Block::TYPE) {
 					auto name = other[0]->as<String>()->value;
-					return self->as<Class>()->extend(name, other[1]->as<Block>());
+					return self->as<Class>()->extend(nullptr, name, other[1]->as<Block>());
 				} else throw execution_error("Class.extend: second argument must be a block");
 			} else throw execution_error("Class.extend: first argument must be a string");
 		} else throw execution_error("Class.extend: invalid number of arguments");
 	});
 	natives["Class.new"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto cls = self->as<Class>();
-		return cls->newInstance<Object>(Context::create(self->context), other);
+		return cls->newInstance(Context::create(self->context), other, cls);
 	});
 	natives["Class.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
-		return String::create("Class:" + self->as<Class>()->name, self->context);
+		return StringClass->newInstance(self->context, {}, "Class:" + self->as<Class>()->name);
 	});
 	natives["Object.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
-		return String::create(self->toString(), self->context);
+		return StringClass->newInstance(self->context, {}, self->toString());
 	});
 	natives["Object.type"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
-		return String::create(self->as<Object>()->context->toString(), self->context);
+		return StringClass->newInstance(self->context, {}, self->as<Object>()->context->toString());
 	});
 	natives["Object.println"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		shared_ptr<Object> var = self->as<Object>();
@@ -78,7 +78,7 @@ void pool::initialize() {
 		return Void;
 	});
 	natives["Bool.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
-		return String::create(self->as<Bool>()->value ? "true" : "false", self->context);
+		return StringClass->newInstance(self->context, {}, string(self->as<Bool>()->value ? "true" : "false"));
 	});
 	natives["Bool.!"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		return !(self->as<Bool>()->value) ? True : False;
@@ -100,11 +100,11 @@ void pool::initialize() {
 			return Null;
 		auto par = other[0];
 		if (par->getType() == Integer::TYPE) {
-			return Integer::create(value + par->as<Integer>()->value, self->context);
+			return IntegerClass->newInstance(self->context, {}, value + par->as<Integer>()->value);
 		} else if (par->getType() == Decimal::TYPE) {
-			return Decimal::create(value + par->as<Decimal>()->value, self->context);
+			return DecimalClass->newInstance(self->context, {}, value + par->as<Decimal>()->value);
 		} else if (par->getType() == String::TYPE) {
-			return String::create(to_string(value) + par->as<String>()->value, self->context);
+			return StringClass->newInstance(self->context, {}, to_string(value) + par->as<String>()->value);
 		} else return Null;
 	});
 	natives["Integer.-"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
@@ -113,13 +113,13 @@ void pool::initialize() {
 			return Null;
 		auto par = other[0];
 		if (par->getType() == Integer::TYPE) {
-			return Integer::create(value - par->as<Integer>()->value, self->context);
+			return IntegerClass->newInstance(self->context, {}, value - par->as<Integer>()->value);
 		} else if (par->getType() == Decimal::TYPE) {
-			return Decimal::create(value - par->as<Decimal>()->value, self->context);
+			return DecimalClass->newInstance(self->context, {}, value - par->as<Decimal>()->value);
 		} else return Null;
 	});
 	natives["Integer.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
-		return String::create(to_string(self->as<Integer>()->value), self->context);
+		return StringClass->newInstance(self->context, {}, to_string(self->as<Integer>()->value));
 	});
 	natives["Decimal.+"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto value = self->as<Decimal>()->value;
@@ -127,11 +127,11 @@ void pool::initialize() {
 			return Null;
 		auto par = other[0];
 		if (par->getType() == Integer::TYPE) {
-			return Decimal::create(value + par->as<Integer>()->value, self->context);
+			return DecimalClass->newInstance(self->context, {}, value + par->as<Integer>()->value);
 		} else if (par->getType() == Decimal::TYPE) {
-			return Decimal::create(value + par->as<Decimal>()->value, self->context);
+			return DecimalClass->newInstance(self->context, {}, value + par->as<Decimal>()->value);
 		} else if (par->getType() == String::TYPE) {
-			return String::create(to_string(value) + par->as<String>()->value, self->context);
+			return StringClass->newInstance(self->context, {}, to_string(value) + par->as<String>()->value);
 		} else return Null;
 	});
 	natives["Decimal.-"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
@@ -140,13 +140,13 @@ void pool::initialize() {
 			return Null;
 		auto par = other[0];
 		if (par->getType() == Integer::TYPE) {
-			return Decimal::create(value - par->as<Integer>()->value, self->context);
+			return DecimalClass->newInstance(self->context, {}, value - par->as<Integer>()->value);
 		} else if (par->getType() == Decimal::TYPE) {
-			return Decimal::create(value - par->as<Decimal>()->value, self->context);
+			return DecimalClass->newInstance(self->context, {}, value - par->as<Decimal>()->value);
 		} else return Null;
 	});
 	natives["Decimal.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
-		return String::create(to_string(self->as<Decimal>()->value), self->context);
+		return StringClass->newInstance(self->context, {}, to_string(self->as<Decimal>()->value));
 	});
 	natives["String.+"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		if (other.size() == 1) {
@@ -154,7 +154,8 @@ void pool::initialize() {
 			if (auto method = var->findMethod("toString")) {
 				auto result = method->execute(var, {});
 				if (result->getType() == String::TYPE) {
-					return String::create(self->as<String>()->value + result->as<String>()->value, self->context);
+					return StringClass->newInstance(self->context, {},
+													self->as<String>()->value + result->as<String>()->value);
 				}
 			}
 		}
@@ -198,7 +199,14 @@ void pool::initialize() {
 			ss.seekp(-1, stringstream::cur); //remove last comma
 		}
 		ss << ")";
-		return String::create(ss.str(), fun->context);
+		return StringClass->newInstance(self->context, {}, ss.str());
+	});
+	natives["Array.init"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+		auto array = self->as<Array>();
+		for (auto &value : other) {
+			array->values.push_back(value->as<Object>());
+		}
+		return Void;
 	});
 	natives["Array.at"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		if (other.size() == 1) {
@@ -206,8 +214,7 @@ void pool::initialize() {
 			if (arg->getType() == Integer::TYPE) {
 				auto index = arg->as<Integer>()->value;
 				auto array = self->as<Array>();
-				if (index >= 0 && index < array->calls.size()) {
-					array->invoke();
+				if (index >= 0 && index < array->values.size()) {
 					return array->values[index];
 				} else throw execution_error("Array access index out of range");
 			} else throw execution_error("Array access argument must be an integer");
@@ -215,9 +222,8 @@ void pool::initialize() {
 	});
 	natives["Array.push"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto array = self->as<Array>();
-		//array->invoke();
 		for (auto &value : other) {
-			array->values.push_back(value);
+			array->values.push_back(value->as<Object>());
 		}
 		return Void;
 	});
@@ -226,15 +232,14 @@ void pool::initialize() {
 			if (other[0]->getType() == Fun::TYPE) {
 				auto fun = other[0]->as<Fun>();
 				auto array = self->as<Array>();
-				array->invoke();
 				size_t i = 0;
 				for (auto &value : array->values) {
 					if (fun->params.size() == 1)
 						fun->execute(fun, {value});
 					else if (fun->params.size() == 2)
-						fun->execute(fun, {value, Integer::create(i, self->context)});
+						fun->execute(fun, {value, IntegerClass->newInstance(self->context, {}, i)});
 					else if (fun->params.size() == 3)
-						fun->execute(fun, {value, Integer::create(i, self->context), array});
+						fun->execute(fun, {value, IntegerClass->newInstance(self->context, {}, i), array});
 					else throw execution_error("Array.forEach argument Fun must have at most 3 paramenters");
 					i++;
 				}

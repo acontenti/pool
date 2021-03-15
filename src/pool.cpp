@@ -6,6 +6,7 @@
 #include "../lib/termcolor.hpp"
 #include "ErrorListener.hpp"
 #include "PoolLexer.h"
+#include "std.hpp"
 
 using namespace pool;
 using namespace chrono;
@@ -30,18 +31,25 @@ std::string getExecutionTime(high_resolution_clock::time_point startTime, high_r
 
 void Pool::initialiaze() {
 	pool::initialize();
-	Pool::execute("std");
+	Pool::execute(":std");
 }
 
 void Pool::setOptions(const Settings &settings) {
 	debug = settings.debug;
 	for (const auto &arg : settings.args) {
-		arguments.push_back(String::create(arg, Context::global));
+		arguments.push_back(StringClass->newInstance(Context::global, {}, arg));
 	}
 }
 
 Pool Pool::execute(const string &module) {
 	string filename = module;
+	if (startsWith(filename, ":")) {
+		auto it = STD_MODULES.find(filename);
+		if (it != STD_MODULES.end()) {
+			istringstream is(it->second);
+			return Pool(filename, is);
+		}
+	}
 	if (!endsWith(filename, EXT))
 		filename += EXT;
 	auto file = fs::path(filename);
@@ -49,18 +57,18 @@ Pool Pool::execute(const string &module) {
 		if (fs::is_regular_file(file)) {
 			if (ifstream(file).good()) {
 				file = fs::canonical(file);
-				return Pool(file.string());
+				ifstream is(file);
+				return Pool(file.string(), is);
 			} else throw compile_fatal("File \"" + file.string() + "\" is not readable");
 		} else throw compile_fatal("File \"" + file.string() + "\" is not a regular file");
 	} else throw compile_fatal("File \"" + file.string() + "\" not found");
 }
 
-Pool::Pool(const string &file) {
+Pool::Pool(const string &filename, istream &stream) {
 	bool result;
 	auto startTime = high_resolution_clock::now();
-	ifstream is(file);
-	auto inputStream = make_unique<ANTLRInputStream>(is);
-	inputStream->name = file;
+	auto inputStream = make_unique<ANTLRInputStream>(stream);
+	inputStream->name = filename;
 	auto lexer = make_unique<PoolLexer>(inputStream.get());
 	lexer->removeErrorListeners();
 	lexer->addErrorListener(ErrorListener::INSTANCE());
@@ -69,17 +77,16 @@ Pool::Pool(const string &file) {
 	parser->removeErrorListeners();
 	parser->addErrorListener(ErrorListener::INSTANCE());
 	try {
-		vector<shared_ptr<Callable>> args(arguments.size() + 1);
-		args[0] = Identity::create(String::create(file, Context::global));
-		transform(arguments.begin(), arguments.end(), args.begin() + 1, [](const shared_ptr<Object> &item) {
-			return Identity::create(item);
-		});
+		vector<shared_ptr<Object>> args;
+		args.reserve(arguments.size() + 1);
+		args.push_back(StringClass->newInstance(Context::global, {}, filename));
+		args.insert(args.end(), arguments.begin(), arguments.end());
 		auto tree = parser->program();
 		if (debug) {
 			cout << tree->toStringTree(parser.get()) << endl;
 		}
 		auto main = parseProgram(tree, {"args"}, Context::global);
-		main->execute(nullptr, {Array::create(args, Context::global)->invoke()});
+		main->execute(nullptr, {ArrayClass->newInstance(Context::global, args)});
 		result = true;
 	} catch (::compile_error &error) {
 		std::cout << termcolor::red << error << termcolor::reset << std::endl;
@@ -113,7 +120,11 @@ size_t getNextLineToken(unique_ptr<Token> &&token, Token *original = nullptr) {
 }
 
 void Pool::compile_error(const std::string &message, Token *token, ostream &stream) noexcept {
-	return compile_error(message, token, token->getLine(), token->getCharPositionInLine(), stream);
+	if (token)
+		return compile_error(message, token, token->getLine(), token->getCharPositionInLine(), stream);
+	else {
+		return compile_error(message, token, 0, 0, stream);
+	}
 }
 
 void Pool::compile_error(const string &message, Token *token, size_t line, size_t col, ostream &stream) noexcept {

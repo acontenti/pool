@@ -44,9 +44,6 @@ public:
   virtual void enterBlock(PoolParser::BlockContext *ctx) = 0;
   virtual void exitBlock(PoolParser::BlockContext *ctx) = 0;
 
-  virtual void enterArr(PoolParser::ArrContext *ctx) = 0;
-  virtual void exitArr(PoolParser::ArrContext *ctx) = 0;
-
   virtual void enterFun(PoolParser::FunContext *ctx) = 0;
   virtual void exitFun(PoolParser::FunContext *ctx) = 0;
 

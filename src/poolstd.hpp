@@ -9,6 +9,8 @@
 using namespace std;
 
 namespace pool {
+	using any = antlrcpp::Any;
+
 	class Class;
 
 	class Variable;
@@ -50,7 +52,7 @@ namespace pool {
 		const shared_ptr<Class> cls;
 		const shared_ptr<Context> context;
 
-		Object(shared_ptr<Class> cls, const shared_ptr<Context> &context);
+		Object(const shared_ptr<Context> &context, shared_ptr<Class> cls);
 
 		virtual string_view getType();
 
@@ -74,6 +76,10 @@ namespace pool {
 		virtual bool isVariable() const {
 			return false;
 		}
+
+		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &cls, const any &name, const any &super) {
+			return make_shared<Object>(context, cls);
+		}
 	};
 
 	template<>
@@ -81,13 +87,16 @@ namespace pool {
 
 	class Class : public Object {
 	public:
+		typedef shared_ptr<Object>(*creator_t)(const shared_ptr<Context> &context, const any &a1, const any &a2, const any &a3);
+
 		constexpr static const string_view TYPE = "Class";
 		static std::size_t COUNTER;
 		size_t instances = 0;
 		string name;
 		shared_ptr<Class> super;
+		creator_t creator;
 
-		Class(const shared_ptr<Context> &context, string name, shared_ptr<Class> super);
+		Class(const shared_ptr<Context> &context, creator_t creator, string name, shared_ptr<Class> super);
 
 		shared_ptr<Object> find(const string &id) const override {
 			if (auto local = findInClass(id)) {
@@ -109,42 +118,45 @@ namespace pool {
 			return nullptr;
 		};
 
-		template<class T, typename std::enable_if<std::is_base_of<Object, T>::value>::type * = nullptr, typename... Args>
-		shared_ptr<T> newInstance(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other = {}, Args &&... args) {
-			auto ptr = make_shared<T>(context, args...);
+		shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other = {}, const any &a1 = nullptr, const any &a2 = nullptr, const any &a3 = nullptr) const {
+			auto ptr = creator(context, a1, a2, a3);
 			callInit(ptr, other);
 			return ptr;
 		}
 
-		shared_ptr<Class> extend(const string &className, const shared_ptr<Block> &other = nullptr);
+		shared_ptr<Class> extend(creator_t creator, const string &className, const shared_ptr<Block> &other = nullptr);
 
 		static void callInit(const shared_ptr<Object> &ptr, const vector<shared_ptr<Object>> &other);
-	};
 
-	template<>
-	shared_ptr<Object> Class::newInstance<Object>(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other);
+		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &creator, const any &name, const any &super) {
+			return make_shared<Class>(context, creator.as<creator_t>(), name.as<string>(), super.isNotNull()
+																						   ? super.as<shared_ptr<Class>>()
+																						   : nullptr);
+		}
+	};
 
 	class Bool : public Object {
 	public:
 		bool value;
 		constexpr static const string_view TYPE = "Bool";
 
-		Bool(const shared_ptr<Context> &context, bool value) : Object(BoolClass, context), value(value) {}
+		Bool(const shared_ptr<Context> &context, bool value) : Object(context, BoolClass), value(value) {}
 
-		static shared_ptr<Bool> create(const bool &value, const shared_ptr<Context> &context) {
+		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
 			return make_shared<Bool>(context, value);
 		}
 	};
 
 	class Integer : public Object {
 	public:
-		int64_t value;
+		long long int value;
 		constexpr static const string_view TYPE = "Integer";
 
-		Integer(int64_t value, const shared_ptr<Context> &context) : Object(IntegerClass, context), value(value) {}
+		Integer(long long int value, const shared_ptr<Context> &context)
+				: Object(context, IntegerClass), value(value) {}
 
-		static shared_ptr<Integer> create(const int64_t &value, const shared_ptr<Context> &context) {
-			return make_shared<Integer>(value, context);
+		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
+			return make_shared<Integer>(value.as<long long int>(), context);
 		}
 	};
 
@@ -153,9 +165,9 @@ namespace pool {
 		double value;
 		constexpr static const string_view TYPE = "Decimal";
 
-		Decimal(double value, const shared_ptr<Context> &context) : Object(DecimalClass, context), value(value) {}
+		Decimal(double value, const shared_ptr<Context> &context) : Object(context, DecimalClass), value(value) {}
 
-		static shared_ptr<Decimal> create(const double &value, const shared_ptr<Context> &context) {
+		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
 			return make_shared<Decimal>(value, context);
 		}
 	};
@@ -165,10 +177,10 @@ namespace pool {
 		constexpr static const string_view TYPE = "String";
 		string value;
 
-		String(const shared_ptr<Context> &context, string value) : Object(StringClass, context), value(move(value)) {}
+		String(const shared_ptr<Context> &context, string value) : Object(context, StringClass), value(move(value)) {}
 
-		static shared_ptr<String> create(const string &value, const shared_ptr<Context> &context) {
-			return StringClass->newInstance<String>(context, {}, value);
+		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
+			return make_shared<String>(context, value);
 		}
 	};
 
@@ -216,10 +228,10 @@ namespace pool {
 		}
 
 		Variable(string name, shared_ptr<Object> value, const shared_ptr<Context> &context, bool immutable)
-				: Object(VariableClass, context), name(move(name)), value(move(value)), immutable(immutable) {
+				: Object(context, VariableClass), name(move(name)), value(move(value)), immutable(immutable) {
 		}
 
-		static shared_ptr<Variable> create(const string &name, const shared_ptr<Context> &context) {
+		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &name, const any &_a2 = nullptr, const any &_a3 = nullptr) {
 			return make_shared<Variable>(name, Null, context, false);
 		}
 	};
@@ -229,7 +241,7 @@ namespace pool {
 		vector<string> params;
 
 		Executable(const vector<string> &params, const shared_ptr<Context> &context, const shared_ptr<Class> &cls)
-				: Object(cls, context), params(params) {}
+				: Object(context, cls), params(params) {}
 
 		virtual shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) = 0;
 	};
@@ -287,7 +299,7 @@ namespace pool {
 			return returnValue;
 		}
 
-		static shared_ptr<Fun> create(const vector<string> &params, const vector<shared_ptr<Callable>> &calls, const shared_ptr<Context> &context) {
+		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &params, const any &calls, const any &_a3 = nullptr) {
 			return make_shared<Fun>(params, calls, context);
 		}
 	};
@@ -312,24 +324,20 @@ namespace pool {
 			return invoke();
 		}
 
-		static shared_ptr<Block> create(const vector<shared_ptr<Callable>> &calls, const shared_ptr<Context> &context) {
+		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &calls, const any &_a2 = nullptr, const any &_a3 = nullptr) {
 			return make_shared<Block>(calls, context);
 		}
 	};
 
-	class Array : public Object, public Callable {
+	class Array : public Object {
 	public:
 		constexpr static const string_view TYPE = "Array";
-		vector<shared_ptr<Callable>> calls;
 		vector<shared_ptr<Object>> values;
 
-		Array(vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
-				: Object(ArrayClass, context), calls(move(calls)) {}
+		explicit Array(const shared_ptr<Context> &context) : Object(context, ArrayClass) {}
 
-		shared_ptr<Object> invoke() override;
-
-		static shared_ptr<Array> create(const vector<shared_ptr<Callable>> &calls, const shared_ptr<Context> &context) {
-			return make_shared<Array>(calls, context);
+		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &_a1 = nullptr, const any &_a2 = nullptr, const any &_a3 = nullptr) {
+			return make_shared<Array>(context);
 		}
 	};
 

@@ -24,7 +24,7 @@ Integer::> ::= (this, other) : {
 Integer::toString ::= `Integer.toString`;
 Integer::to ::= (this, end) : {
 	i := this.+(0);
-	array := [];
+	array := Array.new();
 	end.println();
 	{i.<(end);}.whileDo({
 		array.<<(i);
@@ -44,6 +44,7 @@ Decimal::- ::= `Decimal.-`;
 Decimal::toString ::= `Decimal.toString`;
 
 Array ::= `Array`;
+Array::init ::= `Array.init`;
 Array::at ::= `Array.at`;
 Array::forEach ::= `Array.forEach`;
 Array::push ::= `Array.push`;

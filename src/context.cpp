@@ -44,7 +44,7 @@ shared_ptr<Object> Context::add(const string &name, const shared_ptr<Object> &va
 }
 
 shared_ptr<Object> Context::add(const string &name) {
-	return heap.try_emplace(name, Variable::create(name, shared_from_this())).first->second;
+	return heap.try_emplace(name, VariableClass->newInstance(shared_from_this(), {}, name)).first->second;
 }
 
 void Context::set(const string &name, const shared_ptr<Object> &value) {
