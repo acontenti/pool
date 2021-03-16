@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(pool VERSION 0.1.0 LANGUAGES CXX)
 
 # ANTLR4 RUNTIME
-set(ANTLR4_VERSION "4.9.1")
+set(ANTLR4_VERSION "4.9.2")
 add_compile_definitions(_HAS_STD_BYTE=0)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 if (ANTLR4_BASE_DIR)
@@ -26,7 +26,7 @@ find_package(ANTLR REQUIRED)
 
 # PARSER GENERATOR
 antlr_target(PoolLexer PoolLexer.g4 LEXER OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/gen)
-antlr_target(PoolParser PoolParser.g4 PARSER OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/gen LISTENER DEPENDS_ANTLR PoolLexer)
+antlr_target(PoolParser PoolParser.g4 PARSER OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/gen DEPENDS_ANTLR PoolLexer)
 
 # POOL STD RESOURCES
 add_custom_target(embed_std COMMAND ${CMAKE_COMMAND} -Dsource_dir="${CMAKE_SOURCE_DIR}/std" -Doutput_dir="${CMAKE_SOURCE_DIR}/src" -P ${CMAKE_SOURCE_DIR}/cmake/ResourceEmbed.cmake)
