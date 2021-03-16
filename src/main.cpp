@@ -21,8 +21,7 @@ int main(int argc, char **argv) {
 			for (int i = 1; i < result.pos.size(); ++i) {
 				args.emplace_back(result.pos[i]);
 			}
-			Pool::initialiaze();
-			Pool::setOptions({debug, args});
+			Pool::initialiaze({debug, args});
 			Pool::execute(filename);
 		}
 		return EXIT_SUCCESS;

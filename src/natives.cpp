@@ -22,21 +22,56 @@ shared_ptr<Bool> pool::True = nullptr;
 shared_ptr<Bool> pool::False = nullptr;
 
 void pool::initialize() {
-	natives["Class"] = ClassClass = Class::make(Context::global, Class::make, string(Class::TYPE), nullptr)->as<Class>(); //ObjectClass is not yet created
-	natives["Object"] = ObjectClass = ClassClass->newInstance(Context::global, {}, Object::make, string(Object::TYPE))->as<Class>();
-	ClassClass->super = ObjectClass;
-	natives["Bool"] = BoolClass = ObjectClass->extend(Bool::make, string(Bool::TYPE));
-	natives["Integer"] = IntegerClass = ObjectClass->extend(Integer::make, string(Integer::TYPE));
-	natives["Decimal"] = DecimalClass = ObjectClass->extend(Decimal::make, string(Decimal::TYPE));
-	natives["String"] = StringClass = ObjectClass->extend(String::make, string(String::TYPE));
-	natives["Array"] = ArrayClass = ObjectClass->extend(Array::make, string(Array::TYPE));
-	natives["Variable"] = VariableClass = ObjectClass->extend(Variable::make, string(Variable::TYPE));
-	natives["Block"] = BlockClass = ObjectClass->extend(Block::make, string(Block::TYPE));
-	natives["Fun"] = FunClass = ObjectClass->extend(Fun::make, string(Fun::TYPE));
+	Context::global = Context::create(nullptr);
+	Context::global->set("import", NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
+		if (other.size() == 1) {
+			auto arg = other[0];
+			if (arg->getType() == String::TYPE) {
+				auto moduleName = other[0]->as<String>()->value;
+				try {
+					Pool::execute(moduleName);
+				} catch (const compile_error &e) {
+					throw execution_error("Cannot import module \"" + moduleName + "\": " + string(e));
+				}
+			} else throw execution_error("import argument must a String");
+		} else throw execution_error("import needs one argument");
+		return Void;
+	}));
+	natives["Class"] = ClassClass = make_shared<Class>(Context::create(Context::global), [](const shared_ptr<Context> &context, const any &creator, const any &name, const any &super) {
+		return make_shared<Class>(context, creator, name, super.isNotNull() ? super.as<shared_ptr<Class>>() : nullptr);
+	}, string(Class::TYPE), nullptr)->as<Class>(); // ObjectClass is not yet created, so we pass nullptr as super
+	natives["Object"] = ObjectClass = ClassClass->newInstance(Context::global, {}, static_cast<Class::creator_t>([](const shared_ptr<Context> &context, const any &cls, const any &name, const any &super) -> shared_ptr<Object> {
+		return make_shared<Object>(context, cls);
+	}), string(Object::TYPE), nullptr)->as<Class>(); // ObjectClass is the base class, so it has no super
+	ClassClass->super = ObjectClass; // Now ObjectClass exists, so we can assign it to ClassClass->super
+	natives["Bool"] = BoolClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
+		return make_shared<Bool>(context, value);
+	}, string(Bool::TYPE));
+	natives["Integer"] = IntegerClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
+		return make_shared<Integer>(value, context);
+	}, string(Integer::TYPE));
+	natives["Decimal"] = DecimalClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
+		return make_shared<Decimal>(value, context);
+	}, string(Decimal::TYPE));
+	natives["String"] = StringClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
+		return make_shared<String>(context, value);
+	}, string(String::TYPE));
+	natives["Array"] = ArrayClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &_a1 = nullptr, const any &_a2 = nullptr, const any &_a3 = nullptr) {
+		return make_shared<Array>(context);
+	}, string(Array::TYPE));
+	natives["Variable"] = VariableClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &name, const any &_a2 = nullptr, const any &_a3 = nullptr) {
+		return make_shared<Variable>(name, Null, context, false);
+	}, string(Variable::TYPE));
+	natives["Block"] = BlockClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &calls, const any &_a2 = nullptr, const any &_a3 = nullptr) {
+		return make_shared<Block>(calls, context);
+	}, string(Block::TYPE));
+	natives["Fun"] = FunClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &params, const any &calls, const any &_a3 = nullptr) {
+		return make_shared<Fun>(params, calls, context);
+	}, string(Fun::TYPE));
 	natives["Void"] = VoidClass = ObjectClass->extend(nullptr, "Void");
 	natives["Nothing"] = NothingClass = ObjectClass->extend(nullptr, "Nothing");
 	natives["void"] = Void = VoidClass->newInstance(Context::global, {}, VoidClass);
-	natives["null"] = Null = NothingClass->newInstance(Context::global, {}, VoidClass);
+	natives["null"] = Null = NothingClass->newInstance(Context::global, {}, NothingClass);
 	natives["true"] = True = BoolClass->newInstance(Context::global, {}, true)->as<Bool>();
 	natives["false"] = False = BoolClass->newInstance(Context::global, {}, false)->as<Bool>();
 	natives["Class.extend"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
@@ -56,7 +91,7 @@ void pool::initialize() {
 	});
 	natives["Class.new"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto cls = self->as<Class>();
-		return cls->newInstance(Context::create(self->context), other, cls);
+		return cls->newInstance(self->context, other, cls);
 	});
 	natives["Class.toString"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
 		return StringClass->newInstance(self->context, {}, "Class:" + self->as<Class>()->name);
@@ -161,15 +196,6 @@ void pool::initialize() {
 		}
 		return Null;
 	});
-	natives["String.import"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
-		auto moduleName = self->as<String>()->value;
-		try {
-			Pool::execute(moduleName);
-		} catch (const compile_error &e) {
-			throw Pool::compile_fatal("Cannot import module \"" + moduleName + "\": " + string(e));
-		}
-		return Void;
-	});
 	natives["Fun.classmethod"] = NativeFun::create([](const shared_ptr<Object> &fself, const vector<shared_ptr<Object>> &fother) -> shared_ptr<Object> {
 		return NativeFun::create([fself](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 			if (self->getType() == Class::TYPE) {
@@ -216,9 +242,9 @@ void pool::initialize() {
 				auto array = self->as<Array>();
 				if (index >= 0 && index < array->values.size()) {
 					return array->values[index];
-				} else throw execution_error("Array access index out of range");
-			} else throw execution_error("Array access argument must be an integer");
-		} else throw execution_error("Array access needs an argument");
+				} else throw execution_error("Array.at index out of range");
+			} else throw execution_error("Array.at argument must be an integer");
+		} else throw execution_error("Array.at needs an argument");
 	});
 	natives["Array.push"] = NativeFun::create([](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 		auto array = self->as<Array>();

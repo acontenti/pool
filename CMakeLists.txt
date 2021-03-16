@@ -29,8 +29,7 @@ antlr_target(PoolLexer PoolLexer.g4 LEXER OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/g
 antlr_target(PoolParser PoolParser.g4 PARSER OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/gen LISTENER DEPENDS_ANTLR PoolLexer)
 
 # POOL STD RESOURCES
-include(ResourceEmbed)
-create_resources(std src)
+add_custom_target(embed_std COMMAND ${CMAKE_COMMAND} -Dsource_dir="${CMAKE_SOURCE_DIR}/std" -Doutput_dir="${CMAKE_SOURCE_DIR}/src" -P ${CMAKE_SOURCE_DIR}/cmake/ResourceEmbed.cmake)
 
 # POOL
 include_directories(${ANTLR_PoolLexer_OUTPUT_DIR} ${ANTLR_PoolParser_OUTPUT_DIR} ${ANTLR4_INCLUDE_DIRS})
@@ -44,10 +43,11 @@ else ()
 	target_link_libraries(pool dl pthread stdc++fs)
 endif ()
 target_link_libraries(pool ${ANTLR4_LIB})
+add_dependencies(pool embed_std)
 
 # INSTALL
 install(TARGETS pool CONFIGURATIONS Release DESTINATION ${CMAKE_SOURCE_DIR}/dist)
 
 # TEST
 enable_testing()
-add_test(NAME basic_test COMMAND pool test ctest WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME basic_test COMMAND pool test ctest WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/test)

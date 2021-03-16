@@ -76,10 +76,6 @@ namespace pool {
 		virtual bool isVariable() const {
 			return false;
 		}
-
-		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &cls, const any &name, const any &super) {
-			return make_shared<Object>(context, cls);
-		}
 	};
 
 	template<>
@@ -87,7 +83,7 @@ namespace pool {
 
 	class Class : public Object {
 	public:
-		typedef shared_ptr<Object>(*creator_t)(const shared_ptr<Context> &context, const any &a1, const any &a2, const any &a3);
+		using creator_t = function<shared_ptr<Object>(const shared_ptr<Context> &context, const any &a1, const any &a2, const any &a3)>;
 
 		constexpr static const string_view TYPE = "Class";
 		static std::size_t COUNTER;
@@ -109,7 +105,7 @@ namespace pool {
 		}
 
 		shared_ptr<Object> findInClass(const string &id) const {
-			if (auto local = context->find(id)) {
+			if (auto local = context->findLocal(id)) {
 				return local;
 			}
 			if (super) {
@@ -118,8 +114,12 @@ namespace pool {
 			return nullptr;
 		};
 
-		shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other = {}, const any &a1 = nullptr, const any &a2 = nullptr, const any &a3 = nullptr) const {
-			auto ptr = creator(context, a1, a2, a3);
+		shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other = {}, const any &a1 = nullptr, const any &a2 = nullptr, const any &a3 = nullptr, bool createContext = true) const {
+			auto ctx = context;
+			if (createContext) {
+				ctx = Context::create(context);
+			}
+			auto ptr = creator(ctx, a1, a2, a3);
 			callInit(ptr, other);
 			return ptr;
 		}
@@ -127,12 +127,6 @@ namespace pool {
 		shared_ptr<Class> extend(creator_t creator, const string &className, const shared_ptr<Block> &other = nullptr);
 
 		static void callInit(const shared_ptr<Object> &ptr, const vector<shared_ptr<Object>> &other);
-
-		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &creator, const any &name, const any &super) {
-			return make_shared<Class>(context, creator.as<creator_t>(), name.as<string>(), super.isNotNull()
-																						   ? super.as<shared_ptr<Class>>()
-																						   : nullptr);
-		}
 	};
 
 	class Bool : public Object {
@@ -141,10 +135,6 @@ namespace pool {
 		constexpr static const string_view TYPE = "Bool";
 
 		Bool(const shared_ptr<Context> &context, bool value) : Object(context, BoolClass), value(value) {}
-
-		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
-			return make_shared<Bool>(context, value);
-		}
 	};
 
 	class Integer : public Object {
@@ -154,10 +144,6 @@ namespace pool {
 
 		Integer(long long int value, const shared_ptr<Context> &context)
 				: Object(context, IntegerClass), value(value) {}
-
-		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
-			return make_shared<Integer>(value.as<long long int>(), context);
-		}
 	};
 
 	class Decimal : public Object {
@@ -166,10 +152,6 @@ namespace pool {
 		constexpr static const string_view TYPE = "Decimal";
 
 		Decimal(double value, const shared_ptr<Context> &context) : Object(context, DecimalClass), value(value) {}
-
-		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
-			return make_shared<Decimal>(value, context);
-		}
 	};
 
 	class String : public Object {
@@ -178,10 +160,6 @@ namespace pool {
 		string value;
 
 		String(const shared_ptr<Context> &context, string value) : Object(context, StringClass), value(move(value)) {}
-
-		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
-			return make_shared<String>(context, value);
-		}
 	};
 
 
@@ -229,10 +207,6 @@ namespace pool {
 
 		Variable(string name, shared_ptr<Object> value, const shared_ptr<Context> &context, bool immutable)
 				: Object(context, VariableClass), name(move(name)), value(move(value)), immutable(immutable) {
-		}
-
-		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &name, const any &_a2 = nullptr, const any &_a3 = nullptr) {
-			return make_shared<Variable>(name, Null, context, false);
 		}
 	};
 
@@ -298,10 +272,6 @@ namespace pool {
 			}
 			return returnValue;
 		}
-
-		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &params, const any &calls, const any &_a3 = nullptr) {
-			return make_shared<Fun>(params, calls, context);
-		}
 	};
 
 	class Block : public Executable, public Callable {
@@ -323,10 +293,6 @@ namespace pool {
 		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override {
 			return invoke();
 		}
-
-		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &calls, const any &_a2 = nullptr, const any &_a3 = nullptr) {
-			return make_shared<Block>(calls, context);
-		}
 	};
 
 	class Array : public Object {
@@ -335,10 +301,6 @@ namespace pool {
 		vector<shared_ptr<Object>> values;
 
 		explicit Array(const shared_ptr<Context> &context) : Object(context, ArrayClass) {}
-
-		static shared_ptr<Object> make(const shared_ptr<Context> &context, const any &_a1 = nullptr, const any &_a2 = nullptr, const any &_a3 = nullptr) {
-			return make_shared<Array>(context);
-		}
 	};
 
 	extern void initialize();

@@ -132,7 +132,7 @@ shared_ptr<Object> parseString(PoolParser::StringContext *ast, const shared_ptr<
 
 shared_ptr<Object> parseBlock(PoolParser::BlockContext *ast, const shared_ptr<Context> &parent) {
 	auto context = Context::create(parent);
-	return BlockClass->newInstance(context, {}, parseStatements(ast->statement(), context));
+	return BlockClass->newInstance(context, {}, parseStatements(ast->statement(), context), nullptr, nullptr, false);
 }
 
 shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<Context> &parent) {
@@ -143,7 +143,7 @@ shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<C
 		params.emplace_back(getId(id));
 	}
 	auto context = Context::create(parent);
-	return FunClass->newInstance(context, {}, params, parseStatements(ast->statement(), context));
+	return FunClass->newInstance(context, {}, params, parseStatements(ast->statement(), context), nullptr, false);
 }
 
 shared_ptr<Callable> parseNative(tree::TerminalNode *ast, const shared_ptr<Context> &context) {
@@ -210,6 +210,8 @@ shared_ptr<Callable> pool::parseCall(PoolParser::CallContext *ast, const shared_
 	}
 }
 
-shared_ptr<Fun> pool::parseProgram(PoolParser::ProgramContext *ast, const vector<string> &params, const shared_ptr<Context> &context) {
-	return FunClass->newInstance(context, {}, params, parseStatements(ast->statement(), context))->as<Fun>();
+void pool::parseProgram(PoolParser::ProgramContext *ast, const shared_ptr<Context> &context) {
+	for (auto statement : ast->statement()) {
+		parseExpression(statement->expression(), context)->invoke();
+	}
 }

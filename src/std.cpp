@@ -39,7 +39,6 @@ Integer::to ::= (this, end) : {
 String ::= `String`;
 String::+ ::= `String.+`;
 String::toString ::= (this) : {this;};
-String::import ::= `String.import`;
 
 Decimal ::= `Decimal`;
 Decimal::+ ::= `Decimal.+`;

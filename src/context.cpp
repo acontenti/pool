@@ -3,11 +3,9 @@
 
 using namespace pool;
 
-const shared_ptr<Context> Context::global = Context::create(nullptr);
+shared_ptr<Context> Context::global = nullptr;
 
 shared_ptr<pool::Object> Context::find(const string &name) const {
-	if (name == "=") return natives["="];
-	if (name == "=>") return natives["=>"];
 	auto iterator = heap.find(name);
 	if (iterator != heap.end()) {
 		return iterator->second;

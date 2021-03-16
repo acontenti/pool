@@ -21,9 +21,7 @@ namespace pool {
 		constexpr static const string_view VERSION = POOL_VERSION;
 		constexpr static const string_view EXT = ".pool";
 
-		static void initialiaze();
-
-		static void setOptions(const Settings &settings);
+		static void initialiaze(const Settings &settings);
 
 		static Pool execute(const string &filename);
 

@@ -13,7 +13,7 @@ namespace pool {
 		unordered_map<string, shared_ptr<pool::Object>> heap;
 		const shared_ptr<Context> parent;
 	public:
-		static const shared_ptr<Context> global;
+		static shared_ptr<Context> global;
 
 		explicit Context(shared_ptr<Context> parent) : parent(move(parent)) {}
 

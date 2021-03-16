@@ -29,7 +29,7 @@ shared_ptr<Executable> Object::findMethod(const string &methodName) const {
 }
 
 shared_ptr<Object> Object::find(const string &name) const {
-	if (auto local = context->find(name)) {
+	if (auto local = context->findLocal(name)) {
 		return local;
 	}
 	if (cls) {
@@ -52,7 +52,7 @@ shared_ptr<Variable> Object::as<Variable>() {
 }
 
 Class::Class(const shared_ptr<Context> &context, creator_t creator, string name, shared_ptr<Class> super)
-		: Object(Context::create(context), ClassClass), creator(creator), name(move(name)), super(move(super)) {}
+		: Object(context, ClassClass), creator(creator), name(move(name)), super(move(super)) {}
 
 shared_ptr<Class> Class::extend(creator_t _creator, const string &className, const shared_ptr<Block> &other) {
 	auto self = this->as<Class>();

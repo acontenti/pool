@@ -29,16 +29,14 @@ std::string getExecutionTime(high_resolution_clock::time_point startTime, high_r
 	return output.str();
 }
 
-void Pool::initialiaze() {
-	pool::initialize();
-	Pool::execute(":std");
-}
-
-void Pool::setOptions(const Settings &settings) {
+void Pool::initialiaze(const Settings &settings) {
 	debug = settings.debug;
+	pool::initialize();
+	arguments.push_back(StringClass->newInstance(Context::global, {}, string()));
 	for (const auto &arg : settings.args) {
 		arguments.push_back(StringClass->newInstance(Context::global, {}, arg));
 	}
+	Context::global->set("args", ArrayClass->newInstance(Context::global, arguments));
 }
 
 Pool Pool::execute(const string &module) {
@@ -58,7 +56,11 @@ Pool Pool::execute(const string &module) {
 			if (ifstream(file).good()) {
 				file = fs::canonical(file);
 				ifstream is(file);
-				return Pool(file.string(), is);
+				auto cwd = fs::current_path();
+				fs::current_path(file.parent_path());
+				const Pool &pool = Pool(file.string(), is);
+				fs::current_path(cwd);
+				return pool;
 			} else throw compile_fatal("File \"" + file.string() + "\" is not readable");
 		} else throw compile_fatal("File \"" + file.string() + "\" is not a regular file");
 	} else throw compile_fatal("File \"" + file.string() + "\" not found");
@@ -77,16 +79,15 @@ Pool::Pool(const string &filename, istream &stream) {
 	parser->removeErrorListeners();
 	parser->addErrorListener(ErrorListener::INSTANCE());
 	try {
-		vector<shared_ptr<Object>> args;
-		args.reserve(arguments.size() + 1);
-		args.push_back(StringClass->newInstance(Context::global, {}, filename));
-		args.insert(args.end(), arguments.begin(), arguments.end());
 		auto tree = parser->program();
 		if (debug) {
 			cout << tree->toStringTree(parser.get()) << endl;
 		}
-		auto main = parseProgram(tree, {"args"}, Context::global);
-		main->execute(nullptr, {ArrayClass->newInstance(Context::global, args)});
+		const auto &oldArgs = Context::global->find("args");
+		arguments[0] = StringClass->newInstance(Context::global, {}, filename);
+		Context::global->set("args", ArrayClass->newInstance(Context::global, arguments));
+		parseProgram(tree, Context::global);
+		Context::global->set("args", oldArgs);
 		result = true;
 	} catch (::compile_error &error) {
 		std::cout << termcolor::red << error << termcolor::reset << std::endl;
