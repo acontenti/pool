@@ -327,8 +327,8 @@ PoolParser::CallContext* PoolParser::AccessContext::call() {
   return getRuleContext<PoolParser::CallContext>(0);
 }
 
-tree::TerminalNode* PoolParser::AccessContext::SQ() {
-  return getToken(PoolParser::SQ, 0);
+tree::TerminalNode* PoolParser::AccessContext::DOTDOT() {
+  return getToken(PoolParser::DOTDOT, 0);
 }
 
 
@@ -369,7 +369,7 @@ PoolParser::AccessContext* PoolParser::access() {
       setState(64);
       dynamic_cast<AccessContext *>(_localctx)->callee = call(0);
       setState(65);
-      match(PoolParser::SQ);
+      match(PoolParser::DOTDOT);
       setState(66);
       match(PoolParser::ID);
       dynamic_cast<AccessContext *>(_localctx)->type = AccessContext::L;
@@ -1290,12 +1290,12 @@ std::vector<std::string> PoolParser::_ruleNames = {
 
 std::vector<std::string> PoolParser::_literalNames = {
   "", "", "", "", "';'", "'('", "')'", "'{'", "'}'", "'['", "']'", "'.'", 
-  "','", "':='", "'::='", "'::'", "':'", "'#'", "'@'", "'\u003F'", "'...'"
+  "','", "':='", "'::='", "'..'", "':'", "'#'", "'@'", "'\u003F'", "'...'"
 };
 
 std::vector<std::string> PoolParser::_symbolicNames = {
   "", "WS", "COMMENT", "LINE_COMMENT", "SEMI", "LP", "RP", "LB", "RB", "LSB", 
-  "RSB", "DOT", "COMMA", "EQ", "CEQ", "SQ", "COLON", "HASH", "AT", "QM", 
+  "RSB", "DOT", "COMMA", "EQ", "CEQ", "DOTDOT", "COLON", "HASH", "AT", "QM", 
   "DOTS", "DECIMAL_INTEGER_LITERAL", "HEX_INTEGER_LITERAL", "BIN_INTEGER_LITERAL", 
   "FLOAT_LITERAL", "STRING_LITERAL", "NATIVE_SYMBOL", "ID"
 };

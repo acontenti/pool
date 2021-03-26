@@ -17,7 +17,7 @@ assignment returns [enum Type {V,C} type]:
 
 access returns [enum Type {G,L,I} type]:
 	callee=call DOT ID {$type=AccessContext::G;} |
-	callee=call SQ ID {$type=AccessContext::L;} |
+	callee=call DOTDOT ID {$type=AccessContext::L;} |
 	ID {$type=AccessContext::I;};
 
 call returns [enum Type {IA,A,T} type]:

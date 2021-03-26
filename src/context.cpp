@@ -5,7 +5,7 @@ using namespace pool;
 
 shared_ptr<Context> Context::global = nullptr;
 
-shared_ptr<pool::Object> Context::find(const string &name) const {
+shared_ptr<Variable> Context::find(const string &name) const {
 	auto iterator = heap.find(name);
 	if (iterator != heap.end()) {
 		return iterator->second;
@@ -14,23 +14,24 @@ shared_ptr<pool::Object> Context::find(const string &name) const {
 	} else return nullptr;
 }
 
-shared_ptr<pool::Object> Context::findLocal(const string &name) const {
+shared_ptr<Variable> Context::findLocal(const string &name) const {
 	auto iterator = heap.find(name);
 	if (iterator != heap.end()) {
 		return iterator->second;
 	} else return nullptr;
 }
 
-shared_ptr<Object> Context::add(const string &name, const shared_ptr<Object> &var) {
-	return heap.try_emplace(name, var).first->second;
+shared_ptr<Variable> Context::add(const string &name) {
+	const auto &variable = make_shared<Variable>(Context::create(shared_from_this()), name, Null, false);
+	return heap.try_emplace(name, variable).first->second;
 }
 
-shared_ptr<Object> Context::add(const string &name) {
-	return heap.try_emplace(name, VariableClass->newInstance(shared_from_this(), {}, name)).first->second;
-}
-
-void Context::set(const string &name, const shared_ptr<Object> &value) {
-	heap[name] = value;
+void Context::set(const string &name, const shared_ptr<Object> &value, bool immutable) {
+	if (const auto &var = this->findLocal(name)) {
+		var->as<Variable>()->setValue(value->as<Object>());
+	} else {
+		heap[name] = make_shared<Variable>(Context::create(shared_from_this()), name, value->as<Object>(), immutable);
+	}
 }
 
 string Context::toString() const {

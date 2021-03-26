@@ -206,22 +206,22 @@ shared_ptr<Args> parseArgs(PoolParser::ArgsContext *ast, const shared_ptr<Contex
 shared_ptr<Callable> pool::parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context) {
 	switch (ast->type) {
 		case PoolParser::CallContext::T: {
-			auto caller = parseTerm(ast->term(), context);
-			return caller;
+			return parseTerm(ast->term(), context);
 		}
 		case PoolParser::CallContext::A: {
 			auto caller = parseCall(ast->callee, context);
-			auto callee = parseArgs(ast->a, context);
-			return Invocation::create(caller, caller, callee);
+			auto args = parseArgs(ast->a, context);
+			return Invocation::create(caller, args);
 		}
 		case PoolParser::CallContext::IA: {
 			auto caller = parseCall(ast->callee, context);
 			auto id = getId(ast->ID());
-			auto access = Access::create(caller, id);
 			if (ast->a) {
-				auto callee = parseArgs(ast->a, context);
-				return Invocation::create(caller, access, callee);
-			} else return access;
+				auto args = parseArgs(ast->a, context);
+				return InvocationAccess::create(caller, id, args);
+			} else {
+				return Access::create(caller, id);
+			}
 		}
 		default:
 			throw Pool::compile_fatal("invalid call", ast->getStart());

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <utility>
 #include <vector>
 #include <string>
 #include <memory>
@@ -68,18 +69,33 @@ namespace pool {
 	};
 
 	class Invocation : public Callable {
-		shared_ptr<Callable> self;
 		shared_ptr<Callable> caller;
 		shared_ptr<Args> args;
 	public:
 
-		Invocation(const shared_ptr<Callable> &self, const shared_ptr<Callable> &caller, const shared_ptr<Args> &args)
-				: self(self), caller(caller), args(args) {}
+		Invocation(const shared_ptr<Callable> &caller, const shared_ptr<Args> &args)
+				: caller(caller), args(args) {}
 
 		shared_ptr<Object> invoke() override;
 
-		static shared_ptr<Invocation> create(const shared_ptr<Callable> &self, const shared_ptr<Callable> &caller, const shared_ptr<Args> &args) {
-			return make_shared<Invocation>(self, caller, args);
+		static shared_ptr<Invocation> create(const shared_ptr<Callable> &caller, const shared_ptr<Args> &args) {
+			return make_shared<Invocation>(caller, args);
+		}
+	};
+
+	class InvocationAccess : public Callable {
+		shared_ptr<Callable> caller;
+		string id;
+		shared_ptr<Args> args;
+	public:
+
+		InvocationAccess(const shared_ptr<Callable> &caller, string id, const shared_ptr<Args> &args)
+				: caller(caller), id(move(id)), args(args) {}
+
+		shared_ptr<Object> invoke() override;
+
+		static shared_ptr<InvocationAccess> create(const shared_ptr<Callable> &caller, const string &id, const shared_ptr<Args> &args) {
+			return make_shared<InvocationAccess>(caller, id, args);
 		}
 	};
 

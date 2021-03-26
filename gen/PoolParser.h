@@ -14,7 +14,7 @@ public:
   enum {
     WS = 1, COMMENT = 2, LINE_COMMENT = 3, SEMI = 4, LP = 5, RP = 6, LB = 7, 
     RB = 8, LSB = 9, RSB = 10, DOT = 11, COMMA = 12, EQ = 13, CEQ = 14, 
-    SQ = 15, COLON = 16, HASH = 17, AT = 18, QM = 19, DOTS = 20, DECIMAL_INTEGER_LITERAL = 21, 
+    DOTDOT = 15, COLON = 16, HASH = 17, AT = 18, QM = 19, DOTS = 20, DECIMAL_INTEGER_LITERAL = 21, 
     HEX_INTEGER_LITERAL = 22, BIN_INTEGER_LITERAL = 23, FLOAT_LITERAL = 24, 
     STRING_LITERAL = 25, NATIVE_SYMBOL = 26, ID = 27
   };
@@ -117,7 +117,7 @@ public:
     antlr4::tree::TerminalNode *DOT();
     antlr4::tree::TerminalNode *ID();
     CallContext *call();
-    antlr4::tree::TerminalNode *SQ();
+    antlr4::tree::TerminalNode *DOTDOT();
 
    
   };

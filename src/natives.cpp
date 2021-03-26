@@ -11,7 +11,6 @@ shared_ptr<Class> pool::IntegerClass = nullptr;
 shared_ptr<Class> pool::DecimalClass = nullptr;
 shared_ptr<Class> pool::StringClass = nullptr;
 shared_ptr<Class> pool::ArrayClass = nullptr;
-shared_ptr<Class> pool::VariableClass = nullptr;
 shared_ptr<Class> pool::BlockClass = nullptr;
 shared_ptr<Class> pool::FunClass = nullptr;
 shared_ptr<Class> pool::VoidClass = nullptr;
@@ -23,7 +22,6 @@ shared_ptr<Bool> pool::False = nullptr;
 
 namespace pool {
 	void initializeContext() {
-		Context::global = Context::create(nullptr);
 		Context::global->set("import", NativeFun::create({{"moduleName"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
 			auto arg = other[0];
 			if (arg->getType() == String::TYPE) {
@@ -62,9 +60,6 @@ namespace pool {
 		ArrayClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &_a1 = nullptr, const any &_a2 = nullptr, const any &_a3 = nullptr) {
 			return make_shared<Array>(context);
 		}, string(Array::TYPE));
-		VariableClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &name, const any &_a2 = nullptr, const any &_a3 = nullptr) {
-			return make_shared<Variable>(name, Null, context, false);
-		}, string(Variable::TYPE));
 		BlockClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &calls, const any &_a2 = nullptr, const any &_a3 = nullptr) {
 			return make_shared<Block>(calls, context);
 		}, string(Block::TYPE));
@@ -87,7 +82,6 @@ namespace pool {
 		natives["Decimal"] = DecimalClass;
 		natives["String"] = StringClass;
 		natives["Array"] = ArrayClass;
-		natives["Variable"] = VariableClass;
 		natives["Block"] = BlockClass;
 		natives["Fun"] = FunClass;
 		natives["Void"] = VoidClass;
@@ -270,6 +264,9 @@ namespace pool {
 				return (value == par->as<String>()->value) ? True : False;
 			} else throw execution_error("String.== argument must be a Number");
 		});
+		natives["String.toString"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
+			return StringClass->newInstance(self->context, {}, self->as<String>()->value);
+		});
 		natives["Fun.classmethod"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &fself, const vector<shared_ptr<Object>> &fother) -> shared_ptr<Object> {
 			return NativeFun::create({{"this"},
 									  {"args", true}}, [fself](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) -> shared_ptr<Object> {
@@ -396,7 +393,8 @@ namespace pool {
 }
 
 void pool::initialize() {
-	initializeContext();
+	Context::global = Context::create(nullptr);
 	initializeBaseSymbols();
+	initializeContext();
 	initializeNativeSymbols();
 }

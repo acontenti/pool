@@ -34,7 +34,6 @@ namespace pool {
 	extern shared_ptr<Class> DecimalClass;
 	extern shared_ptr<Class> StringClass;
 	extern shared_ptr<Class> ArrayClass;
-	extern shared_ptr<Class> VariableClass;
 	extern shared_ptr<Class> BlockClass;
 	extern shared_ptr<Class> FunClass;
 	extern shared_ptr<Class> VoidClass;
@@ -70,9 +69,9 @@ namespace pool {
 
 		virtual shared_ptr<Executable> findMethod(const string &methodName) const;
 
-		virtual shared_ptr<Object> find(const string &name) const;
+		virtual shared_ptr<Variable> find(const string &name) const;
 
-		virtual shared_ptr<Object> findLocal(const string &id) const;
+		virtual shared_ptr<Variable> findLocal(const string &id) const;
 
 		virtual bool isVariable() const {
 			return false;
@@ -87,7 +86,6 @@ namespace pool {
 		using creator_t = function<shared_ptr<Object>(const shared_ptr<Context> &context, const any &a1, const any &a2, const any &a3)>;
 
 		constexpr static const string_view TYPE = "Class";
-		static std::size_t COUNTER;
 		size_t instances = 0;
 		string name;
 		shared_ptr<Class> super;
@@ -95,7 +93,7 @@ namespace pool {
 
 		Class(const shared_ptr<Context> &context, creator_t creator, string name, shared_ptr<Class> super);
 
-		shared_ptr<Object> find(const string &id) const override {
+		shared_ptr<Variable> find(const string &id) const override {
 			if (auto local = findInClass(id)) {
 				return local;
 			}
@@ -105,7 +103,7 @@ namespace pool {
 			return nullptr;
 		}
 
-		shared_ptr<Object> findInClass(const string &id) const {
+		shared_ptr<Variable> findInClass(const string &id) const {
 			if (auto local = context->findLocal(id)) {
 				return local;
 			}
@@ -115,19 +113,9 @@ namespace pool {
 			return nullptr;
 		};
 
-		shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other = {}, const any &a1 = nullptr, const any &a2 = nullptr, const any &a3 = nullptr, bool createContext = true) const {
-			auto ctx = context;
-			if (createContext) {
-				ctx = Context::create(context);
-			}
-			auto ptr = creator(ctx, a1, a2, a3);
-			callInit(ptr, other);
-			return ptr;
-		}
+		shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other = {}, const any &a1 = nullptr, const any &a2 = nullptr, const any &a3 = nullptr, bool createContext = true) const;
 
-		shared_ptr<Class> extend(creator_t creator, const string &className, const shared_ptr<Block> &other = nullptr);
-
-		static void callInit(const shared_ptr<Object> &ptr, const vector<shared_ptr<Object>> &other);
+		shared_ptr<Class> extend(const creator_t& creator, const string &className, const shared_ptr<Block> &other = nullptr);
 	};
 
 	class Bool : public Object {
@@ -168,7 +156,6 @@ namespace pool {
 		shared_ptr<Object> value;
 		bool immutable = false;
 	public:
-		constexpr static const string_view TYPE = "Variable";
 		const string name;
 
 		void setImmutable(bool _immutable) {
@@ -181,7 +168,7 @@ namespace pool {
 
 		void setValue(const shared_ptr<Object> &val) {
 			if (!immutable)
-				value = val;
+				value = val->as<Object>();
 			else throw execution_error("Cannot assign immutable variable \"" + name + "\"");
 		}
 
@@ -189,11 +176,11 @@ namespace pool {
 			return value->findMethod(methodName);
 		}
 
-		shared_ptr<Object> find(const string &id) const override {
+		shared_ptr<Variable> find(const string &id) const override {
 			return value->find(id);
 		}
 
-		shared_ptr<Object> findLocal(const string &id) const override {
+		shared_ptr<Variable> findLocal(const string &id) const override {
 			return value->findLocal(id);
 		}
 
@@ -206,8 +193,8 @@ namespace pool {
 			return true;
 		}
 
-		Variable(string name, shared_ptr<Object> value, const shared_ptr<Context> &context, bool immutable)
-				: Object(context, VariableClass), name(move(name)), value(move(value)), immutable(immutable) {
+		Variable(const shared_ptr<Context> &context, string name, shared_ptr<Object> value, bool immutable)
+				: Object(context, nullptr), name(move(name)), value(move(value)), immutable(immutable) {
 		}
 	};
 
@@ -237,27 +224,7 @@ namespace pool {
 		NativeFun(const vector<Param> &params, method_t code, const shared_ptr<Context> &context)
 				: Executable(params, context, FunClass), code(move(code)) {}
 
-		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override {
-			if (self->as<Object>() == shared_from_this()) {
-				if (params.back().rest) {
-					if (params.size() - 1 > other.size())
-						throw execution_error("Parameters number does not match arguments number");
-				} else {
-					if (params.size() != other.size())
-						throw execution_error("Parameters number does not match arguments number");
-				}
-			} else {
-				if (params.back().rest) {
-					if (params.size() - 1 > other.size() + 1)
-						throw execution_error("Parameters number does not match arguments number");
-				} else {
-					if (params.size() != other.size() + 1)
-						throw execution_error("Parameters number does not match arguments number");
-				}
-			}
-			auto returnValue = code(self, other);
-			return returnValue;
-		}
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override;
 
 		static shared_ptr<NativeFun> create(const vector<Param> &params, const method_t &code) {
 			return make_shared<NativeFun>(params, code, Context::global);
@@ -272,62 +239,13 @@ namespace pool {
 		Fun(const vector<Param> &params, vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
 				: Executable(params, context, FunClass), calls(move(calls)) {
 			for (auto &param : params) {
-				context->add(param.id);
+				this->context->add(param.id);
 			}
 		}
 
-		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override {
-			shared_ptr<Object> returnValue = Void;
-			vector<shared_ptr<Object>> args;
-			if (self) {
-				auto ptr = self->as<Object>();
-				if (ptr != shared_from_this()) {
-					args.reserve(other.size() + 1);
-					args.push_back(ptr);
-				}
-			} else {
-				args.reserve(other.size());
-			}
-			args.insert(args.end(), other.begin(), other.end());
-			if (!params.empty() && params.back().rest) {
-				if (params.size() - 1 > args.size())
-					throw execution_error("Parameters number does not match arguments number");
-			} else {
-				if (params.size() != args.size())
-					throw execution_error("Parameters number does not match arguments number");
-			}
-			associateContext(args);
-			for (auto &call: calls) {
-				returnValue = call->invoke();
-			}
-			return returnValue;
-		}
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override;
 
-		void associateContext(const vector<shared_ptr<pool::Object>> &args) {
-			for (int i = 0; i < params.size(); ++i) {
-				shared_ptr<Object> value;
-				auto name = params[i].id;
-				if (params[i].rest) {
-					vector<shared_ptr<Object>> rest;
-					rest.reserve(args.size() - i);
-					for (int j = i; j < args.size(); ++j) {
-						rest.emplace_back(args[j]);
-					}
-					value = ArrayClass->newInstance(context, rest);
-				} else {
-					value = args[i];
-				}
-				if (const auto &var = context->find(name)) {
-					if (var->isVariable())
-						var->as<Variable>()->setValue(value);
-					else {
-						context->set(name, value);
-					}
-				} else {
-					context->add(name, value);
-				}
-			}
-		}
+		void associateContext(const vector<shared_ptr<pool::Object>> &args);
 	};
 
 	class Block : public Executable, public Callable {
@@ -338,13 +256,7 @@ namespace pool {
 		Block(vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
 				: Executable({}, context, BlockClass), calls(move(calls)) {}
 
-		shared_ptr<Object> invoke() override {
-			shared_ptr<Object> returnValue = Void;
-			for (auto &call: calls) {
-				returnValue = call->invoke();
-			}
-			return returnValue;
-		}
+		shared_ptr<Object> invoke() override;
 
 		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override {
 			return invoke();

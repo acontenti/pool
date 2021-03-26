@@ -14,7 +14,7 @@ null
 ','
 ':='
 '::='
-'::'
+'..'
 ':'
 '#'
 '@'
@@ -44,7 +44,7 @@ DOT
 COMMA
 EQ
 CEQ
-SQ
+DOTDOT
 COLON
 HASH
 AT

@@ -5,7 +5,7 @@ options {
 }
 
 WS : [ \t\r\n]+ -> channel(HIDDEN);
-COMMENT : '/*' .*? '*/' -> channel(HIDDEN);
+COMMENT : '/*' .*? ('*/' | EOF) -> channel(HIDDEN);
 LINE_COMMENT : '//' ~[\r\n]* -> channel(HIDDEN);
 
 SEMI:';';
@@ -19,7 +19,7 @@ DOT:'.';
 COMMA:',';
 EQ:':=';
 CEQ:'::=';
-SQ:'::';
+DOTDOT:'..';
 COLON:':';
 HASH:'#';
 AT:'@';

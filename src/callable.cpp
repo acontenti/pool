@@ -2,22 +2,34 @@
 
 using namespace pool;
 
-shared_ptr<Object> Invocation::invoke() {
-	auto ptr = caller->invoke()->as<Object>();
-	if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
-		const auto &values = args->invoke();
-		return executable->execute(self->invoke(), values);
-	} else throw execution_error(ptr->toString() + " is not executable");
-}
-
 shared_ptr<Object> Assignment::invoke() {
 	auto var = assignee->invoke();
 	if (var->isVariable()) {
 		auto val = value->invoke();
-		var->as<Variable>()->setValue(val);
+		var->as<Variable>()->setValue(val->as<Object>());
 		var->as<Variable>()->setImmutable(immutable);
 		return val;
 	} else throw execution_error(var->toString() + " is not a Variable");
+}
+
+shared_ptr<Object> Invocation::invoke() {
+	auto ptr = caller->invoke()->as<Object>();
+	if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
+		const auto &values = args->invoke();
+		return executable->execute(ptr, values);
+	} else throw execution_error(ptr->toString() + " is not executable");
+}
+
+shared_ptr<Object> InvocationAccess::invoke() {
+	const auto &selfPtr = caller->invoke();
+	auto access = selfPtr->find(id);
+	if (access) {
+		const auto &ptr = access->as<Object>();
+		if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
+			const auto &values = args->invoke();
+			return executable->execute(selfPtr, values);
+		} else throw execution_error(ptr->toString() + " is not executable");
+	} else throw execution_error(Null->toString() + " is not executable");
 }
 
 shared_ptr<Object> Access::invoke() {
