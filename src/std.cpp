@@ -1,6 +1,11 @@
 #include "std.hpp"
 
 const std::string std_module = R"::::(
+null ::= `null`;
+void ::= `void`;
+true ::= `true`;
+false ::= `false`;
+
 Class ::= `Class`;
 Class..extend ::= `Class.extend`;
 Class..new ::= `Class.new`;
@@ -15,13 +20,12 @@ Object..!= ::= (this, other) : {
 };
 
 Bool ::= `Bool`;
+Bool..new ::= null;
 Bool..toString ::= `Bool.toString`;
 Bool..! ::= `Bool.!`;
 Bool..|| ::= `Bool.||`;
 Bool..&& ::= `Bool.&&`;
 Bool..== ::= `Bool.==`;
-true ::= `true`;
-false ::= `false`;
 
 Array ::= `Array`;
 Array..init ::= `Array.init`;
@@ -31,6 +35,7 @@ Array..push ::= `Array.push`;
 Array..toString ::= `Array.toString`;
 
 Integer ::= `Integer`;
+Integer..new ::= null;
 Integer..+ ::= `Integer.+`;
 Integer..- ::= `Integer.-`;
 Integer..== ::= `Integer.==`;
@@ -59,6 +64,7 @@ Integer..toInclusive ::= (this, end) : {
 };
 
 Decimal ::= `Decimal`;
+Decimal..new ::= null;
 Decimal..+ ::= `Decimal.+`;
 Decimal..- ::= `Decimal.-`;
 Decimal..== ::= `Decimal.==`;
@@ -75,25 +81,28 @@ Decimal..>= ::= (this, other) : {
 Decimal..toString ::= `Decimal.toString`;
 
 String ::= `String`;
+String..new ::= null;
 String..+ ::= `String.+`;
 String..== ::= `String.==`;
 String..toString ::= `String.toString`;
 
 Block ::= `Block`;
+Block..new ::= null;
 Block..whileDo ::= `Block.whileDo`;
 
 Fun ::= `Fun`;
+Fun..new ::= null;
 Fun..classmethod ::= `Fun.classmethod`;
 Fun..staticmethod ::= `Fun.staticmethod`;
 Fun..toString ::= `Fun.toString`;
 
 Void ::= `Void`;
+Void..new ::= null;
 Void..toString ::= (this) : {"void";};
-void ::= `void`;
 
 Nothing ::= `Nothing`;
+Nothing..new ::= null;
 Nothing..toString ::= (this) : {"null";};
-null ::= `null`;
 
 assert ::= `assert`;
 )::::";
