@@ -157,6 +157,9 @@ shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<C
 		}
 	}
 	auto context = Context::create(parent);
+	for (auto &param : params) {
+		context->add(param.id);
+	}
 	return FunClass->newInstance(context, {}, params, parseStatements(ast->statement(), context), nullptr, false);
 }
 

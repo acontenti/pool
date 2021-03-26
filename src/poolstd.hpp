@@ -115,7 +115,7 @@ namespace pool {
 
 		shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other = {}, const any &a1 = nullptr, const any &a2 = nullptr, const any &a3 = nullptr, bool createContext = true) const;
 
-		shared_ptr<Class> extend(const creator_t& creator, const string &className, const shared_ptr<Block> &other = nullptr);
+		shared_ptr<Class> extend(const creator_t &creator, const string &className, const shared_ptr<Block> &other = nullptr);
 	};
 
 	class Bool : public Object {
@@ -237,11 +237,7 @@ namespace pool {
 		vector<shared_ptr<Callable>> calls;
 
 		Fun(const vector<Param> &params, vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
-				: Executable(params, context, FunClass), calls(move(calls)) {
-			for (auto &param : params) {
-				this->context->add(param.id);
-			}
-		}
+				: Executable(params, context, FunClass), calls(move(calls)) {}
 
 		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override;
 

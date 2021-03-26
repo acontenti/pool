@@ -43,9 +43,8 @@ Integer..>= ::= (this, other) : {
 };
 Integer..toString ::= `Integer.toString`;
 Integer..to ::= (this, end) : {
-	i := 0.+(this);
+	i := this;
 	array := Array.new();
-	end;
 	{i.<(end);}.whileDo({
 		array.push(i);
 		i := i.+(1);
