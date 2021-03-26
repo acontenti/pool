@@ -24,6 +24,7 @@ COLON:':';
 HASH:'#';
 AT:'@';
 QM:'?';
+DOTS:'...';
 
 fragment HEX_DIGIT: [0-9A-Fa-f];
 fragment BIN_DIGIT: [0-1];

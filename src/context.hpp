@@ -27,8 +27,6 @@ namespace pool {
 
 		void set(const string &name, const shared_ptr<Object> &value);
 
-		void associate(const vector<string> &params, const vector<shared_ptr<Object>> &args);
-
 		string toString() const;
 
 		inline auto begin() const {

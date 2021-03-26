@@ -25,7 +25,9 @@ call returns [enum Type {IA,A,T} type]:
     callee=call a=args {$type=CallContext::A;} |
 	term {$type=CallContext::T;};
 
-args: LP call? (COMMA call)* RP;
+args: LP arg? (COMMA arg)* RP;
+
+arg: DOTS? call;
 
 term returns [enum Type {NUM,STR,FUN,PAR,BLK,NSM,IDT} type]:
 	num {$type=TermContext::NUM;} |
@@ -40,7 +42,9 @@ par: LP expression RP;
 
 block: LB statement* RB;
 
-fun: LP ID? (COMMA ID)* RP COLON LB statement* RB;
+fun: LP param? (COMMA param)* RP COLON LB statement* RB;
+
+param: DOTS? ID;
 
 num returns [enum Type {DEC,HEX,BIN,FLT} type]:
 	DECIMAL_INTEGER_LITERAL {$type=NumContext::DEC;} |

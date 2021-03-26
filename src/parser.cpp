@@ -136,11 +136,25 @@ shared_ptr<Object> parseBlock(PoolParser::BlockContext *ast, const shared_ptr<Co
 }
 
 shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<Context> &parent) {
-	auto idsAst = ast->ID();
-	vector<string> params;
-	params.reserve(idsAst.size());
-	for (auto id : idsAst) {
-		params.emplace_back(getId(id));
+	auto paramsAst = ast->param();
+	vector<Executable::Param> params;
+	params.reserve(paramsAst.size());
+	for (auto param = paramsAst.begin(); param != paramsAst.end(); ++param) {
+		auto id = getId((*param)->ID());
+		auto find = find_if(params.begin(), params.end(), [id](const Executable::Param &p) { return p.id == id; });
+		if (find != params.end()) {
+			throw Pool::compile_fatal("Duplicate parameter '" + id + "'", (*param)->ID()->getSymbol());
+		}
+		if ((*param)->DOTS()) {
+			if (next(param) != paramsAst.end()) {
+				throw Pool::compile_fatal("Variadic parameter '" + id +
+										  "' must be the last parameter in the function definition", (*param)->ID()->getSymbol());
+			} else {
+				params.emplace_back(id, true);
+			}
+		} else {
+			params.emplace_back(id, false);
+		}
 	}
 	auto context = Context::create(parent);
 	return FunClass->newInstance(context, {}, params, parseStatements(ast->statement(), context), nullptr, false);
@@ -175,14 +189,18 @@ shared_ptr<Callable> parseTerm(PoolParser::TermContext *ast, const shared_ptr<Co
 	}
 }
 
-vector<shared_ptr<Callable>> parseArgs(PoolParser::ArgsContext *ast, const shared_ptr<Context> &context) {
-	auto callsAst = ast->call();
+shared_ptr<Args> parseArgs(PoolParser::ArgsContext *ast, const shared_ptr<Context> &context) {
+	auto argsAst = ast->arg();
 	vector<shared_ptr<Callable>> args;
-	args.reserve(callsAst.size());
-	for (auto call : callsAst) {
-		args.emplace_back(parseCall(call, context));
+	shared_ptr<Expansion> rest = nullptr;
+	args.reserve(argsAst.size());
+	for (auto arg : argsAst) {
+		auto ptr = parseCall(arg->call(), context);
+		if (arg->DOTS()) {
+			rest = Expansion::create(ptr);
+		} else args.emplace_back(ptr);
 	}
-	return args;
+	return Args::create(args, rest);
 }
 
 shared_ptr<Callable> pool::parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context) {

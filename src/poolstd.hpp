@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <utility>
 #include "util.hpp"
 #include "callable.hpp"
 #include "context.hpp"
@@ -148,7 +149,7 @@ namespace pool {
 
 	class Decimal : public Object {
 	public:
-		double value;
+		long double value;
 		constexpr static const string_view TYPE = "Decimal";
 
 		Decimal(double value, const shared_ptr<Context> &context) : Object(context, DecimalClass), value(value) {}
@@ -212,9 +213,16 @@ namespace pool {
 
 	class Executable : public Object {
 	public:
-		vector<string> params;
+		struct Param {
+			string id;
+			bool rest;
 
-		Executable(const vector<string> &params, const shared_ptr<Context> &context, const shared_ptr<Class> &cls)
+			Param(string id, bool rest = false) : id(std::move(id)), rest(rest) {}
+		};
+
+		vector<Param> params;
+
+		Executable(const vector<Param> &params, const shared_ptr<Context> &context, const shared_ptr<Class> &cls)
 				: Object(context, cls), params(params) {}
 
 		virtual shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) = 0;
@@ -226,16 +234,33 @@ namespace pool {
 	public:
 		method_t code;
 
-		NativeFun(method_t code, const shared_ptr<Context> &context)
-				: Executable({"this", "other"}, context, FunClass), code(move(code)) {}
+		NativeFun(const vector<Param> &params, method_t code, const shared_ptr<Context> &context)
+				: Executable(params, context, FunClass), code(move(code)) {}
 
 		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override {
+			if (self->as<Object>() == shared_from_this()) {
+				if (params.back().rest) {
+					if (params.size() - 1 > other.size())
+						throw execution_error("Parameters number does not match arguments number");
+				} else {
+					if (params.size() != other.size())
+						throw execution_error("Parameters number does not match arguments number");
+				}
+			} else {
+				if (params.back().rest) {
+					if (params.size() - 1 > other.size() + 1)
+						throw execution_error("Parameters number does not match arguments number");
+				} else {
+					if (params.size() != other.size() + 1)
+						throw execution_error("Parameters number does not match arguments number");
+				}
+			}
 			auto returnValue = code(self, other);
 			return returnValue;
 		}
 
-		static shared_ptr<NativeFun> create(const method_t &code) {
-			return make_shared<NativeFun>(code, Context::global);
+		static shared_ptr<NativeFun> create(const vector<Param> &params, const method_t &code) {
+			return make_shared<NativeFun>(params, code, Context::global);
 		}
 	};
 
@@ -244,10 +269,10 @@ namespace pool {
 		constexpr static const string_view TYPE = "Fun";
 		vector<shared_ptr<Callable>> calls;
 
-		Fun(const vector<string> &params, vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
+		Fun(const vector<Param> &params, vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
 				: Executable(params, context, FunClass), calls(move(calls)) {
 			for (auto &param : params) {
-				context->add(param);
+				context->add(param.id);
 			}
 		}
 
@@ -264,13 +289,44 @@ namespace pool {
 				args.reserve(other.size());
 			}
 			args.insert(args.end(), other.begin(), other.end());
-			if (params.size() != args.size())
-				throw execution_error("Parameters number does not match arguments number");
-			context->associate(params, args);
+			if (!params.empty() && params.back().rest) {
+				if (params.size() - 1 > args.size())
+					throw execution_error("Parameters number does not match arguments number");
+			} else {
+				if (params.size() != args.size())
+					throw execution_error("Parameters number does not match arguments number");
+			}
+			associateContext(args);
 			for (auto &call: calls) {
 				returnValue = call->invoke();
 			}
 			return returnValue;
+		}
+
+		void associateContext(const vector<shared_ptr<pool::Object>> &args) {
+			for (int i = 0; i < params.size(); ++i) {
+				shared_ptr<Object> value;
+				auto name = params[i].id;
+				if (params[i].rest) {
+					vector<shared_ptr<Object>> rest;
+					rest.reserve(args.size() - i);
+					for (int j = i; j < args.size(); ++j) {
+						rest.emplace_back(args[j]);
+					}
+					value = ArrayClass->newInstance(context, rest);
+				} else {
+					value = args[i];
+				}
+				if (const auto &var = context->find(name)) {
+					if (var->isVariable())
+						var->as<Variable>()->setValue(value);
+					else {
+						context->set(name, value);
+					}
+				} else {
+					context->add(name, value);
+				}
+			}
 		}
 	};
 
@@ -285,7 +341,7 @@ namespace pool {
 		shared_ptr<Object> invoke() override {
 			shared_ptr<Object> returnValue = Void;
 			for (auto &call: calls) {
-				call->invoke();
+				returnValue = call->invoke();
 			}
 			return returnValue;
 		}

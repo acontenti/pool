@@ -7,47 +7,72 @@ Object ::= `Object`;
 Object::toString ::= `Object.toString`;
 Object::type ::= `Object.type`;
 Object::println ::= `Object.println`;
+Object::!= ::= (this, other) : {
+	this.==(other).!();
+};
 
 Bool ::= `Bool`;
 Bool::toString ::= `Bool.toString`;
 Bool::! ::= `Bool.!`;
+Bool::|| ::= `Bool.||`;
+Bool::&& ::= `Bool.&&`;
+Bool.== ::= `Bool.==`;
 true ::= `true`;
 false ::= `false`;
 
 Integer ::= `Integer`;
 Integer::+ ::= `Integer.+`;
 Integer::- ::= `Integer.-`;
+Integer.== ::= `Integer.==`;
 Integer::< ::= `Integer.<`;
+Integer::<= ::= (this, other) : {
+	this.<(other).||(this.==(other)).!();
+};
 Integer::> ::= (this, other) : {
+	this.<=(other).!();
+};
+Integer::>= ::= (this, other) : {
 	this.<(other).!();
 };
 Integer::toString ::= `Integer.toString`;
 Integer::to ::= (this, end) : {
-	i := this.+(0);
+	i := 0.+(this);
 	array := Array.new();
 	end.println();
 	{i.<(end);}.whileDo({
-		array.<<(i);
+		array.push(i);
 		i := i.+(1);
 	});
 	array;
 };
 
-String ::= `String`;
-String::+ ::= `String.+`;
-String::toString ::= (this) : {this;};
-
 Decimal ::= `Decimal`;
 Decimal::+ ::= `Decimal.+`;
 Decimal::- ::= `Decimal.-`;
+Decimal.== ::= `Decimal.==`;
+Decimal::< ::= `Decimal.<`;
+Decimal::<= ::= (this, other) : {
+	this.<(other).||(this.==(other)).!();
+};
+Decimal::> ::= (this, other) : {
+	this.<=(other).!();
+};
+Decimal::>= ::= (this, other) : {
+	this.<(other).!();
+};
 Decimal::toString ::= `Decimal.toString`;
+
+String ::= `String`;
+String::+ ::= `String.+`;
+String.== ::= `String.==`;
+String::toString ::= (this) : {this;};
 
 Array ::= `Array`;
 Array::init ::= `Array.init`;
 Array::at ::= `Array.at`;
 Array::forEach ::= `Array.forEach`;
 Array::push ::= `Array.push`;
-Array::<< ::= `Array.push`;
+Array::toString ::= `Array.toString`;
 
 Variable ::= `Variable`;
 
@@ -66,3 +91,5 @@ void ::= `void`;
 Nothing ::= `Nothing`;
 Nothing::toString ::= (this) : {"null";};
 null ::= `null`;
+
+assert ::= `assert`;

@@ -1,4 +1,3 @@
-#include <algorithm>
 #include "poolstd.hpp"
 
 using namespace pool;
@@ -6,10 +5,7 @@ using namespace pool;
 shared_ptr<Object> Invocation::invoke() {
 	auto ptr = caller->invoke()->as<Object>();
 	if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
-		vector<shared_ptr<Object>> values(args.size());
-		transform(args.begin(), args.end(), values.begin(), [](const shared_ptr<Callable> &callable) {
-			return callable->invoke();
-		});
+		const auto &values = args->invoke();
 		return executable->execute(self->invoke(), values);
 	} else throw execution_error(ptr->toString() + " is not executable");
 }
@@ -38,4 +34,26 @@ shared_ptr<Object> LocalAccess::invoke() {
 
 shared_ptr<Object> Identity::invoke() {
 	return object;
+}
+
+vector<shared_ptr<Object>> Args::invoke() {
+	vector<shared_ptr<Object>> result;
+	for (const auto &arg : args) {
+		result.emplace_back(arg->invoke());
+	}
+	if (rest) {
+		const auto &restVector = rest->invoke();
+		for (const auto &arg : restVector) {
+			result.emplace_back(arg);
+		}
+	}
+	return result;
+}
+
+vector<shared_ptr<Object>> Expansion::invoke() {
+	vector<shared_ptr<Object>> result;
+	auto ptr = caller->invoke();
+	if (ptr->getType() == Array::TYPE) {
+		return ptr->as<Array>()->values;
+	} else throw execution_error("Cannot expand value of type '" + string(ptr->getType()) + "'");
 }

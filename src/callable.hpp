@@ -42,18 +42,43 @@ namespace pool {
 		}
 	};
 
+	class Expansion {
+		shared_ptr<Callable> caller;
+	public:
+		explicit Expansion(const shared_ptr<Callable> &caller) : caller(caller) {}
+
+		vector<shared_ptr<Object>> invoke();
+
+		static shared_ptr<Expansion> create(const shared_ptr<Callable> &caller) {
+			return make_shared<Expansion>(caller);
+		}
+	};
+
+	class Args {
+		vector<shared_ptr<Callable>> args;
+		shared_ptr<Expansion> rest;
+	public:
+		Args(const vector<shared_ptr<Callable>> &args, const shared_ptr<Expansion> &rest) : args(args), rest(rest) {}
+
+		vector<shared_ptr<Object>> invoke();
+
+		static shared_ptr<Args> create(const vector<shared_ptr<Callable>> &args, const shared_ptr<Expansion> &rest) {
+			return make_shared<Args>(args, rest);
+		}
+	};
+
 	class Invocation : public Callable {
 		shared_ptr<Callable> self;
 		shared_ptr<Callable> caller;
-		vector<shared_ptr<Callable>> args;
+		shared_ptr<Args> args;
 	public:
 
-		Invocation(const shared_ptr<Callable> &self, const shared_ptr<Callable> &caller, const vector<shared_ptr<Callable>> &args)
+		Invocation(const shared_ptr<Callable> &self, const shared_ptr<Callable> &caller, const shared_ptr<Args> &args)
 				: self(self), caller(caller), args(args) {}
 
 		shared_ptr<Object> invoke() override;
 
-		static shared_ptr<Invocation> create(const shared_ptr<Callable> &self, const shared_ptr<Callable> &caller, const vector<shared_ptr<Callable>> &args) {
+		static shared_ptr<Invocation> create(const shared_ptr<Callable> &self, const shared_ptr<Callable> &caller, const shared_ptr<Args> &args) {
 			return make_shared<Invocation>(self, caller, args);
 		}
 	};

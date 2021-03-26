@@ -21,22 +21,6 @@ shared_ptr<pool::Object> Context::findLocal(const string &name) const {
 	} else return nullptr;
 }
 
-void Context::associate(const vector<string> &params, const vector<shared_ptr<pool::Object>> &args) {
-	for (int i = 0; i < params.size(); ++i) {
-		auto name = params[i];
-		auto value = args[i];
-		if (const auto &var = find(name)) {
-			if (var->isVariable())
-				var->as<Variable>()->setValue(value);
-			else {
-				set(name, value);
-			}
-		} else {
-			add(name, value);
-		}
-	}
-}
-
 shared_ptr<Object> Context::add(const string &name, const shared_ptr<Object> &var) {
 	return heap.try_emplace(name, var).first->second;
 }
