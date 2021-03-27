@@ -1,4 +1,5 @@
 #include "poolstd.hpp"
+#include "util/errors.hpp"
 
 using namespace pool;
 
@@ -54,7 +55,7 @@ shared_ptr<Class> Class::extend(const creator_t &_creator, const string &classNa
 	auto cls = ClassClass->newInstance(context, {}, _creator ? _creator : creator, className, self)->as<Class>();
 	cls->context->set("super", self);
 	if (other) {
-		other->invoke();
+		other->execute(other, {});
 		for (auto[name, value] : *other->context) {
 			cls->context->set(name, value->as<Object>());
 		}
@@ -75,6 +76,12 @@ shared_ptr<Object> Class::newInstance(const shared_ptr<Context> &context, const 
 		init->execute(ptr, other);
 	}
 	return ptr;
+}
+
+void Variable::setValue(const shared_ptr<Object> &val) {
+	if (!immutable)
+		value = val->as<Object>();
+	else throw execution_error("Cannot assign immutable variable \"" + name + "\"");
 }
 
 shared_ptr<Object> NativeFun::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
@@ -144,7 +151,7 @@ void Fun::associateContext(const vector<shared_ptr<pool::Object>> &args) {
 	}
 }
 
-shared_ptr<Object> Block::invoke() {
+shared_ptr<Object> Block::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
 	shared_ptr<Object> returnValue = Void;
 	for (auto &call: calls) {
 		returnValue = call->invoke();

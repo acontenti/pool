@@ -2,11 +2,9 @@
 
 #include <vector>
 #include <memory>
-#include "Token.h"
-#include "util.hpp"
+#include <string>
 
 using namespace std;
-using namespace antlr4;
 
 namespace pool {
 	struct Settings {
@@ -15,20 +13,20 @@ namespace pool {
 	};
 
 	class Pool {
+		bool result;
+
 		Pool(const string &filename, istream &stream);
 
 	public:
+		[[nodiscard]] constexpr inline bool getResult() const {
+			return result;
+		}
+
 		constexpr static const string_view VERSION = POOL_VERSION;
 		constexpr static const string_view EXT = ".pool";
 
 		static void initialiaze(const Settings &settings);
 
 		static Pool execute(const string &filename);
-
-		static void compile_error(const string &message, Token *token, ostream &stream) noexcept;
-
-		static void compile_error(const string &message, Token *token, size_t line, size_t col, ostream &stream) noexcept;
-
-		static ::compile_error compile_fatal(const string &message, Token *token = nullptr) noexcept;
 	};
 }

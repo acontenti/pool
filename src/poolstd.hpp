@@ -1,8 +1,6 @@
 #pragma once
 
 #include <functional>
-#include <utility>
-#include "util.hpp"
 #include "callable.hpp"
 #include "context.hpp"
 #include "parser.hpp"
@@ -158,6 +156,10 @@ namespace pool {
 	public:
 		const string name;
 
+		bool isImmutable() const {
+			return immutable;
+		}
+
 		void setImmutable(bool _immutable) {
 			immutable = _immutable;
 		}
@@ -166,11 +168,7 @@ namespace pool {
 			return value;
 		}
 
-		void setValue(const shared_ptr<Object> &val) {
-			if (!immutable)
-				value = val->as<Object>();
-			else throw execution_error("Cannot assign immutable variable \"" + name + "\"");
-		}
+		void setValue(const shared_ptr<Object> &val);
 
 		shared_ptr<Executable> findMethod(const string &methodName) const override {
 			return value->findMethod(methodName);
@@ -244,7 +242,7 @@ namespace pool {
 		void associateContext(const vector<shared_ptr<pool::Object>> &args);
 	};
 
-	class Block : public Executable, public Callable {
+	class Block : public Executable {
 	public:
 		constexpr static const string_view TYPE = "Block";
 		vector<shared_ptr<Callable>> calls;
@@ -252,11 +250,7 @@ namespace pool {
 		Block(vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
 				: Executable({}, context, BlockClass), calls(move(calls)) {}
 
-		shared_ptr<Object> invoke() override;
-
-		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override {
-			return invoke();
-		}
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override;
 	};
 
 	class Array : public Object {

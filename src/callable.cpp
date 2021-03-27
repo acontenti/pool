@@ -1,15 +1,22 @@
 #include "poolstd.hpp"
+#include "pool.hpp"
+#include "util/errors.hpp"
 
 using namespace pool;
 
 shared_ptr<Object> Assignment::invoke() {
-	auto var = assignee->invoke();
-	if (var->isVariable()) {
-		auto val = value->invoke();
-		var->as<Variable>()->setValue(val->as<Object>());
-		var->as<Variable>()->setImmutable(immutable);
-		return val;
-	} else throw execution_error(var->toString() + " is not a Variable");
+	const auto &ptr = assignee->invoke();
+	if (ptr->isVariable()) {
+		const auto &val = value->invoke();
+		const auto &var = ptr->as<Variable>();
+		if (!var->isImmutable()) {
+			var->setValue(val->as<Object>());
+			var->setImmutable(immutable);
+			return val;
+		} else
+			throw compile_error("Cannot assign immutable variable \"" + var->name + "\"",
+								assignee->start, assignee->end);
+	} else throw compile_error(ptr->toString() + " is not a Variable", assignee->start, assignee->end);
 }
 
 shared_ptr<Object> Invocation::invoke() {
@@ -17,7 +24,7 @@ shared_ptr<Object> Invocation::invoke() {
 	if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
 		const auto &values = args->invoke();
 		return executable->execute(ptr, values);
-	} else throw execution_error(ptr->toString() + " is not executable");
+	} else throw compile_error(ptr->toString() + " is not executable", caller->start, caller->end);
 }
 
 shared_ptr<Object> InvocationAccess::invoke() {
@@ -28,8 +35,8 @@ shared_ptr<Object> InvocationAccess::invoke() {
 		if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
 			const auto &values = args->invoke();
 			return executable->execute(selfPtr, values);
-		} else throw execution_error(ptr->toString() + " is not executable");
-	} else throw execution_error(Null->toString() + " is not executable");
+		} else throw compile_error(ptr->toString() + " is not executable", idToken, idToken);
+	} else throw compile_error(Null->toString() + " is not executable", idToken, idToken);
 }
 
 shared_ptr<Object> Access::invoke() {
@@ -67,5 +74,6 @@ vector<shared_ptr<Object>> Expansion::invoke() {
 	auto ptr = caller->invoke();
 	if (ptr->getType() == Array::TYPE) {
 		return ptr->as<Array>()->values;
-	} else throw execution_error("Cannot expand value of type '" + string(ptr->getType()) + "'");
+	} else
+		throw compile_error("Cannot expand value of type '" + string(ptr->getType()) + "'", caller->start, caller->end);
 }

@@ -1,5 +1,6 @@
 #include "pool.hpp"
 #include "poolstd.hpp"
+#include "util/errors.hpp"
 
 using namespace pool;
 
