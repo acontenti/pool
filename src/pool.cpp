@@ -3,10 +3,10 @@
 #include "poolstd.hpp"
 #include "pool.hpp"
 #include "PoolLexer.h"
-#include "std.hpp"
 #include "util/strings.hpp"
 #include "util/errors.hpp"
 #include "util/ErrorListener.hpp"
+#include <cpplocate/cpplocate.h>
 
 using namespace pool;
 namespace fs = filesystem;
@@ -14,22 +14,18 @@ namespace fs = filesystem;
 void Pool::initialiaze(const Settings &settings) {
 	debug = settings.debug;
 	pool::initialize();
-	arguments.push_back(StringClass->newInstance(Context::global, {}, string()));
+	arguments.push_back(StringClass->newInstance(Context::global, {}, {}, string()));
 	for (const auto &arg : settings.args) {
-		arguments.push_back(StringClass->newInstance(Context::global, {}, arg));
+		arguments.push_back(StringClass->newInstance(Context::global, {}, {}, arg));
 	}
-	Context::global->set("args", ArrayClass->newInstance(Context::global, arguments));
+	Context::global->set("args", ArrayClass->newInstance(Context::global, {}, arguments));
 }
 
 Pool Pool::execute(const string &module) {
-	if (startsWith(module, ":")) {
-		auto it = STD_MODULES.find(module);
-		if (it != STD_MODULES.end()) {
-			istringstream is(it->second);
-			return Pool(module, is);
-		} else throw runtime_error("Module '" + module + "' not found");
-	}
 	string filename = module;
+	if (startsWith(module, ":")) {
+		filename = (fs::path(cpplocate::getModulePath()) / ".." / "std" / module.substr(1)).string();
+	}
 	if (!endsWith(filename, EXT))
 		filename += EXT;
 	auto file = fs::path(filename);
@@ -61,13 +57,13 @@ Pool::Pool(const string &filename, istream &stream) {
 	try {
 		auto tree = parser->program();
 		const auto &oldArgs = Context::global->find("args");
-		arguments[0] = StringClass->newInstance(Context::global, {}, filename);
-		Context::global->set("args", ArrayClass->newInstance(Context::global, arguments));
+		arguments[0] = StringClass->newInstance(Context::global, {}, {}, filename);
+		Context::global->set("args", ArrayClass->newInstance(Context::global, {}, arguments));
 		parseProgram(tree, Context::global);
 		Context::global->set("args", oldArgs);
 		result = true;
 	} catch (const compile_error &error) {
-		cout << error;
+		cerr << error;
 		result = false;
 	}
 }

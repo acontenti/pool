@@ -20,7 +20,8 @@ std::ostream &operator<<(ostream &stream, const compile_error &error) {
 		stream << "  " << code << endl;
 		stream << "  " << termcolor::red << string(error.start->getCharPositionInLine(), ' ') << '^';
 		make_signed<size_t>::type delta = error.end->getStopIndex() - error.start->getStartIndex();
-		stream << string(llabs(delta), '~');
+		auto length = max(0ul, min((size_t) llabs(delta), code.size() - error.start->getCharPositionInLine() - 1));
+		stream << string(length, '~');
 		stream << termcolor::reset << endl;
 	}
 	return stream;

@@ -111,9 +111,9 @@ namespace pool {
 			return nullptr;
 		};
 
-		shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other = {}, const any &a1 = nullptr, const any &a2 = nullptr, const any &a3 = nullptr, bool createContext = true) const;
+		shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const pair<Token *, Token *> &location, const vector<shared_ptr<Object>> &other = {}, const any &a1 = nullptr, const any &a2 = nullptr, const any &a3 = nullptr, bool createContext = true) const;
 
-		shared_ptr<Class> extend(const creator_t &creator, const string &className, const shared_ptr<Block> &other = nullptr);
+		shared_ptr<Class> extend(const creator_t &creator, const string &className, const shared_ptr<Block> &other, const pair<Token *, Token *> &location);
 	};
 
 	class Bool : public Object {
@@ -210,10 +210,10 @@ namespace pool {
 		Executable(const vector<Param> &params, const shared_ptr<Context> &context, const shared_ptr<Class> &cls)
 				: Object(context, cls), params(params) {}
 
-		virtual shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) = 0;
+		virtual shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) = 0;
 	};
 
-	using method_t = function<shared_ptr<Object>(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other)>;
+	using method_t = function<shared_ptr<Object>(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location)>;
 
 	class NativeFun : public Executable {
 	public:
@@ -222,7 +222,7 @@ namespace pool {
 		NativeFun(const vector<Param> &params, method_t code, const shared_ptr<Context> &context)
 				: Executable(params, context, FunClass), code(move(code)) {}
 
-		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override;
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) override;
 
 		static shared_ptr<NativeFun> create(const vector<Param> &params, const method_t &code) {
 			return make_shared<NativeFun>(params, code, Context::global);
@@ -237,9 +237,9 @@ namespace pool {
 		Fun(const vector<Param> &params, vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
 				: Executable(params, context, FunClass), calls(move(calls)) {}
 
-		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override;
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) override;
 
-		void associateContext(const vector<shared_ptr<pool::Object>> &args);
+		void associateContext(const vector<shared_ptr<pool::Object>> &args, const pair<Token *, Token *> &location);
 	};
 
 	class Block : public Executable {
@@ -250,7 +250,7 @@ namespace pool {
 		Block(vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
 				: Executable({}, context, BlockClass), calls(move(calls)) {}
 
-		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) override;
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) override;
 	};
 
 	class Array : public Object {

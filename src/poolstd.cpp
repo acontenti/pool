@@ -50,12 +50,13 @@ shared_ptr<Variable> Object::as<Variable>() {
 Class::Class(const shared_ptr<Context> &context, creator_t creator, string name, shared_ptr<Class> super)
 		: Object(context, ClassClass), creator(move(creator)), name(move(name)), super(move(super)) {}
 
-shared_ptr<Class> Class::extend(const creator_t &_creator, const string &className, const shared_ptr<Block> &other) {
+shared_ptr<Class> Class::extend(const creator_t &_creator, const string &className, const shared_ptr<Block> &other, const pair<Token *, Token *> &location) {
 	auto self = this->as<Class>();
-	auto cls = ClassClass->newInstance(context, {}, _creator ? _creator : creator, className, self)->as<Class>();
+	auto cls = ClassClass->newInstance(context, location, {}, _creator ? _creator
+																	   : creator, className, self)->as<Class>();
 	cls->context->set("super", self);
 	if (other) {
-		other->execute(other, {});
+		other->execute(other, {}, location);
 		for (auto[name, value] : *other->context) {
 			cls->context->set(name, value->as<Object>());
 		}
@@ -63,7 +64,7 @@ shared_ptr<Class> Class::extend(const creator_t &_creator, const string &classNa
 	return cls;
 }
 
-shared_ptr<Object> Class::newInstance(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &other, const any &a1, const any &a2, const any &a3, bool createContext) const {
+shared_ptr<Object> Class::newInstance(const shared_ptr<Context> &context, const pair<Token *, Token *> &location, const vector<shared_ptr<Object>> &other, const any &a1, const any &a2, const any &a3, bool createContext) const {
 	auto ctx = context;
 	if (createContext) {
 		ctx = Context::create(context);
@@ -73,7 +74,7 @@ shared_ptr<Object> Class::newInstance(const shared_ptr<Context> &context, const 
 		ptr->context->set("class", ptr->cls);
 	}
 	if (auto init = ptr->findMethod("init")) {
-		init->execute(ptr, other);
+		init->execute(ptr, other, location);
 	}
 	return ptr;
 }
@@ -81,32 +82,32 @@ shared_ptr<Object> Class::newInstance(const shared_ptr<Context> &context, const 
 void Variable::setValue(const shared_ptr<Object> &val) {
 	if (!immutable)
 		value = val->as<Object>();
-	else throw execution_error("Cannot assign immutable variable \"" + name + "\"");
+	else throw compile_error("Cannot assign immutable variable '" + name + "'", {});
 }
 
-shared_ptr<Object> NativeFun::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
+shared_ptr<Object> NativeFun::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 	if (self->as<Object>() == shared_from_this()) {
 		if (params.back().rest) {
 			if (params.size() - 1 > other.size())
-				throw execution_error("Parameters number does not match arguments number");
+				throw compile_error("Parameters number does not match arguments number", location);
 		} else {
 			if (params.size() != other.size())
-				throw execution_error("Parameters number does not match arguments number");
+				throw compile_error("Parameters number does not match arguments number", location);
 		}
 	} else {
 		if (params.back().rest) {
 			if (params.size() - 1 > other.size() + 1)
-				throw execution_error("Parameters number does not match arguments number");
+				throw compile_error("Parameters number does not match arguments number", location);
 		} else {
 			if (params.size() != other.size() + 1)
-				throw execution_error("Parameters number does not match arguments number");
+				throw compile_error("Parameters number does not match arguments number", location);
 		}
 	}
-	auto returnValue = code(self, other);
+	auto returnValue = code(self, other, location);
 	return returnValue;
 }
 
-shared_ptr<Object> Fun::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
+shared_ptr<Object> Fun::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 	shared_ptr<Object> returnValue = Void;
 	vector<shared_ptr<Object>> args;
 	if (self) {
@@ -121,19 +122,19 @@ shared_ptr<Object> Fun::execute(const shared_ptr<Object> &self, const vector<sha
 	args.insert(args.end(), other.begin(), other.end());
 	if (!params.empty() && params.back().rest) {
 		if (params.size() - 1 > args.size())
-			throw execution_error("Parameters number does not match arguments number");
+			throw compile_error("Parameters number does not match arguments number", location);
 	} else {
 		if (params.size() != args.size())
-			throw execution_error("Parameters number does not match arguments number");
+			throw compile_error("Parameters number does not match arguments number", location);
 	}
-	associateContext(args);
+	associateContext(args, location);
 	for (auto &call: calls) {
 		returnValue = call->invoke();
 	}
 	return returnValue;
 }
 
-void Fun::associateContext(const vector<shared_ptr<pool::Object>> &args) {
+void Fun::associateContext(const vector<shared_ptr<pool::Object>> &args, const pair<Token *, Token *> &location) {
 	for (int i = 0; i < params.size(); ++i) {
 		shared_ptr<Object> value;
 		auto name = params[i].id;
@@ -143,7 +144,7 @@ void Fun::associateContext(const vector<shared_ptr<pool::Object>> &args) {
 			for (int j = i; j < args.size(); ++j) {
 				rest.emplace_back(args[j]);
 			}
-			value = ArrayClass->newInstance(context, rest);
+			value = ArrayClass->newInstance(context, location, rest);
 		} else {
 			value = args[i];
 		}
@@ -151,7 +152,7 @@ void Fun::associateContext(const vector<shared_ptr<pool::Object>> &args) {
 	}
 }
 
-shared_ptr<Object> Block::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other) {
+shared_ptr<Object> Block::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 	shared_ptr<Object> returnValue = Void;
 	for (auto &call: calls) {
 		returnValue = call->invoke();

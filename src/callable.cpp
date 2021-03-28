@@ -14,7 +14,7 @@ shared_ptr<Object> Assignment::invoke() {
 			var->setImmutable(immutable);
 			return val;
 		} else
-			throw compile_error("Cannot assign immutable variable \"" + var->name + "\"",
+			throw compile_error("Cannot assign immutable variable '" + var->name + "'",
 								assignee->start, assignee->end);
 	} else throw compile_error(ptr->toString() + " is not a Variable", assignee->start, assignee->end);
 }
@@ -23,7 +23,7 @@ shared_ptr<Object> Invocation::invoke() {
 	auto ptr = caller->invoke()->as<Object>();
 	if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
 		const auto &values = args->invoke();
-		return executable->execute(ptr, values);
+		return executable->execute(ptr, values, {start, end});
 	} else throw compile_error(ptr->toString() + " is not executable", caller->start, caller->end);
 }
 
@@ -34,7 +34,7 @@ shared_ptr<Object> InvocationAccess::invoke() {
 		const auto &ptr = access->as<Object>();
 		if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
 			const auto &values = args->invoke();
-			return executable->execute(selfPtr, values);
+			return executable->execute(selfPtr, values, {start, end});
 		} else throw compile_error(ptr->toString() + " is not executable", idToken, idToken);
 	} else throw compile_error(Null->toString() + " is not executable", idToken, idToken);
 }
