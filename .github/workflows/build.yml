@@ -17,6 +17,8 @@ jobs:
           - os: ubuntu-latest
             cc: gcc-9
             cxx: g++-9
+          - os: windows-latest
+            sysversion: 10.0.18362
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -31,7 +33,7 @@ jobs:
       - name: Configure CMake
         shell: bash
         working-directory: ${{runner.workspace}}/build
-        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_SYSTEM_VERSION=${{matrix.sysversion}}
         env:
           CC: ${{matrix.cc}}
           CXX: ${{matrix.cxx}}
@@ -56,9 +58,6 @@ jobs:
         working-directory: ${{runner.workspace}}/build
         shell: bash
         run: ctest --extra-verbose -C Release
-        env:
-          CC: ${{matrix.cc}}
-          CXX: ${{matrix.cxx}}
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v2
