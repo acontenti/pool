@@ -1,6 +1,17 @@
 cmake_minimum_required(VERSION 3.10)
 project(pool VERSION 0.1.0 LANGUAGES CXX)
 
+# CPPLOCATE
+include(FetchContent)
+SET(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs")
+FetchContent_Declare(cpplocate GIT_REPOSITORY https://github.com/cginternals/cpplocate.git GIT_TAG v2.2.0)
+FetchContent_GetProperties(cpplocate)
+if (NOT cpplocate_POPULATED)
+	FetchContent_Populate(cpplocate)
+	add_subdirectory(${cpplocate_SOURCE_DIR} ${cpplocate_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif ()
+find_package(cpplocate REQUIRED)
+
 # ANTLR4 RUNTIME
 set(ANTLR4_VERSION "4.9.2")
 add_compile_definitions(_HAS_STD_BYTE=0)
@@ -28,30 +39,16 @@ find_package(ANTLR REQUIRED)
 antlr_target(PoolLexer PoolLexer.g4 LEXER OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/gen)
 antlr_target(PoolParser PoolParser.g4 PARSER OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/gen DEPENDS_ANTLR PoolLexer)
 
-# CPPLOCATE
-set(BUILD_SHARED_LIBS false)
-include(FetchContent)
-FetchContent_Declare(cpplocate GIT_REPOSITORY https://github.com/cginternals/cpplocate.git GIT_TAG v2.2.0)
-FetchContent_GetProperties(cpplocate)
-if (NOT cpplocate_POPULATED)
-	FetchContent_Populate(cpplocate)
-	add_subdirectory(${cpplocate_SOURCE_DIR} ${cpplocate_BINARY_DIR} EXCLUDE_FROM_ALL)
-endif ()
-find_package(cpplocate REQUIRED)
-
 # POOL
 include_directories(${ANTLR_PoolLexer_OUTPUT_DIR} ${ANTLR_PoolParser_OUTPUT_DIR} ${ANTLR4_INCLUDE_DIRS})
 add_compile_definitions(POOL_VERSION="${PROJECT_VERSION}")
 file(GLOB_RECURSE POOL_SRC src/*.cpp)
 add_executable(pool ${POOL_SRC} ${ANTLR_PoolLexer_CXX_OUTPUTS} ${ANTLR_PoolParser_CXX_OUTPUTS})
 set_property(TARGET pool PROPERTY CXX_STANDARD 17)
-if (WIN32)
-	target_link_libraries(pool PUBLIC ws2_32 userenv)
-else ()
-	target_link_libraries(pool PUBLIC dl pthread stdc++fs)
-endif ()
-target_link_libraries(pool PUBLIC ${ANTLR4_LIB})
-target_link_libraries(pool PUBLIC cpplocate::cpplocate)
+find_package(Threads REQUIRED)
+target_link_libraries(pool Threads::Threads)
+target_link_libraries(pool ${ANTLR4_LIB})
+target_link_libraries(pool cpplocate::cpplocate)
 
 # INSTALL
 set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/dist)
