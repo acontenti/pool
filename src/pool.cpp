@@ -24,7 +24,7 @@ void Pool::initialiaze(const Settings &settings) {
 Pool Pool::execute(const string &module) {
 	string filename = module;
 	if (startsWith(module, ":")) {
-		filename = (fs::path(cpplocate::getModulePath()) / ".." / "std" / module.substr(1)).string();
+		filename = (fs::path(cpplocate::getModulePath()) / "std" / module.substr(1)).string();
 	}
 	if (!endsWith(filename, EXT))
 		filename += EXT;
