@@ -1,3 +1,4 @@
+#include <memory>
 #include <sstream>
 #include "poolstd.hpp"
 
@@ -34,6 +35,10 @@ void Context::set(const string &name, const shared_ptr<Object> &value, bool immu
 	}
 }
 
+void Context::remove(const string &name) {
+	heap.erase(name);
+}
+
 string Context::toString() const {
 	stringstream ss;
 	ss << "{";
@@ -45,4 +50,10 @@ string Context::toString() const {
 	}
 	ss << "}";
 	return ss.str();
+}
+
+Context::Context(shared_ptr<Context> parent) : parent(move(parent)) {}
+
+shared_ptr<Context> Context::create(const shared_ptr<Context> &parent) {
+	return make_shared<Context>(parent);
 }

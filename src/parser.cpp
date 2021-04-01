@@ -1,5 +1,6 @@
-#include "poolstd.hpp"
+#include "natives.hpp"
 #include "pool.hpp"
+#include "parser.hpp"
 #include "util/strings.hpp"
 #include "util/errors.hpp"
 
@@ -23,19 +24,19 @@ shared_ptr<Callable> parseAccess(PoolParser::AccessContext *ast, const shared_pt
 		case PoolParser::AccessContext::G: {
 			auto caller = parseCall(ast->callee, context);
 			auto id = getId(ast->ID());
-			return Access::create(ast->getStart(), ast->getStop(), caller, id);
+			return Access::create({ast->start, ast->stop}, caller, id);
 		}
 		case PoolParser::AccessContext::L: {
 			auto caller = parseCall(ast->callee, context);
 			auto id = getId(ast->ID());
-			return LocalAccess::create(ast->getStart(), ast->getStop(), caller, id);
+			return LocalAccess::create({ast->start, ast->stop}, caller, id);
 		}
 		case PoolParser::AccessContext::I: {
 			auto id = parseIdentifier(ast->ID(), context);
-			return Identity::create(ast->getStart(), ast->getStop(), id);
+			return Identity::create({ast->start, ast->stop}, id);
 		}
 		default:
-			throw compile_error("invalid access", ast->getStart(), ast->getStop());
+			throw compile_error("invalid access", {ast->start, ast->stop});
 	}
 }
 
@@ -44,15 +45,15 @@ shared_ptr<Callable> parseAssignment(PoolParser::AssignmentContext *ast, const s
 		case PoolParser::AssignmentContext::V: {
 			auto assignee = parseAccess(ast->assignee, context);
 			auto value = parseCall(ast->value, context);
-			return Assignment::create(ast->getStart(), ast->getStop(), assignee, value, false);
+			return Assignment::create({ast->start, ast->stop}, assignee, value, false);
 		}
 		case PoolParser::AssignmentContext::C: {
 			auto assignee = parseAccess(ast->assignee, context);
 			auto value = parseCall(ast->value, context);
-			return Assignment::create(ast->getStart(), ast->getStop(), assignee, value, true);
+			return Assignment::create({ast->start, ast->stop}, assignee, value, true);
 		}
 		default:
-			throw compile_error("invalid assignment", ast->getStart(), ast->getStop());
+			throw compile_error("invalid assignment", {ast->start, ast->stop});
 	}
 }
 
@@ -61,7 +62,7 @@ shared_ptr<Callable> parseExpression(PoolParser::ExpressionContext *ast, const s
 		return parseAssignment(ast->a, context);
 	} else if (ast->c) {
 		return parseCall(ast->c, context);
-	} else throw compile_error("invalid expression", ast->getStart(), ast->getStop());
+	} else throw compile_error("invalid expression", {ast->start, ast->stop});
 }
 
 vector<shared_ptr<Callable>> parseStatements(const vector<PoolParser::StatementContext *> &statements, const shared_ptr<Context> &context) {
@@ -72,7 +73,7 @@ vector<shared_ptr<Callable>> parseStatements(const vector<PoolParser::StatementC
 		if (exp) {
 			result.emplace_back(parseExpression(exp, context));
 		} else {
-			result.emplace_back(Identity::create(ast->getStart(), ast->getStop(), Void));
+			result.emplace_back(Identity::create({ast->start, ast->stop}, Void));
 		}
 	}
 	return result;
@@ -80,7 +81,7 @@ vector<shared_ptr<Callable>> parseStatements(const vector<PoolParser::StatementC
 
 shared_ptr<Callable> parsePar(PoolParser::ParContext *ast, const shared_ptr<Context> &context) {
 	auto exp = ast->expression();
-	return exp ? parseExpression(exp, context) : Identity::create(ast->getStart(), ast->getStop(), Void);
+	return exp ? parseExpression(exp, context) : Identity::create({ast->start, ast->stop}, Void);
 }
 
 shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Context> &context) {
@@ -130,7 +131,7 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 			}
 		}
 		default:
-			throw compile_error("invalid number literal", ast->getStart(), ast->getStop());
+			throw compile_error("invalid number literal", {ast->start, ast->stop});
 	}
 }
 
@@ -142,17 +143,16 @@ shared_ptr<Object> parseString(PoolParser::StringContext *ast, const shared_ptr<
 
 shared_ptr<Object> parseBlock(PoolParser::BlockContext *ast, const shared_ptr<Context> &parent) {
 	auto context = Context::create(parent);
-	return BlockClass->newInstance(context, {ast->start,
-											 ast->stop}, {}, parseStatements(ast->statement(), context), nullptr, nullptr, false);
+	return BlockClass->newInstance(context, {ast->start, ast->stop}, {}, parseStatements(ast->statement(), context), nullptr, nullptr, false);
 }
 
 shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<Context> &parent) {
 	auto paramsAst = ast->param();
-	vector<Executable::Param> params;
+	vector<Fun::Param> params;
 	params.reserve(paramsAst.size());
 	for (auto param = paramsAst.begin(); param != paramsAst.end(); ++param) {
 		auto id = getId((*param)->ID());
-		auto find = find_if(params.begin(), params.end(), [id](const Executable::Param &p) { return p.id == id; });
+		auto find = find_if(params.begin(), params.end(), [id](const Fun::Param &p) { return p.id == id; });
 		if (find != params.end()) {
 			auto idToken = (*param)->ID()->getSymbol();
 			throw compile_error("Duplicate parameter '" + id + "'", idToken, idToken);
@@ -173,36 +173,34 @@ shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<C
 	for (auto &param : params) {
 		context->add(param.id);
 	}
-	return FunClass->newInstance(context, {ast->start,
-										   ast->stop}, {}, params, parseStatements(ast->statement(), context), nullptr, false);
+	return FunClass->newInstance(context, {ast->start, ast->stop}, {}, params, parseStatements(ast->statement(), context), nullptr, false);
 }
 
 shared_ptr<Callable> parseNative(tree::TerminalNode *ast, const shared_ptr<Context> &context) {
 	auto id = ast->getText().substr(1, ast->getText().length() - 2);
-	auto iterator = natives.find(id);
-	if (iterator != natives.end()) {
-		return Identity::create(ast->getSymbol(), ast->getSymbol(), iterator->second);
+	if (auto value = Natives::get().find(id)) {
+		return Identity::create({ast->getSymbol(), ast->getSymbol()}, value);
 	} else throw compile_error("Native symbol not found", ast->getSymbol(), ast->getSymbol());
 }
 
 shared_ptr<Callable> parseTerm(PoolParser::TermContext *ast, const shared_ptr<Context> &context) {
 	switch (ast->type) {
 		case PoolParser::TermContext::NUM:
-			return Identity::create(ast->getStart(), ast->getStop(), parseNum(ast->num(), context));
+			return Identity::create({ast->start, ast->stop}, parseNum(ast->num(), context));
 		case PoolParser::TermContext::STR:
-			return Identity::create(ast->getStart(), ast->getStop(), parseString(ast->string(), context));
+			return Identity::create({ast->start, ast->stop}, parseString(ast->string(), context));
 		case PoolParser::TermContext::FUN:
-			return Identity::create(ast->getStart(), ast->getStop(), parseFunction(ast->fun(), context));
+			return Identity::create({ast->start, ast->stop}, parseFunction(ast->fun(), context));
 		case PoolParser::TermContext::PAR:
 			return parsePar(ast->par(), context);
 		case PoolParser::TermContext::BLK:
-			return Identity::create(ast->getStart(), ast->getStop(), parseBlock(ast->block(), context));
+			return Identity::create({ast->start, ast->stop}, parseBlock(ast->block(), context));
 		case PoolParser::TermContext::NSM:
 			return parseNative(ast->NATIVE_SYMBOL(), context);
 		case PoolParser::TermContext::IDT:
-			return Identity::create(ast->getStart(), ast->getStop(), parseIdentifier(ast->ID(), context));
+			return Identity::create({ast->start, ast->stop}, parseIdentifier(ast->ID(), context));
 		default:
-			throw compile_error("invalid term", ast->getStart(), ast->getStop());
+			throw compile_error("invalid term", {ast->start, ast->stop});
 	}
 }
 
@@ -228,20 +226,20 @@ shared_ptr<Callable> pool::parseCall(PoolParser::CallContext *ast, const shared_
 		case PoolParser::CallContext::A: {
 			auto caller = parseCall(ast->callee, context);
 			auto args = parseArgs(ast->a, context);
-			return Invocation::create(ast->getStart(), ast->getStop(), caller, args);
+			return Invocation::create({ast->start, ast->stop}, caller, args);
 		}
 		case PoolParser::CallContext::IA: {
 			auto caller = parseCall(ast->callee, context);
 			auto id = getId(ast->ID());
 			if (ast->a) {
 				auto args = parseArgs(ast->a, context);
-				return InvocationAccess::create(ast->getStart(), ast->getStop(), ast->ID()->getSymbol(), caller, id, args);
+				return InvocationAccess::create({ast->start, ast->stop}, ast->ID()->getSymbol(), caller, id, args);
 			} else {
-				return Access::create(ast->getStart(), ast->getStop(), caller, id);
+				return Access::create({ast->start, ast->stop}, caller, id);
 			}
 		}
 		default:
-			throw compile_error("invalid call", ast->getStart(), ast->getStop());
+			throw compile_error("invalid call", {ast->start, ast->stop});
 	}
 }
 

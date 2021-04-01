@@ -109,6 +109,7 @@ b := {
 };
 b();
 b.a.f.println();
+
 Array.new(0,1,2,3,4,5,6,8,9).forEach((it) : {
 	"i: ".+(it).println();
 });
@@ -121,7 +122,45 @@ acc := 0;
 acc.println();
 acc.to(acc.+(5)).println();
 acc.println();
+
 assert(0.toInclusive(10).toString().==("[0,1,2,3,4,5,6,7,8,9,10]"), "0.toInclusive(10).toString() should be equal to '[0,1,2,3,4,5,6,7,8,9,10]'");
 assert(acc.==(45), "acc should be equal to 45");
+
+"".length().println();
+"aaaa".length().println();
+Array.new(1, 2).length().println();
+Array.new().length().println();
+
+//in_test := input("insert somthing: ");
+//in_test.println();
+
+dtest := {};
+dtest.t := "dtest";
+dtest.t.println();
+dtest.delete("t");
+dtest.t.println();
+
+//qw.println();
+//qw.er := "qwer";
+//qw.er.println();
+//qw.println();
+//qw.delete("qwer");
+//qw.er.println();
+
+iftest := (12.==("12")).thenElse({
+	"equal".println();
+	1;
+},{
+	"different".println();
+	0;
+});
+assert(0.==(iftest), "iftest should be equal to 0");
+
 import("mod/mod");
 import("mod2");
+
+q.println();
+q.q:=123;
+q.q.println();
+null.q.println();
+qqqq.q.println();

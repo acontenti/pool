@@ -14,17 +14,16 @@ shared_ptr<Object> Assignment::invoke() {
 			var->setImmutable(immutable);
 			return val;
 		} else
-			throw compile_error("Cannot assign immutable variable '" + var->name + "'",
-								assignee->start, assignee->end);
-	} else throw compile_error(ptr->toString() + " is not a Variable", assignee->start, assignee->end);
+			throw compile_error("Cannot assign immutable variable '" + var->name + "'", assignee->location);
+	} else throw compile_error(ptr->toString() + " is not a Variable", assignee->location);
 }
 
 shared_ptr<Object> Invocation::invoke() {
 	auto ptr = caller->invoke()->as<Object>();
 	if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
 		const auto &values = args->invoke();
-		return executable->execute(ptr, values, {start, end});
-	} else throw compile_error(ptr->toString() + " is not executable", caller->start, caller->end);
+		return executable->execute(ptr, values, location);
+	} else throw compile_error(ptr->toString() + " is not executable", caller->location);
 }
 
 shared_ptr<Object> InvocationAccess::invoke() {
@@ -34,7 +33,7 @@ shared_ptr<Object> InvocationAccess::invoke() {
 		const auto &ptr = access->as<Object>();
 		if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
 			const auto &values = args->invoke();
-			return executable->execute(selfPtr, values, {start, end});
+			return executable->execute(selfPtr, values, location);
 		} else throw compile_error(ptr->toString() + " is not executable", idToken, idToken);
 	} else throw compile_error(Null->toString() + " is not executable", idToken, idToken);
 }
@@ -75,5 +74,5 @@ vector<shared_ptr<Object>> Expansion::invoke() {
 	if (ptr->getType() == Array::TYPE) {
 		return ptr->as<Array>()->values;
 	} else
-		throw compile_error("Cannot expand value of type '" + string(ptr->getType()) + "'", caller->start, caller->end);
+		throw compile_error("Cannot expand value of type '" + string(ptr->getType()) + "'", caller->location);
 }

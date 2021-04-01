@@ -9,6 +9,8 @@ Class..new ::= `Class.new`;
 Class..toString ::= `Class.toString`;
 
 Object ::= `Object`;
+// Object..instanceOf ::= `Object.instanceOf`; TODO
+Object..delete ::= `Object.delete`;
 Object..toString ::= `Object.toString`;
 Object..type ::= `Object.type`;
 Object..println ::= `Object.println`;
@@ -23,6 +25,8 @@ Bool..! ::= `Bool.!`;
 Bool..|| ::= `Bool.||`;
 Bool..&& ::= `Bool.&&`;
 Bool..== ::= `Bool.==`;
+Bool..then ::= `Bool.then`;
+Bool..thenElse ::= `Bool.thenElse`;
 
 Array ::= `Array`;
 Array..init ::= `Array.init`;
@@ -30,6 +34,7 @@ Array..at ::= `Array.at`;
 Array..forEach ::= `Array.forEach`;
 Array..push ::= `Array.push`;
 Array..toString ::= `Array.toString`;
+Array..length ::= `Array.length`;
 
 Integer ::= `Integer`;
 Integer..new ::= null;
@@ -82,10 +87,12 @@ String..new ::= null;
 String..+ ::= `String.+`;
 String..== ::= `String.==`;
 String..toString ::= `String.toString`;
+String..length ::= `String.length`;
 
 Block ::= `Block`;
 Block..new ::= null;
 Block..whileDo ::= `Block.whileDo`;
+Block..doWhile ::= `Block.doWhile`;
 
 Fun ::= `Fun`;
 Fun..new ::= null;
@@ -101,4 +108,10 @@ Nothing ::= `Nothing`;
 Nothing..new ::= null;
 Nothing..toString ::= (this) : {"null";};
 
-assert ::= `assert`;
+input ::= `input`;
+throw ::= `throw`;
+assert ::= (test, message) : {
+	test.!().then({
+		throw(message);
+	});
+};

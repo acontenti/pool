@@ -1,15 +1,13 @@
 #pragma once
 
 #include <functional>
+#include <any>
 #include "callable.hpp"
 #include "context.hpp"
-#include "parser.hpp"
 
 using namespace std;
 
 namespace pool {
-	using any = antlrcpp::Any;
-
 	class Class;
 
 	class Variable;
@@ -22,9 +20,6 @@ namespace pool {
 
 	class Executable;
 
-	extern bool debug;
-	extern vector<shared_ptr<Object>> arguments;
-	extern unordered_map<string, shared_ptr<Object>> natives;
 	extern shared_ptr<Class> ClassClass;
 	extern shared_ptr<Class> ObjectClass;
 	extern shared_ptr<Class> BoolClass;
@@ -42,10 +37,13 @@ namespace pool {
 	extern shared_ptr<Bool> False;
 
 	class Object : public enable_shared_from_this<Object> {
-		shared_ptr<Object> getVariableValue();
+		shared_ptr<Object> getVariableValue() const;
 
 	public:
 		constexpr static const string_view TYPE = "Object";
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &cls, const any &, const any &) {
+			return make_shared<Object>(context, any_cast<shared_ptr<Class>>(cls));
+		};
 		const size_t id;
 		const shared_ptr<Class> cls;
 		const shared_ptr<Context> context;
@@ -54,15 +52,13 @@ namespace pool {
 
 		virtual string_view getType();
 
-		inline string toString() {
-			return string(getType()) + "@" + to_string(id);
-		};
+		string toString();
 
-		template<class T>
-		shared_ptr<T> as() {
+		template<class T, typename enable_if<is_base_of<Object, T>::value, int>::type = 0>
+		shared_ptr<T> as() const {
 			if (isVariable())
-				return reinterpret_pointer_cast<T>(getVariableValue());
-			return reinterpret_pointer_cast<T>(shared_from_this());
+				return const_pointer_cast<T>(reinterpret_pointer_cast<const T>(getVariableValue()));
+			return const_pointer_cast<T>(reinterpret_pointer_cast<const T>(shared_from_this()));
 		}
 
 		virtual shared_ptr<Executable> findMethod(const string &methodName) const;
@@ -71,19 +67,19 @@ namespace pool {
 
 		virtual shared_ptr<Variable> findLocal(const string &id) const;
 
-		virtual bool isVariable() const {
-			return false;
-		}
-	};
+		virtual bool isVariable() const;
 
-	template<>
-	shared_ptr<Variable> Object::as<Variable>();
+		void remove(const string &name);
+	};
 
 	class Class : public Object {
 	public:
-		using creator_t = function<shared_ptr<Object>(const shared_ptr<Context> &context, const any &a1, const any &a2, const any &a3)>;
+		using creator_t = function<shared_ptr<Object>(const shared_ptr<Context> &context, const any &p1, const any &p2, const any &p3)>;
 
 		constexpr static const string_view TYPE = "Class";
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &creator, const any &name, const any &super) {
+			return make_shared<Class>(context, any_cast<Class::creator_t>(creator), any_cast<string>(name), any_cast<shared_ptr<Class>>(super));
+		};
 		size_t instances = 0;
 		string name;
 		shared_ptr<Class> super;
@@ -91,64 +87,14 @@ namespace pool {
 
 		Class(const shared_ptr<Context> &context, creator_t creator, string name, shared_ptr<Class> super);
 
-		shared_ptr<Variable> find(const string &id) const override {
-			if (auto local = findInClass(id)) {
-				return local;
-			}
-			if (cls) {
-				return cls->find(id);
-			}
-			return nullptr;
-		}
+		shared_ptr<Variable> find(const string &id) const override;
 
-		shared_ptr<Variable> findInClass(const string &id) const {
-			if (auto local = context->findLocal(id)) {
-				return local;
-			}
-			if (super) {
-				return super->findInClass(id);
-			}
-			return nullptr;
-		};
+		shared_ptr<Variable> findInClass(const string &id) const;
 
 		shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const pair<Token *, Token *> &location, const vector<shared_ptr<Object>> &other = {}, const any &a1 = nullptr, const any &a2 = nullptr, const any &a3 = nullptr, bool createContext = true) const;
 
-		shared_ptr<Class> extend(const creator_t &creator, const string &className, const shared_ptr<Block> &other, const pair<Token *, Token *> &location);
+		shared_ptr<Class> extend(const creator_t &creator, const string &className, const shared_ptr<Block> &other, const pair<Token *, Token *> &location) const;
 	};
-
-	class Bool : public Object {
-	public:
-		bool value;
-		constexpr static const string_view TYPE = "Bool";
-
-		Bool(const shared_ptr<Context> &context, bool value) : Object(context, BoolClass), value(value) {}
-	};
-
-	class Integer : public Object {
-	public:
-		long long int value;
-		constexpr static const string_view TYPE = "Integer";
-
-		Integer(long long int value, const shared_ptr<Context> &context)
-				: Object(context, IntegerClass), value(value) {}
-	};
-
-	class Decimal : public Object {
-	public:
-		long double value;
-		constexpr static const string_view TYPE = "Decimal";
-
-		Decimal(double value, const shared_ptr<Context> &context) : Object(context, DecimalClass), value(value) {}
-	};
-
-	class String : public Object {
-	public:
-		constexpr static const string_view TYPE = "String";
-		string value;
-
-		String(const shared_ptr<Context> &context, string value) : Object(context, StringClass), value(move(value)) {}
-	};
-
 
 	class Variable : public Object {
 		shared_ptr<Object> value;
@@ -156,110 +102,137 @@ namespace pool {
 	public:
 		const string name;
 
-		bool isImmutable() const {
-			return immutable;
-		}
+		bool isImmutable() const;
 
-		void setImmutable(bool _immutable) {
-			immutable = _immutable;
-		}
+		void setImmutable(bool _immutable);
 
-		const shared_ptr<Object> &getValue() const {
-			return value;
-		}
+		const shared_ptr<Object> &getValue() const;
 
 		void setValue(const shared_ptr<Object> &val);
 
-		shared_ptr<Executable> findMethod(const string &methodName) const override {
-			return value->findMethod(methodName);
-		}
+		shared_ptr<Executable> findMethod(const string &methodName) const override;
 
-		shared_ptr<Variable> find(const string &id) const override {
-			return value->find(id);
-		}
+		shared_ptr<Variable> find(const string &id) const override;
 
-		shared_ptr<Variable> findLocal(const string &id) const override {
-			return value->findLocal(id);
-		}
+		shared_ptr<Variable> findLocal(const string &id) const override;
 
+		string_view getType() override;
 
-		string_view getType() override {
-			return value->getType();
-		}
+		bool isVariable() const override;
 
-		bool isVariable() const override {
-			return true;
-		}
+		Variable(const shared_ptr<Context> &context, string name, shared_ptr<Object> value, bool immutable);
+	};
 
-		Variable(const shared_ptr<Context> &context, string name, shared_ptr<Object> value, bool immutable)
-				: Object(context, nullptr), name(move(name)), value(move(value)), immutable(immutable) {
-		}
+	template<>
+	shared_ptr<Variable> Object::as<Variable>() const;
+
+	class Bool : public Object {
+	public:
+		bool value;
+		constexpr static const string_view TYPE = "Bool";
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &_value, const any &, const any &) {
+			return make_shared<Bool>(context, any_cast<bool>(_value));
+		};
+
+		Bool(const shared_ptr<Context> &context, bool value);
+	};
+
+	class Integer : public Object {
+	public:
+		long long int value;
+		constexpr static const string_view TYPE = "Integer";
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &_value, const any &, const any &) {
+			return make_shared<Integer>(context, any_cast<long long int>(_value));
+		};
+
+		Integer(const shared_ptr<Context> &context, long long int value);
+	};
+
+	class Decimal : public Object {
+	public:
+		long double value;
+		constexpr static const string_view TYPE = "Decimal";
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &_value, const any &, const any &) {
+			return make_shared<Decimal>(context, any_cast<long double>(_value));
+		};
+
+		Decimal(const shared_ptr<Context> &context, long double value);
+	};
+
+	class String : public Object {
+	public:
+		string value;
+		constexpr static const string_view TYPE = "String";
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &_value, const any &, const any &) {
+			return make_shared<String>(context, any_cast<string>(_value));
+		};
+
+		String(const shared_ptr<Context> &context, string value);
 	};
 
 	class Executable : public Object {
+	public:
+		Executable(const shared_ptr<Context> &context, const shared_ptr<Class> &cls);
+
+		virtual shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) = 0;
+	};
+
+	class Fun : public Executable {
 	public:
 		struct Param {
 			string id;
 			bool rest;
 
-			Param(string id, bool rest = false) : id(std::move(id)), rest(rest) {}
+			Param(string id, bool rest = false) : id(move(id)), rest(rest) {}
 		};
 
 		vector<Param> params;
+		vector<shared_ptr<Callable>> calls;
+		constexpr static const string_view TYPE = "Fun";
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &_params, const any &_calls, const any &) {
+			return make_shared<Fun>(context, any_cast<vector<Param>>(_params), any_cast<vector<shared_ptr<Callable>>>(_calls));
+		};
 
-		Executable(const vector<Param> &params, const shared_ptr<Context> &context, const shared_ptr<Class> &cls)
-				: Object(context, cls), params(params) {}
+		Fun(const shared_ptr<Context> &context, const vector<Param> &params, vector<shared_ptr<Callable>> calls);
 
-		virtual shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) = 0;
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) override;
 	};
 
-	using method_t = function<shared_ptr<Object>(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location)>;
-
-	class NativeFun : public Executable {
+	class NativeFun : public Fun {
 	public:
+		using method_t = function<shared_ptr<Object>(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location)>;
 		method_t code;
 
-		NativeFun(const vector<Param> &params, method_t code, const shared_ptr<Context> &context)
-				: Executable(params, context, FunClass), code(move(code)) {}
+		NativeFun(const shared_ptr<Context> &context, const vector<Param> &params, method_t code);
 
 		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) override;
 
-		static shared_ptr<NativeFun> create(const vector<Param> &params, const method_t &code) {
-			return make_shared<NativeFun>(params, code, Context::global);
-		}
-	};
-
-	class Fun : public Executable {
-	public:
-		constexpr static const string_view TYPE = "Fun";
-		vector<shared_ptr<Callable>> calls;
-
-		Fun(const vector<Param> &params, vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
-				: Executable(params, context, FunClass), calls(move(calls)) {}
-
-		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) override;
-
-		void associateContext(const vector<shared_ptr<pool::Object>> &args, const pair<Token *, Token *> &location);
+		static shared_ptr<NativeFun> create(const vector<Param> &params, const method_t &code);
 	};
 
 	class Block : public Executable {
 	public:
-		constexpr static const string_view TYPE = "Block";
 		vector<shared_ptr<Callable>> calls;
+		constexpr static const string_view TYPE = "Block";
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &_calls, const any &, const any &) {
+			return make_shared<Block>(context, any_cast<vector<shared_ptr<Callable>>>(_calls));
+		};
 
-		Block(vector<shared_ptr<Callable>> calls, const shared_ptr<Context> &context)
-				: Executable({}, context, BlockClass), calls(move(calls)) {}
+		Block(const shared_ptr<Context> &context, vector<shared_ptr<Callable>> calls);
 
 		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) override;
+
+		shared_ptr<Object> execute(const pair<Token *, Token *> &location);
 	};
 
 	class Array : public Object {
 	public:
-		constexpr static const string_view TYPE = "Array";
 		vector<shared_ptr<Object>> values;
+		constexpr static const string_view TYPE = "Array";
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &, const any &, const any &) {
+			return make_shared<Array>(context);
+		};
 
-		explicit Array(const shared_ptr<Context> &context) : Object(context, ArrayClass) {}
+		explicit Array(const shared_ptr<Context> &context);
 	};
-
-	extern void initialize();
 }

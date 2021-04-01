@@ -1,166 +1,155 @@
+#include "natives.hpp"
 #include "pool.hpp"
-#include "poolstd.hpp"
 #include "util/errors.hpp"
 
 using namespace pool;
 
-unordered_map<string, shared_ptr<Object>> pool::natives{};
-shared_ptr<Class> pool::ClassClass = nullptr;
-shared_ptr<Class> pool::ObjectClass = nullptr;
-shared_ptr<Class> pool::BoolClass = nullptr;
-shared_ptr<Class> pool::IntegerClass = nullptr;
-shared_ptr<Class> pool::DecimalClass = nullptr;
-shared_ptr<Class> pool::StringClass = nullptr;
-shared_ptr<Class> pool::ArrayClass = nullptr;
-shared_ptr<Class> pool::BlockClass = nullptr;
-shared_ptr<Class> pool::FunClass = nullptr;
-shared_ptr<Class> pool::VoidClass = nullptr;
-shared_ptr<Class> pool::NothingClass = nullptr;
-shared_ptr<Object> pool::Void = nullptr;
-shared_ptr<Object> pool::Null = nullptr;
-shared_ptr<Bool> pool::True = nullptr;
-shared_ptr<Bool> pool::False = nullptr;
+struct NativesImpl : public Natives {
+	unordered_map<string, shared_ptr<Object>> natives;
 
-namespace pool {
-	void initializeContext() {
-		Context::global->set("import", NativeFun::create({{"moduleName"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
-			auto arg = other[0];
-			if (arg->getType() == String::TYPE) {
-				auto moduleName = arg->as<String>()->value;
-				try {
-					const auto &pool = Pool::execute(moduleName);
-					if (!pool.getResult()) {
-						throw runtime_error("execution error");
-					}
-				} catch (const runtime_error &e) {
-					throw compile_error("Cannot import module '" + moduleName + "': " + e.what(), location);
-				}
-			} else throw compile_error("import argument must be a String", location);
-			return Void;
-		}));
+	NativesImpl() {
+		initialize();
 	}
 
-	void initializeBaseSymbols() {
-		ClassClass = make_shared<Class>(Context::create(Context::global), [](const shared_ptr<Context> &context, const any &creator, const any &name, const any &super) {
-			return make_shared<Class>(context, creator, name, super.isNotNull() ? super.as<shared_ptr<Class>>()
-																				: nullptr);
-		}, string(Class::TYPE), nullptr)->as<Class>(); // ObjectClass is not yet created, so we pass nullptr as super
-		ObjectClass = ClassClass->newInstance(Context::global, {}, {}, static_cast<Class::creator_t>([](const shared_ptr<Context> &context, const any &cls, const any &name, const any &super) {
-			return make_shared<Object>(context, cls);
-		}), string(Object::TYPE), nullptr)->as<Class>(); // ObjectClass is the base class, so it has no super
-		ClassClass->super = ObjectClass; // Now ObjectClass exists, so we can assign it to ClassClass->super
-		BoolClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
-			return make_shared<Bool>(context, value);
-		}, string(Bool::TYPE), {}, {});
-		IntegerClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
-			return make_shared<Integer>(value, context);
-		}, string(Integer::TYPE), {}, {});
-		DecimalClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
-			return make_shared<Decimal>(value, context);
-		}, string(Decimal::TYPE), {}, {});
-		StringClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &value, const any &_a2 = nullptr, const any &_a3 = nullptr) {
-			return make_shared<String>(context, value);
-		}, string(String::TYPE), {}, {});
-		ArrayClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &_a1 = nullptr, const any &_a2 = nullptr, const any &_a3 = nullptr) {
-			return make_shared<Array>(context);
-		}, string(Array::TYPE), {}, {});
-		BlockClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &calls, const any &_a2 = nullptr, const any &_a3 = nullptr) {
-			return make_shared<Block>(calls, context);
-		}, string(Block::TYPE), {}, {});
-		FunClass = ObjectClass->extend([](const shared_ptr<Context> &context, const any &params, const any &calls, const any &_a3 = nullptr) {
-			return make_shared<Fun>(params, calls, context);
-		}, string(Fun::TYPE), {}, {});
-		VoidClass = ObjectClass->extend(nullptr, "Void", {}, {});
-		NothingClass = ObjectClass->extend(nullptr, "Nothing", {}, {});
-		Void = VoidClass->newInstance(Context::global, {}, {}, VoidClass);
-		Null = NothingClass->newInstance(Context::global, {}, {}, NothingClass);
-		True = BoolClass->newInstance(Context::global, {}, {}, true)->as<Bool>();
-		False = BoolClass->newInstance(Context::global, {}, {}, false)->as<Bool>();
+	void initialize() {
+		initializeUtilities();
+		initializeClass();
+		initializeObject();
+		initializeBool();
+		initializeInteger();
+		initializeDecimal();
+		initializeString();
+		initializeFun();
+		initializeArray();
+		initializeBlock();
 	}
 
-	void initializeNativeSymbols() {
-		natives["Class"] = ClassClass;
-		natives["Object"] = ObjectClass;
-		natives["Bool"] = BoolClass;
-		natives["Integer"] = IntegerClass;
-		natives["Decimal"] = DecimalClass;
-		natives["String"] = StringClass;
-		natives["Array"] = ArrayClass;
-		natives["Block"] = BlockClass;
-		natives["Fun"] = FunClass;
-		natives["Void"] = VoidClass;
-		natives["Nothing"] = NothingClass;
-		natives["void"] = Void;
-		natives["null"] = Null;
-		natives["true"] = True;
-		natives["false"] = False;
-		natives["Class.extend"] = NativeFun::create({{"this"},
-													 {"name"},
-													 {"body"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
-			if (other[0]->getType() == String::TYPE) {
-				if (other[1]->getType() == Block::TYPE) {
-					auto name = other[0]->as<String>()->value;
-					return self->as<Class>()->extend(nullptr, name, other[1]->as<Block>(), location);
-				} else throw compile_error("Class.extend: argument body must be a Block", location);
-			} else throw compile_error("Class.extend: argument name must be a String", location);
+	void initializeUtilities() {
+		add("Void", VoidClass);
+		add("Nothing", NothingClass);
+		add("void", Void);
+		add("null", Null);
+		addFun("throw", {{"message"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) -> shared_ptr<Object> {
+			if (!(other[0]->getType() == String::TYPE))
+				throw compile_error("throw argument must be a String", location);
+			throw compile_error(other[0]->as<String>()->value, location);
 		});
-		natives["Class.new"] = NativeFun::create({{"this"},
-												  {"arguments", true}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		addFun("input", {{"prompt"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) -> shared_ptr<Object> {
+			if (!(other[0]->getType() == String::TYPE))
+				throw compile_error("input argument must be a String", location);
+			cout << other[0]->as<String>()->value;
+			string in;
+			cin >> in;
+			return StringClass->newInstance(self->context, location, {}, in);
+		});
+	}
+
+	void initializeClass() {
+		add("Class", ClassClass);
+		addFun("Class.extend", {{"this"}, {"name"}, {"body"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			if (!(other[0]->getType() == String::TYPE))
+				throw compile_error("Class.extend: argument 'name' must be a String", location);
+			if (!(other[1]->getType() == Block::TYPE))
+				throw compile_error("Class.extend: argument 'body' must be a Block", location);
+			auto name = other[0]->as<String>()->value;
+			return self->as<Class>()->extend(nullptr, name, other[1]->as<Block>(), location);
+		});
+		addFun("Class.new", {{"this"}, {"arguments", true}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			auto cls = self->as<Class>();
 			return cls->newInstance(self->context, location, other, cls);
 		});
-		natives["Class.toString"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		addFun("Class.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			return StringClass->newInstance(self->context, location, {}, "Class:" + self->as<Class>()->name);
 		});
-		natives["Object.toString"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+	}
+
+	void initializeObject() {
+		add("Object", ObjectClass);
+		addFun("Object.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			return StringClass->newInstance(self->context, location, {}, self->toString());
 		});
-		natives["Object.type"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		addFun("Object.type", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			return StringClass->newInstance(self->context, location, {}, self->as<Object>()->context->toString());
 		});
-		natives["Object.println"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
-			shared_ptr<Object> var = self->as<Object>();
-			if (auto method = var->findMethod("toString")) {
-				auto result = method->execute(var, {}, location);
+		addFun("Object.println", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			shared_ptr<Object> ptr = self->as<Object>();
+			if (auto method = ptr->findMethod("toString")) {
+				auto result = method->execute(ptr, {}, location);
 				if (result->getType() == String::TYPE) {
 					cout << result->as<String>()->value << endl;
 				}
 			}
 			return Void;
 		});
-		natives["Bool.toString"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		addFun("Object.delete", {{"this"}, {"key"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			if (!(other[0]->getType() == String::TYPE))
+				throw compile_error("input argument must be a String", location);
+			shared_ptr<Object> ptr = self->as<Object>();
+			const auto &key = other[0]->as<String>()->value;
+			if (const auto &var = ptr->findLocal(key)) {
+				if (!var->isImmutable()) {
+					ptr->remove(key);
+				} else throw compile_error("Cannot remove immutable variable '" + var->name + "'", location);
+			}
+			return Void;
+		});
+	}
+
+	void initializeBool() {
+		add("true", True);
+		add("false", False);
+		add("Bool", BoolClass);
+		addFun("Bool.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			return StringClass->newInstance(self->context, location, {}, string(self->as<Bool>()->value ? "true"
 																										: "false"));
 		});
-		natives["Bool.!"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		addFun("Bool.!", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			return !(self->as<Bool>()->value) ? True : False;
 		});
-		natives["Bool.||"] = NativeFun::create({{"this"},
-												{"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		addFun("Bool.||", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			auto value = self->as<Bool>()->value;
 			auto ptr = other[0];
 			if (ptr->getType() == Bool::TYPE) {
 				return value || ptr->as<Bool>()->value ? True : False;
 			} else throw compile_error("Bool.|| argument must be a Number", location);
 		});
-		natives["Bool.&&"] = NativeFun::create({{"this"},
-												{"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		addFun("Bool.&&", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			auto value = self->as<Bool>()->value;
 			auto ptr = other[0];
 			if (ptr->getType() == Bool::TYPE) {
 				return value && ptr->as<Bool>()->value ? True : False;
 			} else throw compile_error("Bool.&& argument must be a Number", location);
 		});
-		natives["Bool.=="] = NativeFun::create({{"this"},
-												{"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
-			auto value = self->as<Bool>()->value;
-			auto par = other[0];
-			if (par->getType() == Bool::TYPE) {
-				return (value == par->as<Bool>()->value) ? True : False;
-			} else throw compile_error("Bool.== argument must be a Number", location);
+		addFun("Bool.==", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			if (other[0]->getType() == Bool::TYPE) {
+				return (self->as<Bool>()->value == other[0]->as<Bool>()->value) ? True : False;
+			} else return False;
 		});
-		natives["Integer.<"] = NativeFun::create({{"this"},
-												  {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		addFun("Bool.then", {{"this"}, {"action"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			if (!(other[0]->getType() == Block::TYPE))
+				throw compile_error("Bool.then argument must be a Block", location);
+			auto block = other[0]->as<Block>();
+			if (self->as<Bool>()->value) {
+				return block->execute(location);
+			}
+			return Void;
+		});
+		addFun("Bool.thenElse", {{"this"}, {"trueAction"}, {"falseAction"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			if (!(other[0]->getType() == Block::TYPE))
+				throw compile_error("Bool.then first argument must be a Block", location);
+			if (!(other[1]->getType() == Block::TYPE))
+				throw compile_error("Bool.then second argument must be a Block", location);
+			if (self->as<Bool>()->value) {
+				return other[0]->as<Block>()->execute(location);
+			} else {
+				return other[1]->as<Block>()->execute(location);
+			}
+		});
+	}
+
+	void initializeInteger() {
+		this->add("Integer", IntegerClass);
+		this->addFun("Integer.<", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			auto value = self->as<Integer>()->value;
 			auto par = other[0];
 			if (par->getType() == Integer::TYPE) {
@@ -169,18 +158,15 @@ namespace pool {
 				return (value < par->as<Decimal>()->value) ? True : False;
 			} else throw compile_error("Integer.< argument must be a Number", location);
 		});
-		natives["Integer.=="] = NativeFun::create({{"this"},
-												   {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
-			auto value = self->as<Integer>()->value;
-			auto par = other[0];
-			if (par->getType() == Integer::TYPE) {
-				return (value == par->as<Integer>()->value) ? True : False;
-			} else if (par->getType() == Decimal::TYPE) {
-				return (value == par->as<Decimal>()->value) ? True : False;
-			} else throw compile_error("Integer.== argument must be a Number", location);
+		this->addFun("Integer.==", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			const auto &oth = other[0];
+			if (oth->getType() == Integer::TYPE) {
+				return (self->as<Integer>()->value == oth->as<Integer>()->value) ? True : False;
+			} else if (oth->getType() == Decimal::TYPE) {
+				return (self->as<Integer>()->value == oth->as<Decimal>()->value) ? True : False;
+			} else return False;
 		});
-		natives["Integer.+"] = NativeFun::create({{"this"},
-												  {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		this->addFun("Integer.+", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			auto value = self->as<Integer>()->value;
 			auto par = other[0];
 			if (par->getType() == Integer::TYPE) {
@@ -192,8 +178,7 @@ namespace pool {
 												to_string(value) + par->as<String>()->value);
 			} else return Null;
 		});
-		natives["Integer.-"] = NativeFun::create({{"this"},
-												  {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		this->addFun("Integer.-", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			auto value = self->as<Integer>()->value;
 			auto par = other[0];
 			if (par->getType() == Integer::TYPE) {
@@ -202,11 +187,14 @@ namespace pool {
 				return DecimalClass->newInstance(self->context, location, {}, value - par->as<Decimal>()->value);
 			} else return Null;
 		});
-		natives["Integer.toString"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		this->addFun("Integer.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			return StringClass->newInstance(self->context, location, {}, to_string(self->as<Integer>()->value));
 		});
-		natives["Decimal.<"] = NativeFun::create({{"this"},
-												  {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+	}
+
+	void initializeDecimal() {
+		this->add("Decimal", DecimalClass);
+		this->addFun("Decimal.<", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			auto value = self->as<Decimal>()->value;
 			auto par = other[0];
 			if (par->getType() == Integer::TYPE) {
@@ -215,18 +203,15 @@ namespace pool {
 				return (value < par->as<Decimal>()->value) ? True : False;
 			} else throw compile_error("Decimal.< argument must be a Number", location);
 		});
-		natives["Decimal.=="] = NativeFun::create({{"this"},
-												   {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
-			auto value = self->as<Decimal>()->value;
-			auto par = other[0];
-			if (par->getType() == Integer::TYPE) {
-				return (value == par->as<Integer>()->value) ? True : False;
-			} else if (par->getType() == Decimal::TYPE) {
-				return (value == par->as<Decimal>()->value) ? True : False;
-			} else throw compile_error("Decimal.== argument must be a Number", location);
+		this->addFun("Decimal.==", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			const auto &oth = other[0];
+			if (oth->getType() == Integer::TYPE) {
+				return (self->as<Decimal>()->value == oth->as<Integer>()->value) ? True : False;
+			} else if (oth->getType() == Decimal::TYPE) {
+				return (self->as<Decimal>()->value == oth->as<Decimal>()->value) ? True : False;
+			} else return False;
 		});
-		natives["Decimal.+"] = NativeFun::create({{"this"},
-												  {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		this->addFun("Decimal.+", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			auto value = self->as<Decimal>()->value;
 			auto par = other[0];
 			if (par->getType() == Integer::TYPE) {
@@ -238,8 +223,7 @@ namespace pool {
 												to_string(value) + par->as<String>()->value);
 			} else return Null;
 		});
-		natives["Decimal.-"] = NativeFun::create({{"this"},
-												  {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		this->addFun("Decimal.-", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			auto value = self->as<Decimal>()->value;
 			auto par = other[0];
 			if (par->getType() == Integer::TYPE) {
@@ -248,35 +232,41 @@ namespace pool {
 				return DecimalClass->newInstance(self->context, location, {}, value - par->as<Decimal>()->value);
 			} else return Null;
 		});
-		natives["Decimal.toString"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		this->addFun("Decimal.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			return StringClass->newInstance(self->context, location, {}, to_string(self->as<Decimal>()->value));
 		});
-		natives["String.+"] = NativeFun::create({{"this"},
-												 {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+	}
+
+	void initializeString() {
+		this->add("String", StringClass);
+		this->addFun("String.length", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			return IntegerClass->newInstance(self->context, location, {}, (signed long long int) self->as<String>()->value.length());
+		});
+		this->addFun("String.+", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			shared_ptr<Object> var = other[0]->as<Object>();
 			if (auto method = var->findMethod("toString")) {
 				auto result = method->execute(var, {}, location);
 				if (result->getType() == String::TYPE) {
-					return StringClass->newInstance(self->context, location, {},
-													self->as<String>()->value + result->as<String>()->value);
+					const auto &value = self->as<String>()->value + result->as<String>()->value;
+					return StringClass->newInstance(self->context, location, {}, value);
 				}
 			}
 			return Null;
 		});
-		natives["String.=="] = NativeFun::create({{"this"},
-												  {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
-			auto value = self->as<String>()->value;
-			auto par = other[0];
-			if (par->getType() == String::TYPE) {
-				return (value == par->as<String>()->value) ? True : False;
-			} else throw compile_error("String.== argument must be a Number", location);
+		this->addFun("String.==", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			if (other[0]->getType() == String::TYPE) {
+				return (self->as<String>()->value == other[0]->as<String>()->value) ? True : False;
+			} else return False;
 		});
-		natives["String.toString"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		this->addFun("String.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			return StringClass->newInstance(self->context, location, {}, self->as<String>()->value);
 		});
-		natives["Fun.classmethod"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &fself, const vector<shared_ptr<Object>> &fother, const pair<Token *, Token *> &flocation) {
-			return NativeFun::create({{"this"},
-									  {"args", true}}, [fself](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+	}
+
+	void initializeFun() {
+		this->add("Fun", FunClass);
+		this->addFun("Fun.classmethod", {{"this"}}, [](const shared_ptr<Object> &fself, const vector<shared_ptr<Object>> &fother, const pair<Token *, Token *> &flocation) {
+			return NativeFun::create({{"this"}, {"args", true}}, [fself](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 				if (self->getType() == Class::TYPE) {
 					return fself->as<Executable>()->execute(self->as<Object>(), other, location);
 				} else {
@@ -284,19 +274,18 @@ namespace pool {
 				}
 			});
 		});
-		natives["Fun.staticmethod"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &fself, const vector<shared_ptr<Object>> &fother, const pair<Token *, Token *> &flocation) {
-			return NativeFun::create({{"this"},
-									  {"args", true}}, [fself](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		this->addFun("Fun.staticmethod", {{"this"}}, [](const shared_ptr<Object> &fself, const vector<shared_ptr<Object>> &fother, const pair<Token *, Token *> &flocation) {
+			return NativeFun::create({{"this"}, {"args", true}}, [fself](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 				if (self->getType() == Class::TYPE) {
-					return fself->as<Executable>()->execute(nullptr, other, location);
+					return fself->as<Executable>()->execute(fself, other, location);
 				} else {
-					return fself->as<Executable>()->execute(nullptr, other, location);
+					return fself->as<Executable>()->execute(fself, other, location);
 				}
 			});
 		});
-		natives["Fun.toString"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		this->addFun("Fun.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			stringstream ss;
-			auto fun = self->as<Executable>();
+			auto fun = self->as<Fun>();
 			ss << "Function@" << fun->id << "(";
 			if (!fun->params.empty()) {
 				for (auto &param : fun->params) {
@@ -308,16 +297,18 @@ namespace pool {
 			ss << ")";
 			return StringClass->newInstance(self->context, location, {}, ss.str());
 		});
-		natives["Array.init"] = NativeFun::create({{"this"},
-												   {"args", true}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+	}
+
+	void initializeArray() {
+		this->add("Array", ArrayClass);
+		this->addFun("Array.init", {{"this"}, {"args", true}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			auto array = self->as<Array>();
 			for (auto &value : other) {
 				array->values.push_back(value->as<Object>());
 			}
 			return Void;
 		});
-		natives["Array.at"] = NativeFun::create({{"this"},
-												 {"index"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		this->addFun("Array.at", {{"this"}, {"index"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			auto arg = other[0];
 			if (arg->getType() == Integer::TYPE) {
 				auto index = arg->as<Integer>()->value;
@@ -327,16 +318,14 @@ namespace pool {
 				} else throw compile_error("Array.at index out of range", location);
 			} else throw compile_error("Array.at argument must be an integer", location);
 		});
-		natives["Array.push"] = NativeFun::create({{"this"},
-												   {"args", true}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		this->addFun("Array.push", {{"this"}, {"args", true}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			auto array = self->as<Array>();
 			for (auto &value : other) {
 				array->values.push_back(value->as<Object>());
 			}
 			return Void;
 		});
-		natives["Array.forEach"] = NativeFun::create({{"this"},
-													  {"action"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		this->addFun("Array.forEach", {{"this"}, {"action"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			if (other[0]->getType() == Fun::TYPE) {
 				auto fun = other[0]->as<Fun>();
 				auto array = self->as<Array>();
@@ -355,7 +344,7 @@ namespace pool {
 				return self;
 			} else throw compile_error("Array.forEach argument must be a Fun", location);
 		});
-		natives["Array.toString"] = NativeFun::create({{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		this->addFun("Array.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			stringstream ss;
 			auto ptr = self->as<Array>();
 			ss << "[";
@@ -375,35 +364,62 @@ namespace pool {
 			ss << "]";
 			return StringClass->newInstance(self->context, location, {}, ss.str());
 		});
-		natives["Block.whileDo"] = NativeFun::create({{"this"},
-													  {"action"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+		this->addFun("Array.length", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			return IntegerClass->newInstance(self->context, location, {}, (signed long long int) self->as<Array>()->values.size());
+		});
+	}
+
+	void initializeBlock() {
+		this->add("Block", BlockClass);
+		this->addFun("Block.whileDo", {{"this"}, {"action"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			if (other[0]->getType() == Block::TYPE) {
 				auto block = other[0]->as<Block>();
 				auto test = self->as<Block>();
-				while (test->execute(test, {}, location)->as<Bool>()->value) { // TODO type check
-					block->execute(block, {}, location);
+				auto testResult = test->execute(location);
+				if (!(testResult->getType() == Bool::TYPE))
+					throw compile_error("this must return a Bool", location);
+				while (testResult->as<Bool>()->value) {
+					block->execute(location);
+					testResult = test->execute(location);
+					if (!(testResult->getType() == Bool::TYPE))
+						throw compile_error("this must return a Bool", location);
 				}
 				return Void;
 			} else throw compile_error("Block.whileDo argument must be a Block", location);
 		});
-		natives["assert"] = NativeFun::create({{"test"},
-											   {"message"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
-			if (!(other[0]->getType() == Bool::TYPE))
-				throw compile_error("assert first argument must be a Bool", location);
-			if (!(other[1]->getType() == String::TYPE))
-				throw compile_error("assert second argument must be a String", location);
-			if (!(other[0]->as<Bool>()->value)) {
-				auto message = other[1]->as<String>()->value;
-				throw compile_error("assert failed: " + message, location);
-			}
-			return Void;
+		this->addFun("Block.doWhile", {{"this"}, {"action"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			if (other[0]->getType() == Block::TYPE) {
+				auto block = other[0]->as<Block>();
+				auto test = self->as<Block>();
+				shared_ptr<Object> testResult;
+				do {
+					block->execute(location);
+					testResult = test->execute(location);
+					if (!(testResult->getType() == Bool::TYPE))
+						throw compile_error("this must return a Bool", location);
+				} while (testResult->as<Bool>()->value);
+				return Void;
+			} else throw compile_error("Block.whileDo argument must be a Block", location);
 		});
 	}
-}
 
-void pool::initialize() {
-	Context::global = Context::create(nullptr);
-	initializeBaseSymbols();
-	initializeContext();
-	initializeNativeSymbols();
+	bool add(const string &name, const shared_ptr<Object> &value) override {
+		return natives.try_emplace(name, value).second;
+	}
+
+	bool addFun(const string &name, const vector<Fun::Param> &parameters, const NativeFun::method_t &code) override {
+		return add(name, NativeFun::create(parameters, code));
+	}
+
+	shared_ptr<Object> find(const string &name) override {
+		const auto &iterator = natives.find(name);
+		if (iterator != natives.end()) {
+			return iterator->second;
+		} else return nullptr;
+	}
+};
+
+Natives &Natives::get() {
+	static NativesImpl instance;
+	return instance;
 }

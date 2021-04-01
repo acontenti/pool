@@ -2,6 +2,7 @@
 #include <filesystem>
 #include "poolstd.hpp"
 #include "pool.hpp"
+#include "parser.hpp"
 #include "PoolLexer.h"
 #include "util/strings.hpp"
 #include "util/errors.hpp"
@@ -11,14 +12,11 @@
 using namespace pool;
 namespace fs = filesystem;
 
-void Pool::initialiaze(const Settings &settings) {
-	debug = settings.debug;
+Pool::Settings Pool::settings;
+
+void Pool::initialiaze(const Settings &_settings) {
+	Pool::settings = _settings;
 	pool::initialize();
-	arguments.push_back(StringClass->newInstance(Context::global, {}, {}, string()));
-	for (const auto &arg : settings.args) {
-		arguments.push_back(StringClass->newInstance(Context::global, {}, {}, arg));
-	}
-	Context::global->set("args", ArrayClass->newInstance(Context::global, {}, arguments));
 }
 
 Pool Pool::execute(const string &module) {
@@ -55,12 +53,18 @@ Pool::Pool(const string &filename, istream &stream) {
 	parser->removeErrorListeners();
 	parser->addErrorListener(ErrorListener::INSTANCE());
 	try {
-		auto tree = parser->program();
+		vector<shared_ptr<Object>> arguments;
+		arguments.push_back(StringClass->newInstance(Context::global, {}, {}, filename));
+		for (const auto &arg : settings.args) {
+			arguments.push_back(StringClass->newInstance(Context::global, {}, {}, arg));
+		}
+		Context::global->set("debug", BoolClass->newInstance(Context::global, {}, {}, settings.debug));
 		const auto &oldArgs = Context::global->find("args");
-		arguments[0] = StringClass->newInstance(Context::global, {}, {}, filename);
 		Context::global->set("args", ArrayClass->newInstance(Context::global, {}, arguments));
-		parseProgram(tree, Context::global);
-		Context::global->set("args", oldArgs);
+		parseProgram(parser->program(), Context::global);
+		if (oldArgs) {
+			Context::global->set("args", oldArgs);
+		}
 		result = true;
 	} catch (const compile_error &error) {
 		cerr << error;

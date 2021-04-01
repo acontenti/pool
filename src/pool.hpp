@@ -7,12 +7,12 @@
 using namespace std;
 
 namespace pool {
-	struct Settings {
-		bool debug;
-		const vector<string> &args;
-	};
 
 	class Pool {
+		static struct Settings {
+			bool debug;
+			vector<string> args;
+		} settings;
 		bool result;
 
 		Pool(const string &filename, istream &stream);
@@ -29,4 +29,6 @@ namespace pool {
 
 		static Pool execute(const string &filename);
 	};
+
+	extern void initialize();
 }
