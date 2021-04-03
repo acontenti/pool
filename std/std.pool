@@ -10,16 +10,18 @@ Class..toString ::= `Class.toString`;
 
 Object ::= `Object`;
 // Object..instanceOf ::= `Object.instanceOf`; TODO
-Object..delete ::= `Object.delete`;
 Object..toString ::= `Object.toString`;
 Object..type ::= `Object.type`;
+Object..print ::= `Object.print`;
 Object..println ::= `Object.println`;
 Object..!= ::= (this, other) : {
 	this.==(other).!();
 };
+Object..get ::= `Object.get`;
+Object..delete ::= `Object.delete`;
+Object..set ::= `Object.set`;
 
 Bool ::= `Bool`;
-Bool..new ::= null;
 Bool..toString ::= `Bool.toString`;
 Bool..! ::= `Bool.!`;
 Bool..|| ::= `Bool.||`;
@@ -27,6 +29,10 @@ Bool..&& ::= `Bool.&&`;
 Bool..== ::= `Bool.==`;
 Bool..then ::= `Bool.then`;
 Bool..thenElse ::= `Bool.thenElse`;
+Bool..new ::= null;
+Bool..get ::= null;
+Bool..delete ::= null;
+Bool..set ::= null;
 
 Array ::= `Array`;
 Array..init ::= `Array.init`;
@@ -35,9 +41,11 @@ Array..forEach ::= `Array.forEach`;
 Array..push ::= `Array.push`;
 Array..toString ::= `Array.toString`;
 Array..length ::= `Array.length`;
+Array..get ::= null;
+Array..delete ::= null;
+Array..set ::= null;
 
 Integer ::= `Integer`;
-Integer..new ::= null;
 Integer..+ ::= `Integer.+`;
 Integer..- ::= `Integer.-`;
 Integer..== ::= `Integer.==`;
@@ -64,9 +72,12 @@ Integer..to ::= (this, end) : {
 Integer..toInclusive ::= (this, end) : {
 	this.to(end.+(1));
 };
+Integer..new ::= null;
+Integer..get ::= null;
+Integer..delete ::= null;
+Integer..set ::= null;
 
 Decimal ::= `Decimal`;
-Decimal..new ::= null;
 Decimal..+ ::= `Decimal.+`;
 Decimal..- ::= `Decimal.-`;
 Decimal..== ::= `Decimal.==`;
@@ -81,13 +92,20 @@ Decimal..>= ::= (this, other) : {
 	this.<(other).!();
 };
 Decimal..toString ::= `Decimal.toString`;
+Decimal..new ::= null;
+Decimal..get ::= null;
+Decimal..delete ::= null;
+Decimal..set ::= null;
 
 String ::= `String`;
-String..new ::= null;
 String..+ ::= `String.+`;
 String..== ::= `String.==`;
 String..toString ::= `String.toString`;
 String..length ::= `String.length`;
+String..new ::= null;
+String..get ::= null;
+String..delete ::= null;
+String..set ::= null;
 
 Block ::= `Block`;
 Block..new ::= null;
@@ -95,21 +113,31 @@ Block..whileDo ::= `Block.whileDo`;
 Block..doWhile ::= `Block.doWhile`;
 
 Fun ::= `Fun`;
-Fun..new ::= null;
 Fun..classmethod ::= `Fun.classmethod`;
 Fun..staticmethod ::= `Fun.staticmethod`;
 Fun..toString ::= `Fun.toString`;
+Fun..new ::= null;
+Fun..get ::= null;
+Fun..delete ::= null;
+Fun..set ::= null;
 
 Void ::= `Void`;
-Void..new ::= null;
 Void..toString ::= (this) : {"void";};
+Void..new ::= null;
+Void..get ::= null;
+Void..delete ::= null;
+Void..set ::= null;
 
 Nothing ::= `Nothing`;
-Nothing..new ::= null;
 Nothing..toString ::= (this) : {"null";};
+Nothing..new ::= null;
+Nothing..delete ::= null;
+Nothing..get ::= null;
+Nothing..set ::= null;
 
 input ::= `input`;
 throw ::= `throw`;
+tryCatch ::= `tryCatch`;
 assert ::= (test, message) : {
 	test.!().then({
 		throw(message);

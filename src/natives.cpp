@@ -34,6 +34,18 @@ struct NativesImpl : public Natives {
 				throw compile_error("throw argument must be a String", location);
 			throw compile_error(other[0]->as<String>()->value, location);
 		});
+		addFun("tryCatch", {{"try"}, {"catch"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			if (!(other[0]->getType() == Block::TYPE))
+				throw compile_error("tryCatch first argument must be a Block", location);
+			if (!(other[1]->getType() == Fun::TYPE))
+				throw compile_error("tryCatch second argument must be a Fun", location);
+			try {
+				return other[0]->as<Block>()->execute(location);
+			} catch (compile_error &error) {
+				const shared_ptr<Fun> &ptr = other[1]->as<Fun>();
+				return ptr->execute(ptr, {StringClass->newInstance(ptr->context, location, {}, string(error.what()))}, location);
+			}
+		});
 		addFun("input", {{"prompt"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) -> shared_ptr<Object> {
 			if (!(other[0]->getType() == String::TYPE))
 				throw compile_error("input argument must be a String", location);
@@ -71,6 +83,16 @@ struct NativesImpl : public Natives {
 		addFun("Object.type", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			return StringClass->newInstance(self->context, location, {}, self->as<Object>()->context->toString());
 		});
+		addFun("Object.print", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			shared_ptr<Object> ptr = self->as<Object>();
+			if (auto method = ptr->findMethod("toString")) {
+				auto result = method->execute(ptr, {}, location);
+				if (result->getType() == String::TYPE) {
+					cout << result->as<String>()->value;
+				}
+			}
+			return Void;
+		});
 		addFun("Object.println", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			shared_ptr<Object> ptr = self->as<Object>();
 			if (auto method = ptr->findMethod("toString")) {
@@ -81,9 +103,31 @@ struct NativesImpl : public Natives {
 			}
 			return Void;
 		});
+		addFun("Object.get", {{"this"}, {"key"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+			if (!(other[0]->getType() == String::TYPE))
+				throw compile_error("Object.get argument must be a String", location);
+			shared_ptr<Object> ptr = self->as<Object>();
+			const auto &key = other[0]->as<String>()->value;
+			if (const auto &var = ptr->findLocal(key)) {
+				return var->getValue();
+			}
+			return Void;
+		});
+		addFun("Object.set", {{"this"}, {"key"}, {"value"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) -> shared_ptr<Object> {
+			if (!(other[0]->getType() == String::TYPE))
+				throw compile_error("Object.set 'key' argument must be a String", location);
+			shared_ptr<Object> ptr = self->as<Object>();
+			const auto &key = other[0]->as<String>()->value;
+			if (const auto &var = ptr->context->findLocal(key)) {
+				if (!var->isImmutable()) {
+					var->setValue(other[1]);
+					return var;
+				} else throw compile_error("Cannot set immutable variable '" + var->name + "'", location);
+			} else return ptr->context->set(key, other[1]);
+		});
 		addFun("Object.delete", {{"this"}, {"key"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
 			if (!(other[0]->getType() == String::TYPE))
-				throw compile_error("input argument must be a String", location);
+				throw compile_error("Object.delete argument must be a String", location);
 			shared_ptr<Object> ptr = self->as<Object>();
 			const auto &key = other[0]->as<String>()->value;
 			if (const auto &var = ptr->findLocal(key)) {

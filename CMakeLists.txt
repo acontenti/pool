@@ -49,13 +49,9 @@ find_package(Threads REQUIRED)
 target_link_libraries(pool Threads::Threads)
 target_link_libraries(pool ${ANTLR4_LIB})
 target_link_libraries(pool cpplocate::cpplocate)
-file(GLOB stdfiles "${CMAKE_CURRENT_SOURCE_DIR}/std/*.pool")
-add_custom_command(
-		TARGET pool POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_directory
-		${CMAKE_SOURCE_DIR}/std/
-		$<TARGET_FILE_DIR:pool>/std
-)
+
+# COPY STD TO BINARY DIR
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/std/std.pool ${CMAKE_CURRENT_BINARY_DIR}/std/std.pool COPYONLY)
 
 # INSTALL
 set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/dist)

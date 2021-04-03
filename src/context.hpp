@@ -25,7 +25,7 @@ namespace pool {
 
 		shared_ptr<Variable> add(const string &name);
 
-		void set(const string &name, const shared_ptr<Object> &value, bool immutable = false);
+		shared_ptr<Variable> set(const string &name, const shared_ptr<Object> &value, bool immutable = false);
 
 		void remove(const string &name);
 

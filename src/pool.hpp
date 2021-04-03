@@ -30,5 +30,5 @@ namespace pool {
 		static Pool execute(const string &filename);
 	};
 
-	extern void initialize();
+	extern void initializeStdLib();
 }

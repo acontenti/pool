@@ -238,6 +238,16 @@ shared_ptr<Callable> pool::parseCall(PoolParser::CallContext *ast, const shared_
 				return Access::create({ast->start, ast->stop}, caller, id);
 			}
 		}
+		case PoolParser::CallContext::ILA: {
+			auto caller = parseCall(ast->callee, context);
+			auto id = getId(ast->ID());
+			if (ast->a) {
+				auto args = parseArgs(ast->a, context);
+				return InvocationLocalAccess::create({ast->start, ast->stop}, ast->ID()->getSymbol(), caller, id, args);
+			} else {
+				return LocalAccess::create({ast->start, ast->stop}, caller, id);
+			}
+		}
 		default:
 			throw compile_error("invalid call", {ast->start, ast->stop});
 	}

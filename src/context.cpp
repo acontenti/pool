@@ -27,11 +27,12 @@ shared_ptr<Variable> Context::add(const string &name) {
 	return heap.try_emplace(name, variable).first->second;
 }
 
-void Context::set(const string &name, const shared_ptr<Object> &value, bool immutable) {
+shared_ptr<Variable> Context::set(const string &name, const shared_ptr<Object> &value, bool immutable) {
 	if (const auto &var = this->findLocal(name)) {
-		var->as<Variable>()->setValue(value->as<Object>());
+		var->setValue(value->as<Object>());
+		return var;
 	} else {
-		heap[name] = make_shared<Variable>(Context::create(shared_from_this()), name, value->as<Object>(), immutable);
+		return heap[name] = make_shared<Variable>(Context::create(shared_from_this()), name, value->as<Object>(), immutable);
 	}
 }
 

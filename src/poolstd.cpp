@@ -294,7 +294,7 @@ void initializeContext() {
 	}));
 }
 
-void initializeBaseSymbols() {
+void initializeBaseObjects() {
 	ClassClass = make_shared<Class>(Context::create(Context::global), Class::CREATOR, string(Class::TYPE), shared_ptr<Class>(nullptr))->as<Class>(); // ObjectClass is not yet created, so we pass nullptr as super
 	ObjectClass = ClassClass->newInstance(Context::global, {}, {}, static_cast<Class::creator_t>(Object::CREATOR), string(Object::TYPE), shared_ptr<Class>(nullptr))->as<Class>(); // ObjectClass is the base class, so it has no super
 	ClassClass->super = ObjectClass; // Now ObjectClass exists, so we can assign it to ClassClass->super
@@ -313,7 +313,7 @@ void initializeBaseSymbols() {
 	False = BoolClass->newInstance(Context::global, {}, {}, false)->as<Bool>();
 }
 
-void pool::initialize() {
+void pool::initializeStdLib() {
 	initializeContext();
-	initializeBaseSymbols();
+	initializeBaseObjects();
 }

@@ -1,6 +1,8 @@
 #include "poolstd.hpp"
 #include "pool.hpp"
 #include "util/errors.hpp"
+#include "callable.hpp"
+
 
 using namespace pool;
 
@@ -38,16 +40,44 @@ shared_ptr<Object> InvocationAccess::invoke() {
 	} else throw compile_error(Null->toString() + " is not executable", idToken, idToken);
 }
 
+shared_ptr<Object> InvocationLocalAccess::invoke() {
+	const auto &selfPtr = caller->invoke();
+	auto access = selfPtr->findLocal(id);
+	if (access) {
+		const auto &ptr = access->as<Object>();
+		if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
+			const auto &values = args->invoke();
+			return executable->execute(selfPtr, values, location);
+		} else throw compile_error(ptr->toString() + " is not executable", idToken, idToken);
+	} else throw compile_error(Null->toString() + " is not executable", idToken, idToken);
+}
+
 shared_ptr<Object> Access::invoke() {
 	auto ptr = caller->invoke();
 	auto result = ptr->find(id);
-	return result ? result : ptr->as<Object>()->context->add(id);
+	if (result) {
+		return result;
+	} else if (auto set = ptr->find("set")) {
+		if (auto exe = dynamic_pointer_cast<Executable>(set->as<Object>())) {
+			return exe->execute(ptr, {StringClass->newInstance(ptr->context, location, {}, id), Null}, location);
+		} else throw compile_error("Cannot call method 'set' on '" + ptr->toString() + "'", location);
+	} else {
+		return ptr->as<Object>()->context->add(id);
+	}
 }
 
 shared_ptr<Object> LocalAccess::invoke() {
 	auto ptr = caller->invoke();
 	auto result = ptr->findLocal(id);
-	return result ? result : ptr->as<Object>()->context->add(id);
+	if (result) {
+		return result;
+	} else if (auto set = ptr->find("set")) {
+		if (auto exe = dynamic_pointer_cast<Executable>(set->as<Object>())) {
+			return exe->execute(ptr, {StringClass->newInstance(ptr->context, location, {}, id), Null}, location);
+		} else throw compile_error("Cannot call method 'set' on '" + ptr->toString() + "'", location);
+	} else {
+		return ptr->as<Object>()->context->add(id);
+	}
 }
 
 shared_ptr<Object> Identity::invoke() {

@@ -16,7 +16,7 @@ Pool::Settings Pool::settings;
 
 void Pool::initialiaze(const Settings &_settings) {
 	Pool::settings = _settings;
-	pool::initialize();
+	pool::initializeStdLib();
 }
 
 Pool Pool::execute(const string &module) {

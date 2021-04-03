@@ -126,7 +126,7 @@ public:
 
   class  CallContext : public antlr4::ParserRuleContext {
   public:
-    enum Type {IA,A,T} type;
+    enum Type {IA,ILA,A,T} type;
     PoolParser::CallContext *callee = nullptr;
     PoolParser::ArgsContext *a = nullptr;
     CallContext(antlr4::ParserRuleContext *parent, size_t invokingState);
@@ -136,6 +136,7 @@ public:
     antlr4::tree::TerminalNode *ID();
     CallContext *call();
     ArgsContext *args();
+    antlr4::tree::TerminalNode *DOTDOT();
 
    
   };

@@ -22,6 +22,7 @@ namespace pool {
 	};
 
 	class Access : public Callable {
+	protected:
 		shared_ptr<Callable> caller;
 		string id;
 	public:
@@ -36,13 +37,11 @@ namespace pool {
 		}
 	};
 
-	class LocalAccess : public Callable {
-		shared_ptr<Callable> caller;
-		string id;
+	class LocalAccess : public Access {
 	public:
 
-		LocalAccess(const pair<Token *, Token *> &location, shared_ptr<Callable> caller, string id)
-				: Callable(location), caller(move(caller)), id(move(id)) {}
+		LocalAccess(const pair<Token *, Token *> &location, const shared_ptr<Callable> &caller, const string &id)
+				: Access(location, caller, id) {}
 
 		shared_ptr<Object> invoke() override;
 
@@ -77,6 +76,7 @@ namespace pool {
 	};
 
 	class Invocation : public Callable {
+	protected:
 		shared_ptr<Callable> caller;
 		shared_ptr<Args> args;
 	public:
@@ -91,20 +91,31 @@ namespace pool {
 		}
 	};
 
-	class InvocationAccess : public Callable {
-		shared_ptr<Callable> caller;
+	class InvocationAccess : public Invocation {
+	protected:
 		string id;
-		shared_ptr<Args> args;
 		Token *const idToken;
 	public:
 
 		InvocationAccess(const pair<Token *, Token *> &location, Token *idToken, const shared_ptr<Callable> &caller, string id, const shared_ptr<Args> &args)
-				: Callable(location), idToken(idToken), caller(caller), id(move(id)), args(args) {}
+				: Invocation(location, caller, args), idToken(idToken), id(move(id)) {}
 
 		shared_ptr<Object> invoke() override;
 
 		static shared_ptr<InvocationAccess> create(const pair<Token *, Token *> &location, Token *idToken, const shared_ptr<Callable> &caller, const string &id, const shared_ptr<Args> &args) {
 			return make_shared<InvocationAccess>(location, idToken, caller, id, args);
+		}
+	};
+
+	class InvocationLocalAccess : public InvocationAccess {
+	public:
+		InvocationLocalAccess(const pair<Token *, Token *> &location, Token *idToken, const shared_ptr<Callable> &caller, const string &id, const shared_ptr<Args> &args)
+				: InvocationAccess(location, idToken, caller, id, args) {}
+
+		shared_ptr<Object> invoke() override;
+
+		static shared_ptr<InvocationLocalAccess> create(const pair<Token *, Token *> &location, Token *idToken, const shared_ptr<Callable> &caller, const string &id, const shared_ptr<Args> &args) {
+			return make_shared<InvocationLocalAccess>(location, idToken, caller, id, args);
 		}
 	};
 

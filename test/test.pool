@@ -6,7 +6,7 @@ f := (x) : {
 f("x");
 
 a := Array.new(0, 1, 2, 3);
-b := 1.+(a.size);
+b := 1.+(a.length());
 b.println();
 
 fun := (x) : {x;};
@@ -29,10 +29,10 @@ empty := {};
 empty().println();
 {}().println();
 fun.println();
-fun.b.println();
+//fun.b.println();
 res := fun(100, 100);
 fun.println();
-fun.b.println();
+//fun.b.println();
 res.println();
 z.println();
 z.b.println();
@@ -96,19 +96,24 @@ n.yes("me");
 Test.maybe("you");
 n.maybe("me");
 "prop test: ".+(Test.type()).println();
-z.c.d.e.println();
+//z.c.d.e.println();
 (x := true.!()).println();
-abc := {a := x;}();
+abc := {a := x.!();}();
 abc.println();
 x := 1;
 b := {
 	x := x.+(123);
-	a := {f := x;};
-	a();
-	;
+	x.println();
+	aaaa := {ffff := x.+(124);};
+	aaaa();
+	this.println();
 };
 b();
-b.a.f.println();
+aaaa.println();
+b.type().println();
+b.println();
+b..aaaa.println();
+b.aaaa.ffff.println();
 
 Array.new(0,1,2,3,4,5,6,8,9).forEach((it) : {
 	"i: ".+(it).println();
@@ -160,7 +165,9 @@ import("mod/mod");
 import("mod2");
 
 q.println();
-q.q:=123;
-q.q.println();
-null.q.println();
-qqqq.q.println();
+tryCatch({
+	qqqq.qqqq := 0;
+}, (error) : {
+	"Correctly caught error witn 'tryCatch': ".print();
+	error.println();
+});
