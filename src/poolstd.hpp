@@ -4,6 +4,7 @@
 #include <any>
 #include "callable.hpp"
 #include "context.hpp"
+#include "parser.hpp"
 
 using namespace std;
 
@@ -70,6 +71,8 @@ namespace pool {
 		virtual bool isVariable() const;
 
 		void remove(const string &name);
+
+		bool instanceOf(const shared_ptr<Class> &_class);
 	};
 
 	class Class : public Object {
@@ -91,9 +94,13 @@ namespace pool {
 
 		shared_ptr<Variable> findInClass(const string &id) const;
 
-		shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const pair<Token *, Token *> &location, const vector<shared_ptr<Object>> &other = {}, const any &a1 = nullptr, const any &a2 = nullptr, const any &a3 = nullptr, bool createContext = true) const;
+		shared_ptr<Object> newInstance(const shared_ptr<Context> &parent, const Location &location, const vector<shared_ptr<Object>> &other = {}, const any &a1 = nullptr, const any &a2 = nullptr, const any &a3 = nullptr) const;
 
-		shared_ptr<Class> extend(const creator_t &creator, const string &className, const shared_ptr<Block> &other, const pair<Token *, Token *> &location) const;
+		shared_ptr<Class> extend(const creator_t &creator, const string &className, const shared_ptr<Block> &other, const Location &location) const;
+
+		bool subclassOf(const shared_ptr<Class> &_class) const;
+
+		bool superclassOf(const shared_ptr<Class> &_class) const;
 	};
 
 	class Variable : public Object {
@@ -146,6 +153,10 @@ namespace pool {
 		};
 
 		Integer(const shared_ptr<Context> &context, long long int value);
+
+		static shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const Location &location, const long long int &value) {
+			return IntegerClass->newInstance(context, location, {}, value);
+		}
 	};
 
 	class Decimal : public Object {
@@ -157,6 +168,10 @@ namespace pool {
 		};
 
 		Decimal(const shared_ptr<Context> &context, long double value);
+
+		static shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const Location &location, const long double &value) {
+			return DecimalClass->newInstance(context, location, {}, value);
+		}
 	};
 
 	class String : public Object {
@@ -168,16 +183,20 @@ namespace pool {
 		};
 
 		String(const shared_ptr<Context> &context, string value);
+
+		static shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const Location &location, const string &value) {
+			return StringClass->newInstance(context, location, {}, value);
+		}
 	};
 
 	class Executable : public Object {
 	public:
 		Executable(const shared_ptr<Context> &context, const shared_ptr<Class> &cls);
 
-		virtual shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) = 0;
+		virtual shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) = 0;
 	};
 
-	class Fun : public Executable {
+	class Function : public Executable {
 	public:
 		struct Param {
 			string id;
@@ -187,42 +206,58 @@ namespace pool {
 		};
 
 		vector<Param> params;
-		vector<shared_ptr<Callable>> calls;
+
+		Function(const shared_ptr<Context> &context, const vector<Param> &params);
+
 		constexpr static const string_view TYPE = "Fun";
-		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &_params, const any &_calls, const any &) {
-			return make_shared<Fun>(context, any_cast<vector<Param>>(_params), any_cast<vector<shared_ptr<Callable>>>(_calls));
-		};
-
-		Fun(const shared_ptr<Context> &context, const vector<Param> &params, vector<shared_ptr<Callable>> calls);
-
-		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) override;
 	};
 
-	class NativeFun : public Fun {
+	class Fun : public Function {
+		vector<PoolParser::StatementContext *> calls;
 	public:
-		using method_t = function<shared_ptr<Object>(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location)>;
-		method_t code;
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &_params, const any &_calls, const any &) {
+			return make_shared<Fun>(context, any_cast<vector<Param>>(_params), any_cast<vector<PoolParser::StatementContext *>>(_calls));
+		};
 
+		Fun(const shared_ptr<Context> &context, const vector<Param> &params, vector<PoolParser::StatementContext *> calls);
+
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) override;
+
+		static shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const Location &location, const vector<Param> &params, const vector<PoolParser::StatementContext *> &calls) {
+			return FunClass->newInstance(context, location, {}, params, calls);
+		}
+	};
+
+	class NativeFun : public Function {
+	public:
+		using method_t = function<shared_ptr<Object>(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location)>;
+	private:
+		method_t code;
+	public:
 		NativeFun(const shared_ptr<Context> &context, const vector<Param> &params, method_t code);
 
-		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) override;
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) override;
 
-		static shared_ptr<NativeFun> create(const vector<Param> &params, const method_t &code);
+		static shared_ptr<NativeFun> newInstance(const vector<Param> &params, const method_t &code);
 	};
 
 	class Block : public Executable {
 	public:
-		vector<shared_ptr<Callable>> calls;
+		vector<PoolParser::StatementContext *> calls;
 		constexpr static const string_view TYPE = "Block";
 		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &_calls, const any &, const any &) {
-			return make_shared<Block>(context, any_cast<vector<shared_ptr<Callable>>>(_calls));
+			return make_shared<Block>(context, any_cast<vector<PoolParser::StatementContext *>>(_calls));
 		};
 
-		Block(const shared_ptr<Context> &context, vector<shared_ptr<Callable>> calls);
+		Block(const shared_ptr<Context> &context, vector<PoolParser::StatementContext *> calls);
 
-		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) override;
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) override;
 
-		shared_ptr<Object> execute(const pair<Token *, Token *> &location);
+		shared_ptr<Object> execute(const Location &location);
+
+		static shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const Location &location, const vector<PoolParser::StatementContext *> &calls) {
+			return BlockClass->newInstance(context, location, {}, calls);
+		}
 	};
 
 	class Array : public Object {

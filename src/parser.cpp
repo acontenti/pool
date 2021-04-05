@@ -6,6 +6,8 @@
 
 using namespace pool;
 
+shared_ptr<Callable> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context);
+
 string getId(tree::TerminalNode *ast) {
 	return ast->getText();
 }
@@ -57,26 +59,12 @@ shared_ptr<Callable> parseAssignment(PoolParser::AssignmentContext *ast, const s
 	}
 }
 
-shared_ptr<Callable> parseExpression(PoolParser::ExpressionContext *ast, const shared_ptr<Context> &context) {
+shared_ptr<Callable> pool::parseExpression(PoolParser::ExpressionContext *ast, const shared_ptr<Context> &context) {
 	if (ast->a) {
 		return parseAssignment(ast->a, context);
 	} else if (ast->c) {
 		return parseCall(ast->c, context);
 	} else throw compile_error("invalid expression", {ast->start, ast->stop});
-}
-
-vector<shared_ptr<Callable>> parseStatements(const vector<PoolParser::StatementContext *> &statements, const shared_ptr<Context> &context) {
-	vector<shared_ptr<Callable>> result;
-	result.reserve(statements.size());
-	for (auto ast : statements) {
-		auto exp = ast->expression();
-		if (exp) {
-			result.emplace_back(parseExpression(exp, context));
-		} else {
-			result.emplace_back(Identity::create({ast->start, ast->stop}, Void));
-		}
-	}
-	return result;
 }
 
 shared_ptr<Callable> parsePar(PoolParser::ParContext *ast, const shared_ptr<Context> &context) {
@@ -90,44 +78,44 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 			Token *token = ast->DECIMAL_INTEGER_LITERAL()->getSymbol();
 			try {
 				auto value = stoll(token->getText());
-				return IntegerClass->newInstance(context, {token, token}, {}, value);
+				return Integer::newInstance(context, {token, token}, value);
 			} catch (const invalid_argument &ex) {
-				throw compile_error(ex.what(), token, token);
+				throw compile_error(ex.what(), {token, token});
 			} catch (const out_of_range &ex) {
-				throw compile_error(ex.what(), token, token);
+				throw compile_error(ex.what(), {token, token});
 			}
 		}
 		case PoolParser::NumContext::HEX: {
 			Token *token = ast->HEX_INTEGER_LITERAL()->getSymbol();
 			try {
 				auto value = stoll(token->getText().substr(2), nullptr, 16);
-				return IntegerClass->newInstance(context, {token, token}, {}, value);
+				return Integer::newInstance(context, {token, token}, value);
 			} catch (const invalid_argument &ex) {
-				throw compile_error(ex.what(), token, token);
+				throw compile_error(ex.what(), {token, token});
 			} catch (const out_of_range &ex) {
-				throw compile_error(ex.what(), token, token);
+				throw compile_error(ex.what(), {token, token});
 			}
 		}
 		case PoolParser::NumContext::BIN: {
 			Token *token = ast->BIN_INTEGER_LITERAL()->getSymbol();
 			try {
 				auto value = stoll(token->getText().substr(2), nullptr, 2);
-				return IntegerClass->newInstance(context, {token, token}, {}, value);
+				return Integer::newInstance(context, {token, token}, value);
 			} catch (const invalid_argument &ex) {
-				throw compile_error(ex.what(), token, token);
+				throw compile_error(ex.what(), {token, token});
 			} catch (const out_of_range &ex) {
-				throw compile_error(ex.what(), token, token);
+				throw compile_error(ex.what(), {token, token});
 			}
 		}
 		case PoolParser::NumContext::FLT: {
 			Token *token = ast->FLOAT_LITERAL()->getSymbol();
 			try {
 				auto value = stod(token->getText());
-				return DecimalClass->newInstance(context, {token, token}, {}, value);
+				return Decimal::newInstance(context, {token, token}, value);
 			} catch (const invalid_argument &ex) {
-				throw compile_error(ex.what(), token, token);
+				throw compile_error(ex.what(), {token, token});
 			} catch (const out_of_range &ex) {
-				throw compile_error(ex.what(), token, token);
+				throw compile_error(ex.what(), {token, token});
 			}
 		}
 		default:
@@ -138,12 +126,11 @@ shared_ptr<Object> parseNum(PoolParser::NumContext *ast, const shared_ptr<Contex
 shared_ptr<Object> parseString(PoolParser::StringContext *ast, const shared_ptr<Context> &context) {
 	auto value = ast->STRING_LITERAL()->getText();
 	value = unescapeString(value.substr(1, value.size() - 2));
-	return StringClass->newInstance(context, {ast->start, ast->stop}, {}, value);
+	return String::newInstance(context, {ast->start, ast->stop}, value);
 }
 
 shared_ptr<Object> parseBlock(PoolParser::BlockContext *ast, const shared_ptr<Context> &parent) {
-	auto context = Context::create(parent);
-	return BlockClass->newInstance(context, {ast->start, ast->stop}, {}, parseStatements(ast->statement(), context), nullptr, nullptr, false);
+	return Block::newInstance(parent, {ast->start, ast->stop}, ast->statement());
 }
 
 shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<Context> &parent) {
@@ -155,13 +142,13 @@ shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<C
 		auto find = find_if(params.begin(), params.end(), [id](const Fun::Param &p) { return p.id == id; });
 		if (find != params.end()) {
 			auto idToken = (*param)->ID()->getSymbol();
-			throw compile_error("Duplicate parameter '" + id + "'", idToken, idToken);
+			throw compile_error("Duplicate parameter '" + id + "'", {idToken, idToken});
 		}
 		if ((*param)->DOTS()) {
 			if (next(param) != paramsAst.end()) {
 				auto idToken = (*param)->ID()->getSymbol();
-				throw compile_error("Variadic parameter '" + id +
-									"' must be the last parameter in the function definition", idToken, idToken);
+				throw compile_error("Rest parameter '" + id +
+									"' must be the last parameter in the function definition", {idToken, idToken});
 			} else {
 				params.emplace_back(id, true);
 			}
@@ -169,18 +156,14 @@ shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<C
 			params.emplace_back(id, false);
 		}
 	}
-	auto context = Context::create(parent);
-	for (auto &param : params) {
-		context->add(param.id);
-	}
-	return FunClass->newInstance(context, {ast->start, ast->stop}, {}, params, parseStatements(ast->statement(), context), nullptr, false);
+	return Fun::newInstance(parent, {ast->start, ast->stop}, params, ast->statement());
 }
 
 shared_ptr<Callable> parseNative(tree::TerminalNode *ast, const shared_ptr<Context> &context) {
 	auto id = ast->getText().substr(1, ast->getText().length() - 2);
 	if (auto value = Natives::get().find(id)) {
 		return Identity::create({ast->getSymbol(), ast->getSymbol()}, value);
-	} else throw compile_error("Native symbol not found", ast->getSymbol(), ast->getSymbol());
+	} else throw compile_error("Native symbol not found", {ast->getSymbol(), ast->getSymbol()});
 }
 
 shared_ptr<Callable> parseTerm(PoolParser::TermContext *ast, const shared_ptr<Context> &context) {
@@ -206,19 +189,18 @@ shared_ptr<Callable> parseTerm(PoolParser::TermContext *ast, const shared_ptr<Co
 
 shared_ptr<Args> parseArgs(PoolParser::ArgsContext *ast, const shared_ptr<Context> &context) {
 	auto argsAst = ast->arg();
-	vector<shared_ptr<Callable>> args;
-	shared_ptr<Expansion> rest = nullptr;
+	vector<Args::arg_t> args;
 	args.reserve(argsAst.size());
 	for (auto arg : argsAst) {
 		auto ptr = parseCall(arg->call(), context);
 		if (arg->DOTS()) {
-			rest = Expansion::create(ptr);
+			args.emplace_back(Expansion::create(ptr));
 		} else args.emplace_back(ptr);
 	}
-	return Args::create(args, rest);
+	return Args::create(args);
 }
 
-shared_ptr<Callable> pool::parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context) {
+shared_ptr<Callable> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context) {
 	switch (ast->type) {
 		case PoolParser::CallContext::T: {
 			return parseTerm(ast->term(), context);

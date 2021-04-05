@@ -164,10 +164,10 @@ assert(0.==(iftest), "iftest should be equal to 0");
 import("mod/mod");
 import("mod2");
 
-q.println();
+qqqq.println();
 tryCatch({
 	qqqq.qqqq := 0;
 }, (error) : {
-	"Correctly caught error witn 'tryCatch': ".print();
+	"Correctly caught error with 'tryCatch': ".print();
 	error.println();
 });

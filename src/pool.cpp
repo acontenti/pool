@@ -1,5 +1,6 @@
 #include <iostream>
 #include <filesystem>
+#include <memory>
 #include "poolstd.hpp"
 #include "pool.hpp"
 #include "parser.hpp"
@@ -12,14 +13,54 @@
 using namespace pool;
 namespace fs = filesystem;
 
-Pool::Settings Pool::settings;
+PoolVM::Settings PoolVM::settings;
+vector<shared_ptr<PoolVM::PoolInstance>> PoolVM::instances;
 
-void Pool::initialiaze(const Settings &_settings) {
-	Pool::settings = _settings;
-	pool::initializeStdLib();
+class PoolVM::PoolInstance {
+public:
+	unique_ptr<ANTLRInputStream> inputStream;
+	unique_ptr<PoolLexer> lexer;
+	unique_ptr<CommonTokenStream> tokens;
+	unique_ptr<PoolParser> parser;
+	bool result;
+
+	PoolInstance(const string &filename, istream &stream) {
+		inputStream = make_unique<ANTLRInputStream>(stream);
+		inputStream->name = filename;
+		lexer = make_unique<PoolLexer>(inputStream.get());
+		lexer->removeErrorListeners();
+		lexer->addErrorListener(ErrorListener::INSTANCE());
+		tokens = make_unique<CommonTokenStream>(lexer.get());
+		parser = make_unique<PoolParser>(tokens.get());
+		parser->removeErrorListeners();
+		parser->addErrorListener(ErrorListener::INSTANCE());
+		try {
+			vector<shared_ptr<Object>> arguments;
+			arguments.push_back(String::newInstance(Context::global, Location::UNKNOWN, filename));
+			for (const auto &arg : settings.args) {
+				arguments.push_back(String::newInstance(Context::global, Location::UNKNOWN, arg));
+			}
+			Context::global->set("debug", settings.debug ? True : False);
+			const auto &oldArgs = Context::global->find("args");
+			Context::global->set("args", ArrayClass->newInstance(Context::global, Location::UNKNOWN, arguments));
+			parseProgram(parser->program(), Context::global);
+			if (oldArgs) {
+				Context::global->set("args", oldArgs);
+			}
+			result = true;
+		} catch (const compile_error &error) {
+			cerr << error;
+			result = false;
+		}
+	}
+};
+
+void PoolVM::initialiaze(const Settings &_settings) {
+	PoolVM::settings = _settings;
+	initializeStdLib();
 }
 
-Pool Pool::execute(const string &module) {
+bool PoolVM::execute(const string &module) {
 	string filename = module;
 	if (startsWith(module, ":")) {
 		filename = (fs::path(cpplocate::getModulePath()) / "std" / module.substr(1)).string();
@@ -34,40 +75,11 @@ Pool Pool::execute(const string &module) {
 				ifstream is(file);
 				auto cwd = fs::current_path();
 				fs::current_path(file.parent_path());
-				const Pool &pool = Pool(file.string(), is);
+				const auto &pool = make_shared<PoolInstance>(file.string(), is);
+				instances.emplace_back(pool);
 				fs::current_path(cwd);
-				return pool;
+				return pool->result;
 			} else throw runtime_error("File '" + file.string() + "' is not readable");
 		} else throw runtime_error("File '" + file.string() + "' is not a regular file");
 	} else throw runtime_error("File '" + file.string() + "' not found");
-}
-
-Pool::Pool(const string &filename, istream &stream) {
-	auto inputStream = make_unique<ANTLRInputStream>(stream);
-	inputStream->name = filename;
-	auto lexer = make_unique<PoolLexer>(inputStream.get());
-	lexer->removeErrorListeners();
-	lexer->addErrorListener(ErrorListener::INSTANCE());
-	auto tokens = make_unique<CommonTokenStream>(lexer.get());
-	auto parser = make_unique<PoolParser>(tokens.get());
-	parser->removeErrorListeners();
-	parser->addErrorListener(ErrorListener::INSTANCE());
-	try {
-		vector<shared_ptr<Object>> arguments;
-		arguments.push_back(StringClass->newInstance(Context::global, {}, {}, filename));
-		for (const auto &arg : settings.args) {
-			arguments.push_back(StringClass->newInstance(Context::global, {}, {}, arg));
-		}
-		Context::global->set("debug", BoolClass->newInstance(Context::global, {}, {}, settings.debug));
-		const auto &oldArgs = Context::global->find("args");
-		Context::global->set("args", ArrayClass->newInstance(Context::global, {}, arguments));
-		parseProgram(parser->program(), Context::global);
-		if (oldArgs) {
-			Context::global->set("args", oldArgs);
-		}
-		result = true;
-	} catch (const compile_error &error) {
-		cerr << error;
-		result = false;
-	}
 }

@@ -12,7 +12,7 @@ vtest := (a1, b1, ...c): {
 vtest(1, 2);
 vtest(1, 2, 3, 4, 5, 6);
 vargs := Array.new(2, 3, 4, 5, 6, 7, 8);
-vtest(...vargs);
+vtest(100, 200, ...vargs, 3000);
 vtest(...Array.new(0, 1, 2));
 vtest2 := (a1, b1): {
 	a1.-(b1).println();

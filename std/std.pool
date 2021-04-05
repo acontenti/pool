@@ -7,15 +7,17 @@ Class ::= `Class`;
 Class..extend ::= `Class.extend`;
 Class..new ::= `Class.new`;
 Class..toString ::= `Class.toString`;
+Class.subclassOf ::= `Class.subclassOf`;
+Class.superclassOf ::= `Class.superclassOf`;
 
 Object ::= `Object`;
-// Object..instanceOf ::= `Object.instanceOf`; TODO
+Object..instanceOf ::= `Object.instanceOf`;
 Object..toString ::= `Object.toString`;
 Object..type ::= `Object.type`;
 Object..print ::= `Object.print`;
 Object..println ::= `Object.println`;
 Object..!= ::= (this, other) : {
-	this.==(other).!();
+    this.==(other).!();
 };
 Object..get ::= `Object.get`;
 Object..delete ::= `Object.delete`;
@@ -24,8 +26,11 @@ Object..set ::= `Object.set`;
 Bool ::= `Bool`;
 Bool..toString ::= `Bool.toString`;
 Bool..! ::= `Bool.!`;
+Bool..not ::= `Bool.!`;
 Bool..|| ::= `Bool.||`;
 Bool..&& ::= `Bool.&&`;
+Bool..or ::= `Bool.||`;
+Bool..and ::= `Bool.&&`;
 Bool..== ::= `Bool.==`;
 Bool..then ::= `Bool.then`;
 Bool..thenElse ::= `Bool.thenElse`;
@@ -51,26 +56,29 @@ Integer..- ::= `Integer.-`;
 Integer..== ::= `Integer.==`;
 Integer..< ::= `Integer.<`;
 Integer..<= ::= (this, other) : {
-	this.<(other).||(this.==(other)).!();
+    this.<(other).||(this.==(other)).!();
 };
 Integer..> ::= (this, other) : {
-	this.<=(other).!();
+    this.<=(other).!();
 };
 Integer..>= ::= (this, other) : {
-	this.<(other).!();
+    this.<(other).!();
 };
 Integer..toString ::= `Integer.toString`;
 Integer..to ::= (this, end) : {
-	i := this;
-	array := Array.new();
-	{i.<(end);}.whileDo({
-		array.push(i);
-		i := i.+(1);
-	});
-	array;
+    end.instanceOf(Integer).!().then({
+        throw("Integer.to argument must be a Integer");
+    });
+    i := this;
+    array := Array.new();
+    {i.<(end);}.whileDo({
+        array.push(i);
+        i := i.+(1);
+    });
+    array;
 };
 Integer..toInclusive ::= (this, end) : {
-	this.to(end.+(1));
+    this.to(end.+(1));
 };
 Integer..new ::= null;
 Integer..get ::= null;
@@ -83,13 +91,13 @@ Decimal..- ::= `Decimal.-`;
 Decimal..== ::= `Decimal.==`;
 Decimal..< ::= `Decimal.<`;
 Decimal..<= ::= (this, other) : {
-	this.<(other).||(this.==(other)).!();
+    this.<(other).||(this.==(other)).!();
 };
 Decimal..> ::= (this, other) : {
-	this.<=(other).!();
+    this.<=(other).!();
 };
 Decimal..>= ::= (this, other) : {
-	this.<(other).!();
+    this.<(other).!();
 };
 Decimal..toString ::= `Decimal.toString`;
 Decimal..new ::= null;
@@ -139,7 +147,7 @@ input ::= `input`;
 throw ::= `throw`;
 tryCatch ::= `tryCatch`;
 assert ::= (test, message) : {
-	test.!().then({
-		throw(message);
-	});
+    test.!().then({
+        throw(message);
+    });
 };

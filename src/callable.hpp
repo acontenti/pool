@@ -2,21 +2,19 @@
 
 #include <utility>
 #include <vector>
+#include <variant>
 #include <string>
 #include <memory>
-#include "Token.h"
-
-using namespace std;
-using namespace antlr4;
+#include "util/location.hpp"
 
 namespace pool {
 	class Object;
 
 	class Callable {
 	public:
-		const pair<Token *, Token *> location;
+		Location location;
 
-		explicit Callable(const pair<Token *, Token *> &location) : location(location) {}
+		explicit Callable(Location location) : location(move(location)) {}
 
 		virtual shared_ptr<Object> invoke() = 0;
 	};
@@ -27,12 +25,12 @@ namespace pool {
 		string id;
 	public:
 
-		Access(const pair<Token *, Token *> &location, shared_ptr<Callable> caller, string id)
+		Access(const Location &location, shared_ptr<Callable> caller, string id)
 				: Callable(location), caller(move(caller)), id(move(id)) {}
 
 		shared_ptr<Object> invoke() override;
 
-		static shared_ptr<Access> create(const pair<Token *, Token *> &location, const shared_ptr<Callable> &caller, const string &id) {
+		static shared_ptr<Access> create(const Location &location, const shared_ptr<Callable> &caller, const string &id) {
 			return make_shared<Access>(location, caller, id);
 		}
 	};
@@ -40,12 +38,12 @@ namespace pool {
 	class LocalAccess : public Access {
 	public:
 
-		LocalAccess(const pair<Token *, Token *> &location, const shared_ptr<Callable> &caller, const string &id)
+		LocalAccess(const Location &location, const shared_ptr<Callable> &caller, const string &id)
 				: Access(location, caller, id) {}
 
 		shared_ptr<Object> invoke() override;
 
-		static shared_ptr<LocalAccess> create(const pair<Token *, Token *> &location, const shared_ptr<Callable> &caller, const string &id) {
+		static shared_ptr<LocalAccess> create(const Location &location, const shared_ptr<Callable> &caller, const string &id) {
 			return make_shared<LocalAccess>(location, caller, id);
 		}
 	};
@@ -63,15 +61,17 @@ namespace pool {
 	};
 
 	class Args {
-		vector<shared_ptr<Callable>> args;
-		shared_ptr<Expansion> rest;
 	public:
-		Args(const vector<shared_ptr<Callable>> &args, const shared_ptr<Expansion> &rest) : args(args), rest(rest) {}
+		using arg_t = variant<shared_ptr<Callable>, shared_ptr<Expansion>>;
+	private:
+		vector<arg_t> args;
+	public:
+		explicit Args(const vector<arg_t> &args) : args(args) {}
 
 		vector<shared_ptr<Object>> invoke();
 
-		static shared_ptr<Args> create(const vector<shared_ptr<Callable>> &args, const shared_ptr<Expansion> &rest) {
-			return make_shared<Args>(args, rest);
+		static shared_ptr<Args> create(const vector<arg_t> &args) {
+			return make_shared<Args>(args);
 		}
 	};
 
@@ -81,40 +81,42 @@ namespace pool {
 		shared_ptr<Args> args;
 	public:
 
-		Invocation(const pair<Token *, Token *> &location, const shared_ptr<Callable> &caller, const shared_ptr<Args> &args)
+		Invocation(const Location &location, const shared_ptr<Callable> &caller, const shared_ptr<Args> &args)
 				: Callable(location), caller(caller), args(args) {}
 
 		shared_ptr<Object> invoke() override;
 
-		static shared_ptr<Invocation> create(const pair<Token *, Token *> &location, const shared_ptr<Callable> &caller, const shared_ptr<Args> &args) {
+		static shared_ptr<Invocation> create(const Location &location, const shared_ptr<Callable> &caller, const shared_ptr<Args> &args) {
 			return make_shared<Invocation>(location, caller, args);
 		}
 	};
 
-	class InvocationAccess : public Invocation {
+	class InvocationAccess : public Callable {
 	protected:
+		shared_ptr<Callable> caller;
+		shared_ptr<Args> args;
 		string id;
 		Token *const idToken;
 	public:
 
-		InvocationAccess(const pair<Token *, Token *> &location, Token *idToken, const shared_ptr<Callable> &caller, string id, const shared_ptr<Args> &args)
-				: Invocation(location, caller, args), idToken(idToken), id(move(id)) {}
+		InvocationAccess(const Location &location, Token *idToken, const shared_ptr<Callable> &caller, string id, const shared_ptr<Args> &args)
+				: Callable(location), caller(caller), args(args), idToken(idToken), id(move(id)) {}
 
 		shared_ptr<Object> invoke() override;
 
-		static shared_ptr<InvocationAccess> create(const pair<Token *, Token *> &location, Token *idToken, const shared_ptr<Callable> &caller, const string &id, const shared_ptr<Args> &args) {
+		static shared_ptr<InvocationAccess> create(const Location &location, Token *idToken, const shared_ptr<Callable> &caller, const string &id, const shared_ptr<Args> &args) {
 			return make_shared<InvocationAccess>(location, idToken, caller, id, args);
 		}
 	};
 
 	class InvocationLocalAccess : public InvocationAccess {
 	public:
-		InvocationLocalAccess(const pair<Token *, Token *> &location, Token *idToken, const shared_ptr<Callable> &caller, const string &id, const shared_ptr<Args> &args)
+		InvocationLocalAccess(const Location &location, Token *idToken, const shared_ptr<Callable> &caller, const string &id, const shared_ptr<Args> &args)
 				: InvocationAccess(location, idToken, caller, id, args) {}
 
 		shared_ptr<Object> invoke() override;
 
-		static shared_ptr<InvocationLocalAccess> create(const pair<Token *, Token *> &location, Token *idToken, const shared_ptr<Callable> &caller, const string &id, const shared_ptr<Args> &args) {
+		static shared_ptr<InvocationLocalAccess> create(const Location &location, Token *idToken, const shared_ptr<Callable> &caller, const string &id, const shared_ptr<Args> &args) {
 			return make_shared<InvocationLocalAccess>(location, idToken, caller, id, args);
 		}
 	};
@@ -122,12 +124,12 @@ namespace pool {
 	class Identity : public Callable {
 		shared_ptr<Object> object;
 	public:
-		explicit Identity(const pair<Token *, Token *> &location, const shared_ptr<Object> &object)
+		explicit Identity(const Location &location, const shared_ptr<Object> &object)
 				: Callable(location), object(object) {}
 
 		shared_ptr<Object> invoke() override;
 
-		static shared_ptr<Callable> create(const pair<Token *, Token *> &location, const shared_ptr<Object> &caller) {
+		static shared_ptr<Callable> create(const Location &location, const shared_ptr<Object> &caller) {
 			return make_shared<Identity>(location, caller);
 		}
 	};
@@ -138,12 +140,12 @@ namespace pool {
 		bool immutable;
 	public:
 
-		Assignment(const pair<Token *, Token *> &location, shared_ptr<Callable> assignee, shared_ptr<Callable> value, bool immutable)
+		Assignment(const Location &location, shared_ptr<Callable> assignee, shared_ptr<Callable> value, bool immutable)
 				: Callable(location), assignee(move(assignee)), value(move(value)), immutable(immutable) {}
 
 		shared_ptr<Object> invoke() override;
 
-		static shared_ptr<Assignment> create(const pair<Token *, Token *> &location, const shared_ptr<Callable> &assignee, const shared_ptr<Callable> &value, bool immutable) {
+		static shared_ptr<Assignment> create(const Location &location, const shared_ptr<Callable> &assignee, const shared_ptr<Callable> &value, bool immutable) {
 			return make_shared<Assignment>(location, assignee, value, immutable);
 		}
 	};

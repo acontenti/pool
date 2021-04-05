@@ -68,6 +68,12 @@ string Object::toString() {
 	return string(getType()) + "@" + to_string(id);
 }
 
+bool Object::instanceOf(const shared_ptr<Class> &_class) {
+	if (cls) {
+		return cls == _class || cls->subclassOf(_class);
+	} else return _class == ObjectClass;
+}
+
 template<>
 shared_ptr<Variable> Object::as<Variable>() const {
 	return const_pointer_cast<Variable>(reinterpret_pointer_cast<const Variable>(shared_from_this()));
@@ -76,7 +82,7 @@ shared_ptr<Variable> Object::as<Variable>() const {
 Class::Class(const shared_ptr<Context> &context, creator_t creator, string name, shared_ptr<Class> super)
 		: Object(context, ClassClass), creator(move(creator)), name(move(name)), super(move(super)) {}
 
-shared_ptr<Class> Class::extend(const creator_t &_creator, const string &className, const shared_ptr<Block> &other, const pair<Token *, Token *> &location) const {
+shared_ptr<Class> Class::extend(const creator_t &_creator, const string &className, const shared_ptr<Block> &other, const Location &location) const {
 	auto self = this->as<Class>();
 	auto cls = ClassClass->newInstance(context, location, {}, _creator ? _creator
 																	   : creator, className, self)->as<Class>();
@@ -90,12 +96,9 @@ shared_ptr<Class> Class::extend(const creator_t &_creator, const string &classNa
 	return cls;
 }
 
-shared_ptr<Object> Class::newInstance(const shared_ptr<Context> &context, const pair<Token *, Token *> &location, const vector<shared_ptr<Object>> &other, const any &a1, const any &a2, const any &a3, bool createContext) const {
-	auto ctx = context;
-	if (createContext) {
-		ctx = Context::create(context);
-	}
-	auto ptr = creator(ctx, a1, a2, a3);
+shared_ptr<Object> Class::newInstance(const shared_ptr<Context> &parent, const Location &location, const vector<shared_ptr<Object>> &other, const any &a1, const any &a2, const any &a3) const {
+	auto context = Context::create(parent);
+	auto ptr = creator(context, a1, a2, a3);
 	if (ptr->cls) {
 		ptr->context->set("class", ptr->cls);
 	}
@@ -125,6 +128,14 @@ shared_ptr<Variable> Class::findInClass(const string &id) const {
 	return nullptr;
 }
 
+bool Class::subclassOf(const shared_ptr<Class> &_class) const {
+	return super && (super == _class || super->subclassOf(_class));
+}
+
+bool Class::superclassOf(const shared_ptr<Class> &_class) const {
+	return _class->super && (this == _class->super.get() || superclassOf(_class->super));
+}
+
 Variable::Variable(const shared_ptr<Context> &context, string name, shared_ptr<Object> value, bool immutable)
 		: Object(context, nullptr), name(move(name)), value(move(value)), immutable(immutable) {
 }
@@ -132,7 +143,7 @@ Variable::Variable(const shared_ptr<Context> &context, string name, shared_ptr<O
 void Variable::setValue(const shared_ptr<Object> &val) {
 	if (!immutable)
 		value = val->as<Object>();
-	else throw compile_error("Cannot assign immutable variable '" + name + "'", {});
+	else throw compile_error("Cannot assign immutable variable '" + name + "'", Location::UNKNOWN);
 }
 
 bool Variable::isImmutable() const {
@@ -182,10 +193,13 @@ String::String(const shared_ptr<Context> &context, string value)
 Executable::Executable(const shared_ptr<Context> &context, const shared_ptr<Class> &cls)
 		: Object(context, cls) {}
 
-Fun::Fun(const shared_ptr<Context> &context, const vector<Param> &params, vector<shared_ptr<Callable>> calls)
-		: Executable(context, FunClass), params(params), calls(move(calls)) {}
+Function::Function(const shared_ptr<Context> &context, const vector<Param> &params)
+		: Executable(context, FunClass), params(params) {}
 
-shared_ptr<Object> Fun::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+Fun::Fun(const shared_ptr<Context> &context, const vector<Param> &params, vector<PoolParser::StatementContext *> calls)
+		: Function(context, params), calls(move(calls)) {}
+
+shared_ptr<Object> Fun::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 	shared_ptr<Object> returnValue = Void;
 	vector<shared_ptr<Object>> args;
 	auto ptr = self->as<Object>();
@@ -220,15 +234,19 @@ shared_ptr<Object> Fun::execute(const shared_ptr<Object> &self, const vector<sha
 		context->set(name, value);
 	}
 	for (auto &call: calls) {
-		returnValue = call->invoke();
+		if (auto exp = call->expression()) {
+			returnValue = parseExpression(exp, context)->invoke();
+		} else {
+			returnValue = Void;
+		}
 	}
 	return returnValue;
 }
 
 NativeFun::NativeFun(const shared_ptr<Context> &context, const vector<Param> &params, method_t code)
-		: Fun(context, params, {}), code(move(code)) {}
+		: Function(context, params), code(move(code)) {}
 
-shared_ptr<Object> NativeFun::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+shared_ptr<Object> NativeFun::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 	if (self->as<Object>() == shared_from_this()) {
 		if (!params.empty() && params.back().rest) {
 			if (params.size() - 1 > other.size())
@@ -254,22 +272,26 @@ shared_ptr<Object> NativeFun::execute(const shared_ptr<Object> &self, const vect
 	return returnValue;
 }
 
-shared_ptr<NativeFun> NativeFun::create(const vector<Param> &params, const NativeFun::method_t &code) {
+shared_ptr<NativeFun> NativeFun::newInstance(const vector<Param> &params, const method_t &code) {
 	return make_shared<NativeFun>(Context::global, params, code);
 }
 
-Block::Block(const shared_ptr<Context> &context, vector<shared_ptr<Callable>> calls)
+Block::Block(const shared_ptr<Context> &context, vector<PoolParser::StatementContext *> calls)
 		: Executable(context, BlockClass), calls(move(calls)) {}
 
-shared_ptr<Object> Block::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+shared_ptr<Object> Block::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 	shared_ptr<Object> returnValue = Void;
 	for (auto &call: calls) {
-		returnValue = call->invoke();
+		if (auto exp = call->expression()) {
+			returnValue = parseExpression(exp, context)->invoke();
+		} else {
+			returnValue = Void;
+		}
 	}
 	return returnValue;
 }
 
-shared_ptr<Object> Block::execute(const pair<Token *, Token *> &location) {
+shared_ptr<Object> Block::execute(const Location &location) {
 	return execute(shared_from_this(), {}, location);
 }
 
@@ -277,13 +299,13 @@ Array::Array(const shared_ptr<Context> &context) : Object(context, ArrayClass) {
 
 void initializeContext() {
 	Context::global = Context::create(nullptr);
-	Context::global->set("import", NativeFun::create({{"moduleName"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const pair<Token *, Token *> &location) {
+	Context::global->set("import", NativeFun::newInstance({{"moduleName"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 		auto arg = other[0];
 		if (arg->getType() == String::TYPE) {
 			auto moduleName = arg->as<String>()->value;
 			try {
-				const auto &pool = Pool::execute(moduleName);
-				if (!pool.getResult()) {
+				auto result = PoolVM::execute(moduleName);
+				if (!result) {
 					throw runtime_error("execution error");
 				}
 			} catch (const runtime_error &e) {
@@ -296,21 +318,21 @@ void initializeContext() {
 
 void initializeBaseObjects() {
 	ClassClass = make_shared<Class>(Context::create(Context::global), Class::CREATOR, string(Class::TYPE), shared_ptr<Class>(nullptr))->as<Class>(); // ObjectClass is not yet created, so we pass nullptr as super
-	ObjectClass = ClassClass->newInstance(Context::global, {}, {}, static_cast<Class::creator_t>(Object::CREATOR), string(Object::TYPE), shared_ptr<Class>(nullptr))->as<Class>(); // ObjectClass is the base class, so it has no super
+	ObjectClass = ClassClass->newInstance(Context::global, Location::UNKNOWN, {}, static_cast<Class::creator_t>(Object::CREATOR), string(Object::TYPE), shared_ptr<Class>(nullptr))->as<Class>(); // ObjectClass is the base class, so it has no super
 	ClassClass->super = ObjectClass; // Now ObjectClass exists, so we can assign it to ClassClass->super
-	BoolClass = ObjectClass->extend(Bool::CREATOR, string(Bool::TYPE), {}, {});
-	IntegerClass = ObjectClass->extend(Integer::CREATOR, string(Integer::TYPE), {}, {});
-	DecimalClass = ObjectClass->extend(Decimal::CREATOR, string(Decimal::TYPE), {}, {});
-	StringClass = ObjectClass->extend(String::CREATOR, string(String::TYPE), {}, {});
-	ArrayClass = ObjectClass->extend(Array::CREATOR, string(Array::TYPE), {}, {});
-	BlockClass = ObjectClass->extend(Block::CREATOR, string(Block::TYPE), {}, {});
-	FunClass = ObjectClass->extend(Fun::CREATOR, string(Fun::TYPE), {}, {});
-	VoidClass = ObjectClass->extend(nullptr, "Void", {}, {});
-	NothingClass = ObjectClass->extend(nullptr, "Nothing", {}, {});
-	Void = VoidClass->newInstance(Context::global, {}, {}, VoidClass);
-	Null = NothingClass->newInstance(Context::global, {}, {}, NothingClass);
-	True = BoolClass->newInstance(Context::global, {}, {}, true)->as<Bool>();
-	False = BoolClass->newInstance(Context::global, {}, {}, false)->as<Bool>();
+	BoolClass = ObjectClass->extend(Bool::CREATOR, string(Bool::TYPE), {}, Location::UNKNOWN);
+	IntegerClass = ObjectClass->extend(Integer::CREATOR, string(Integer::TYPE), {}, Location::UNKNOWN);
+	DecimalClass = ObjectClass->extend(Decimal::CREATOR, string(Decimal::TYPE), {}, Location::UNKNOWN);
+	StringClass = ObjectClass->extend(String::CREATOR, string(String::TYPE), {}, Location::UNKNOWN);
+	ArrayClass = ObjectClass->extend(Array::CREATOR, string(Array::TYPE), {}, Location::UNKNOWN);
+	BlockClass = ObjectClass->extend(Block::CREATOR, string(Block::TYPE), {}, Location::UNKNOWN);
+	FunClass = ObjectClass->extend(Fun::CREATOR, string(Fun::TYPE), {}, Location::UNKNOWN);
+	VoidClass = ObjectClass->extend(nullptr, "Void", {}, Location::UNKNOWN);
+	NothingClass = ObjectClass->extend(nullptr, "Nothing", {}, Location::UNKNOWN);
+	Void = VoidClass->newInstance(Context::global, Location::UNKNOWN, {}, VoidClass);
+	Null = NothingClass->newInstance(Context::global, Location::UNKNOWN, {}, NothingClass);
+	True = BoolClass->newInstance(Context::global, Location::UNKNOWN, {}, true)->as<Bool>();
+	False = BoolClass->newInstance(Context::global, Location::UNKNOWN, {}, false)->as<Bool>();
 }
 
 void pool::initializeStdLib() {

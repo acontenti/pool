@@ -1,7 +1,8 @@
+#include <utility>
+
 #include "poolstd.hpp"
 #include "pool.hpp"
 #include "util/errors.hpp"
-#include "callable.hpp"
 
 
 using namespace pool;
@@ -36,8 +37,8 @@ shared_ptr<Object> InvocationAccess::invoke() {
 		if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
 			const auto &values = args->invoke();
 			return executable->execute(selfPtr, values, location);
-		} else throw compile_error(ptr->toString() + " is not executable", idToken, idToken);
-	} else throw compile_error(Null->toString() + " is not executable", idToken, idToken);
+		} else throw compile_error(ptr->toString() + " is not executable", {idToken, idToken});
+	} else throw compile_error(Null->toString() + " is not executable", {idToken, idToken});
 }
 
 shared_ptr<Object> InvocationLocalAccess::invoke() {
@@ -48,8 +49,8 @@ shared_ptr<Object> InvocationLocalAccess::invoke() {
 		if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
 			const auto &values = args->invoke();
 			return executable->execute(selfPtr, values, location);
-		} else throw compile_error(ptr->toString() + " is not executable", idToken, idToken);
-	} else throw compile_error(Null->toString() + " is not executable", idToken, idToken);
+		} else throw compile_error(ptr->toString() + " is not executable", {idToken, idToken});
+	} else throw compile_error(Null->toString() + " is not executable", {idToken, idToken});
 }
 
 shared_ptr<Object> Access::invoke() {
@@ -59,7 +60,7 @@ shared_ptr<Object> Access::invoke() {
 		return result;
 	} else if (auto set = ptr->find("set")) {
 		if (auto exe = dynamic_pointer_cast<Executable>(set->as<Object>())) {
-			return exe->execute(ptr, {StringClass->newInstance(ptr->context, location, {}, id), Null}, location);
+			return exe->execute(ptr, {String::newInstance(ptr->context, location, id), Null}, location);
 		} else throw compile_error("Cannot call method 'set' on '" + ptr->toString() + "'", location);
 	} else {
 		return ptr->as<Object>()->context->add(id);
@@ -67,13 +68,13 @@ shared_ptr<Object> Access::invoke() {
 }
 
 shared_ptr<Object> LocalAccess::invoke() {
-	auto ptr = caller->invoke();
-	auto result = ptr->findLocal(id);
+	const auto &ptr = caller->invoke();
+	const auto &result = ptr->findLocal(id);
 	if (result) {
 		return result;
-	} else if (auto set = ptr->find("set")) {
-		if (auto exe = dynamic_pointer_cast<Executable>(set->as<Object>())) {
-			return exe->execute(ptr, {StringClass->newInstance(ptr->context, location, {}, id), Null}, location);
+	} else if (const auto &set = ptr->find("set")) {
+		if (const auto &exe = dynamic_pointer_cast<Executable>(set->as<Object>())) {
+			return exe->execute(ptr, {String::newInstance(ptr->context, location, id), Null}, location);
 		} else throw compile_error("Cannot call method 'set' on '" + ptr->toString() + "'", location);
 	} else {
 		return ptr->as<Object>()->context->add(id);
@@ -86,14 +87,15 @@ shared_ptr<Object> Identity::invoke() {
 
 vector<shared_ptr<Object>> Args::invoke() {
 	vector<shared_ptr<Object>> result;
-	for (const auto &arg : args) {
-		result.emplace_back(arg->invoke());
-	}
-	if (rest) {
-		const auto &restVector = rest->invoke();
-		for (const auto &arg : restVector) {
-			result.emplace_back(arg);
-		}
+	for (const arg_t &arg : args) {
+		if (holds_alternative<shared_ptr<Callable>>(arg)) {
+			result.emplace_back(get<shared_ptr<Callable>>(arg)->invoke());
+		} else if (holds_alternative<shared_ptr<Expansion>>(arg)) {
+			const auto &expansion = get<shared_ptr<Expansion>>(arg)->invoke();
+			for (const auto &argarg : expansion) {
+				result.emplace_back(argarg);
+			}
+		} else throw runtime_error("Should not happen (" __FILE__ ":" + to_string(__LINE__) + ")");
 	}
 	return result;
 }

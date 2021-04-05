@@ -15,29 +15,29 @@ int main(int argc, char **argv) {
 				{"help",  vector<string>{"-h", "--help"},  "shows this help",       0}
 		};
 		argagg::parser argparser{options};
-		argagg::parser_results result = argparser.parse(argc, argv);
-		debug = result["debug"];
-		if (debug || result.pos.empty()) {
-			cerr << "pool " << Pool::VERSION << endl;
+		argagg::parser_results arguments = argparser.parse(argc, argv);
+		debug = arguments["debug"];
+		if (debug || arguments.pos.empty()) {
+			cerr << "pool " << PoolVM::VERSION << endl;
 		}
-		if (!result["help"] && !result.pos.empty()) {
+		if (!arguments["help"] && !arguments.pos.empty()) {
 			vector<string> args;
-			string filename = result.pos[0];
-			for (int i = 1; i < result.pos.size(); ++i) {
-				args.emplace_back(result.pos[i]);
+			string filename = arguments.pos[0];
+			for (int i = 1; i < arguments.pos.size(); ++i) {
+				args.emplace_back(arguments.pos[i]);
 			}
-			Pool::initialiaze({debug, args});
-			auto pool = Pool::execute(filename);
+			PoolVM::initialiaze({debug, args});
+			auto result = PoolVM::execute(filename);
 			if (debug) {
 				auto executionTime = getExecutionTime(startTime, high_resolution_clock::now());
-				if (pool.getResult()) {
+				if (result) {
 					cerr << endl << termcolor::bright_green << "Execution successful" << termcolor::reset;
 				} else {
 					cerr << endl << termcolor::red << "Execution failed" << termcolor::reset;
 				}
 				cerr << " in " << executionTime << endl << endl;
 			}
-			return pool.getResult() ? EXIT_SUCCESS : EXIT_FAILURE;
+			return result ? EXIT_SUCCESS : EXIT_FAILURE;
 		} else {
 			argagg::fmt_ostream fmt(cerr);
 			fmt << "Usage: pool [options] file" << endl << argparser;
