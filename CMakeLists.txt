@@ -51,8 +51,7 @@ target_link_libraries(pool ${ANTLR4_LIB})
 target_link_libraries(pool cpplocate::cpplocate)
 
 # COPY STD TO BINARY DIR
-message("RUNTIME_OUTPUT_DIRECTORY: ${RUNTIME_OUTPUT_DIRECTORY}")
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/std/std.pool ${CMAKE_CURRENT_BINARY_DIR}/${RUNTIME_OUTPUT_DIRECTORY}/std/std.pool COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/std/std.pool ${CMAKE_CURRENT_BINARY_DIR}/std/std.pool COPYONLY)
 
 # INSTALL
 set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/dist)
