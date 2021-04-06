@@ -1,5 +1,5 @@
-#include "errors.hpp"
-#include "strings.hpp"
+#include "util/errors.hpp"
+#include "util/strings.hpp"
 #include <cmath>
 #include <CharStream.h>
 
@@ -9,7 +9,9 @@
 
 #undef NOMINMAX
 
-std::ostream &operator<<(ostream &stream, const compile_error &error) {
+using namespace antlr4;
+
+ostream &operator<<(ostream &stream, const compile_error &error) {
 	stream << termcolor::reset << endl;
 	if (error.location.valid) {
 		stream << error.location.inputStream->getSourceName() << ":" << error.location.start.line << ":"
@@ -19,7 +21,8 @@ std::ostream &operator<<(ostream &stream, const compile_error &error) {
 		   << termcolor::reset << endl;
 	if (error.location.valid) {
 		size_t startIndex = error.location.start.startIndex - error.location.start.column;
-		misc::Interval interval(startIndex, startIndex + min<size_t>(200, error.location.inputStream->size() - startIndex));
+		misc::Interval interval(startIndex,
+								startIndex + min<size_t>(200, error.location.inputStream->size() - startIndex));
 		auto code = error.location.inputStream->getText(interval);
 		code = rtrim(code.substr(0, code.find_first_of('\n')));
 		stream << "  " << code << endl;

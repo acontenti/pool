@@ -1,0 +1,4 @@
+import(":std");
+dlopenx("./pool-external-test");
+externalTest ::= `externalTest`;
+externalTest();

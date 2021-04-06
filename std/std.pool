@@ -120,14 +120,14 @@ Block..new ::= null;
 Block..whileDo ::= `Block.whileDo`;
 Block..doWhile ::= `Block.doWhile`;
 
-Fun ::= `Fun`;
-Fun..classmethod ::= `Fun.classmethod`;
-Fun..staticmethod ::= `Fun.staticmethod`;
-Fun..toString ::= `Fun.toString`;
-Fun..new ::= null;
-Fun..get ::= null;
-Fun..delete ::= null;
-Fun..set ::= null;
+Function ::= `Function`;
+Function..classmethod ::= `Function.classmethod`;
+Function..staticmethod ::= `Function.staticmethod`;
+Function..toString ::= `Function.toString`;
+Function..new ::= null;
+Function..get ::= null;
+Function..delete ::= null;
+Function..set ::= null;
 
 Void ::= `Void`;
 Void..toString ::= (this) : {"void";};
@@ -151,3 +151,5 @@ assert ::= (test, message) : {
         throw(message);
     });
 };
+dlopen ::= `dlopen`;
+dlopenx ::= `dlopenx`;

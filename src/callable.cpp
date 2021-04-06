@@ -1,9 +1,7 @@
-#include <utility>
-
 #include "poolstd.hpp"
 #include "pool.hpp"
 #include "util/errors.hpp"
-
+#include <stdexcept>
 
 using namespace pool;
 
@@ -23,7 +21,7 @@ shared_ptr<Object> Assignment::invoke() {
 
 shared_ptr<Object> Invocation::invoke() {
 	auto ptr = caller->invoke()->as<Object>();
-	if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
+	if (const auto &executable = dynamic_pointer_cast<Executable>(ptr)) {
 		const auto &values = args->invoke();
 		return executable->execute(ptr, values, location);
 	} else throw compile_error(ptr->toString() + " is not executable", caller->location);
@@ -34,7 +32,7 @@ shared_ptr<Object> InvocationAccess::invoke() {
 	auto access = selfPtr->find(id);
 	if (access) {
 		const auto &ptr = access->as<Object>();
-		if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
+		if (const auto &executable = dynamic_pointer_cast<Executable>(ptr)) {
 			const auto &values = args->invoke();
 			return executable->execute(selfPtr, values, location);
 		} else throw compile_error(ptr->toString() + " is not executable", {idToken, idToken});
@@ -46,7 +44,7 @@ shared_ptr<Object> InvocationLocalAccess::invoke() {
 	auto access = selfPtr->findLocal(id);
 	if (access) {
 		const auto &ptr = access->as<Object>();
-		if (auto executable = dynamic_pointer_cast<Executable>(ptr)) {
+		if (const auto &executable = dynamic_pointer_cast<Executable>(ptr)) {
 			const auto &values = args->invoke();
 			return executable->execute(selfPtr, values, location);
 		} else throw compile_error(ptr->toString() + " is not executable", {idToken, idToken});
@@ -59,8 +57,8 @@ shared_ptr<Object> Access::invoke() {
 	if (result) {
 		return result;
 	} else if (auto set = ptr->find("set")) {
-		if (auto exe = dynamic_pointer_cast<Executable>(set->as<Object>())) {
-			return exe->execute(ptr, {String::newInstance(ptr->context, location, id), Null}, location);
+		if (const auto &function = dynamic_pointer_cast<Function>(set->as<Object>())) {
+			return function->execute(ptr, {String::newInstance(ptr->context, location, id), Null}, location);
 		} else throw compile_error("Cannot call method 'set' on '" + ptr->toString() + "'", location);
 	} else {
 		return ptr->as<Object>()->context->add(id);
@@ -73,8 +71,8 @@ shared_ptr<Object> LocalAccess::invoke() {
 	if (result) {
 		return result;
 	} else if (const auto &set = ptr->find("set")) {
-		if (const auto &exe = dynamic_pointer_cast<Executable>(set->as<Object>())) {
-			return exe->execute(ptr, {String::newInstance(ptr->context, location, id), Null}, location);
+		if (const auto &function = dynamic_pointer_cast<Function>(set->as<Object>())) {
+			return function->execute(ptr, {String::newInstance(ptr->context, location, id), Null}, location);
 		} else throw compile_error("Cannot call method 'set' on '" + ptr->toString() + "'", location);
 	} else {
 		return ptr->as<Object>()->context->add(id);
@@ -103,7 +101,7 @@ vector<shared_ptr<Object>> Args::invoke() {
 vector<shared_ptr<Object>> Expansion::invoke() {
 	vector<shared_ptr<Object>> result;
 	auto ptr = caller->invoke();
-	if (ptr->getType() == Array::TYPE) {
+	if (ptr->instanceOf(ArrayClass)) {
 		return ptr->as<Array>()->values;
 	} else
 		throw compile_error("Cannot expand value of type '" + string(ptr->getType()) + "'", caller->location);

@@ -1,10 +1,13 @@
 #pragma once
 
 #include <utility>
-
+#include <stdexcept>
 #include "location.hpp"
+#include "macro.hpp"
 
-class compile_error : public runtime_error {
+using namespace std;
+
+class POOL_PUBLIC compile_error : public runtime_error {
 public:
 	Location location;
 
@@ -15,4 +18,4 @@ public:
 	}
 };
 
-std::ostream &operator<<(std::ostream &stream, const compile_error &error);
+ostream &operator<<(ostream &stream, const compile_error &error);

@@ -1,11 +1,17 @@
 #pragma once
 
-#include "Token.h"
+#include <cstddef>
+#include "macro.hpp"
 
-using namespace antlr4;
 using namespace std;
 
-class Location {
+namespace antlr4 {
+	class Token;
+
+	class CharStream;
+}
+
+class POOL_PUBLIC Location {
 	Location() = default;
 
 public:
@@ -15,10 +21,10 @@ public:
 		size_t startIndex;
 		size_t stopIndex;
 	} start{}, end{};
-	CharStream *inputStream = nullptr;
+	antlr4::CharStream *inputStream = nullptr;
 	bool valid = false;
 
-	Location(Token *start, Token *end);
+	Location(antlr4::Token *start, antlr4::Token *end);
 
 	static Location UNKNOWN;
 };

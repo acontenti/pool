@@ -3,15 +3,16 @@
 #include <unordered_map>
 #include <string>
 #include <memory>
+#include "util/macro.hpp"
 
 using namespace std;
 
 namespace pool {
-	class Object;
+	class POOL_PUBLIC Object;
 
-	class Variable;
+	class POOL_PUBLIC Variable;
 
-	class Context : public enable_shared_from_this<Context> {
+	class POOL_PUBLIC Context : public enable_shared_from_this<Context> {
 		unordered_map<string, shared_ptr<Variable>> heap;
 		const shared_ptr<Context> parent;
 	public:

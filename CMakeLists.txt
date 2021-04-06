@@ -41,10 +41,17 @@ antlr_target(PoolParser PoolParser.g4 PARSER OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR
 
 # POOL
 include_directories(${ANTLR_PoolLexer_OUTPUT_DIR} ${ANTLR_PoolParser_OUTPUT_DIR} ${ANTLR4_INCLUDE_DIRS})
-add_compile_definitions(POOL_VERSION="${PROJECT_VERSION}")
 file(GLOB_RECURSE POOL_SRC src/*.cpp)
 add_executable(pool ${POOL_SRC} ${ANTLR_PoolLexer_CXX_OUTPUTS} ${ANTLR_PoolParser_CXX_OUTPUTS})
-set_property(TARGET pool PROPERTY CXX_STANDARD 17)
+target_include_directories(pool PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(pool PUBLIC POOL_VERSION="${PROJECT_VERSION}" POOL_EXPORTS)
+set_target_properties(
+		pool PROPERTIES
+		ENABLE_EXPORTS ON
+		POSITION_INDEPENDENT_CODE ON
+		CXX_STANDARD 17
+		CXX_VISIBILITY_PRESET hidden
+)
 find_package(Threads REQUIRED)
 target_link_libraries(pool Threads::Threads)
 target_link_libraries(pool ${ANTLR4_LIB})
@@ -58,7 +65,11 @@ set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/dist)
 set(INSTALL_PATH ${CMAKE_SOURCE_DIR}/dist)
 install(TARGETS pool CONFIGURATIONS Release DESTINATION ${INSTALL_PATH})
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/std/ DESTINATION ${INSTALL_PATH}/std)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION ${INSTALL_PATH}/include)
 
 # TEST
+add_subdirectory(test/external-test)
+
 enable_testing()
 add_test(NAME basic_test COMMAND pool test ctest WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/test)
+add_test(NAME external_test COMMAND pool external-test/etest.pool WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test)

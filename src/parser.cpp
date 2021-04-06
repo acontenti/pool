@@ -1,10 +1,12 @@
 #include "natives.hpp"
 #include "pool.hpp"
 #include "parser.hpp"
+#include "poolstd_private.hpp"
 #include "util/strings.hpp"
 #include "util/errors.hpp"
 
 using namespace pool;
+using namespace antlr4;
 
 shared_ptr<Callable> parseCall(PoolParser::CallContext *ast, const shared_ptr<Context> &context);
 
@@ -135,11 +137,11 @@ shared_ptr<Object> parseBlock(PoolParser::BlockContext *ast, const shared_ptr<Co
 
 shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<Context> &parent) {
 	auto paramsAst = ast->param();
-	vector<Fun::Param> params;
+	vector<Function::Param> params;
 	params.reserve(paramsAst.size());
 	for (auto param = paramsAst.begin(); param != paramsAst.end(); ++param) {
 		auto id = getId((*param)->ID());
-		auto find = find_if(params.begin(), params.end(), [id](const Fun::Param &p) { return p.id == id; });
+		auto find = find_if(params.begin(), params.end(), [id](const Function::Param &p) { return p.id == id; });
 		if (find != params.end()) {
 			auto idToken = (*param)->ID()->getSymbol();
 			throw compile_error("Duplicate parameter '" + id + "'", {idToken, idToken});
@@ -156,7 +158,7 @@ shared_ptr<Object> parseFunction(PoolParser::FunContext *ast, const shared_ptr<C
 			params.emplace_back(id, false);
 		}
 	}
-	return Fun::newInstance(parent, {ast->start, ast->stop}, params, ast->statement());
+	return CodeFunction::newInstance(parent, {ast->start, ast->stop}, params, ast->statement());
 }
 
 shared_ptr<Callable> parseNative(tree::TerminalNode *ast, const shared_ptr<Context> &context) {

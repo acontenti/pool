@@ -2,10 +2,11 @@
 
 #include <string>
 #include <algorithm>
+#include "macro.hpp"
 
 using namespace std;
 
-string unescapeString(const string &input) noexcept(false);
+POOL_PUBLIC string unescapeString(const string &input) noexcept(false);
 
 static constexpr inline bool endsWith(string_view str, string_view suffix) {
 	return str.size() >= suffix.size() && 0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
