@@ -55,6 +55,15 @@ jobs:
         shell: bash
         run: ctest --extra-verbose -C Release
 
+      - name: Upload build directory on error
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: error-build-${{ matrix.os }}
+          path: ${{runner.workspace}}/build/*
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v2
         with:
@@ -98,6 +107,15 @@ jobs:
       - name: Test
         working-directory: ${{runner.workspace}}/build
         run: ctest --extra-verbose -C Release
+
+      - name: Upload build directory on error
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: error-build-windows-latest
+          path: ${{runner.workspace}}/build/*
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v2

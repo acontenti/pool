@@ -107,7 +107,7 @@ void DynamicLibrariesManager::load(const string &name) {
 #endif
 #if ON_MACOS
 	if (!path.has_extension()) {
-		path.replace_extension("dylib");
+		path.replace_extension("bundle");
 	}
 #endif
 #if ON_LINUX
