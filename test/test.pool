@@ -65,14 +65,14 @@ Test ::= Object.extend("Test", {
 		this.long.println();
 	};
 	toString := (this) : {
-		"This is an instance of class Test, ".+(this.getClass().toString());
+		"This is an instance of class Test, ".+(this.getClass());
 	};
 	number := 0;
 	no := (class, who) : {
 		"no: class := ".+(class).println();
 		"no: who := ".+(who).println();
 	}.classmethod();
-	yes := (who) : {
+	yes := (who: String) : {
 		"yes: who := ".+(who).println();
 	}.staticmethod();
 	maybe := (this, who) : {
@@ -95,7 +95,7 @@ Test.yes("you");
 n.yes("me");
 Test.maybe("you");
 n.maybe("me");
-"prop test: ".+(Test.type()).println();
+"prop test: ".+(Test.getContextInfo()).println();
 //z.c.d.e.println();
 (x := true.!()).println();
 abc := {a := x.!();}();
@@ -110,7 +110,7 @@ b := {
 };
 b();
 aaaa.println();
-b.type().println();
+b.getContextInfo().println();
 b.println();
 b..aaaa.println();
 b.aaaa.ffff.println();

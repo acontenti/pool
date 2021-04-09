@@ -239,10 +239,14 @@ public:
 
   class  ParamContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *name = nullptr;
+    antlr4::Token *type = nullptr;
     ParamContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *ID();
+    std::vector<antlr4::tree::TerminalNode *> ID();
+    antlr4::tree::TerminalNode* ID(size_t i);
     antlr4::tree::TerminalNode *DOTS();
+    antlr4::tree::TerminalNode *COLON();
 
    
   };

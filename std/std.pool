@@ -14,7 +14,7 @@ Class..superclassOf ::= `Class.superclassOf`;
 Object ::= `Object`;
 Object..instanceOf ::= `Object.instanceOf`;
 Object..toString ::= `Object.toString`;
-Object..type ::= `Object.type`;
+Object..getContextInfo ::= `Object.getContextInfo`;
 Object..getClass ::= `Object.getClass`;
 Object..print ::= `Object.print`;
 Object..println ::= `Object.println`;
@@ -53,13 +53,13 @@ Array..delete ::= null;
 Number ::= `Number`;
 Number..== ::= `Number.==`;
 Number..< ::= `Number.<`;
-Number..<= ::= (this, other) : {
+Number..<= ::= (this, other: Number) : {
     this.<(other).||(this.==(other));
 };
-Number..> ::= (this, other) : {
+Number..> ::= (this, other: Number) : {
     this.<=(other).!();
 };
-Number..>= ::= (this, other) : {
+Number..>= ::= (this, other: Number) : {
     this.<(other).!();
 };
 Number..+ ::= `Number.+`;
@@ -83,10 +83,7 @@ Integer..~ ::= `Integer.~`;
 Integer..<< ::= `Integer.<<`;
 Integer..>> ::= `Integer.>>`;
 Integer..toString ::= `Integer.toString`;
-Integer..to ::= (this, end) : {
-    end.instanceOf(Integer).!().then({
-        throw("Integer.to argument must be a Integer");
-    });
+Integer..to ::= (this, end: Integer) : {
     i := this;
     array := Array.new();
     {i.<(end);}.whileDo({
@@ -95,7 +92,7 @@ Integer..to ::= (this, end) : {
     });
     array;
 };
-Integer..toInclusive ::= (this, end) : {
+Integer..toInclusive ::= (this, end: Integer) : {
     this.to(end.+(1));
 };
 Integer..extend ::= null;
@@ -156,7 +153,7 @@ Nothing..set ::= null;
 input ::= `input`;
 throw ::= `throw`;
 tryCatch ::= `tryCatch`;
-assert ::= (test, message) : {
+assert ::= (test, message: String) : {
     test.!().then({
         throw(message);
     });

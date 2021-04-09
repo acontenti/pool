@@ -45,7 +45,7 @@ block: LB statement* RB;
 
 fun: LP param? (COMMA param)* RP COLON LB statement* RB;
 
-param: DOTS? ID;
+param: DOTS? name=ID (COLON type=ID)?;
 
 num returns [enum Type {DEC,HEX,BIN,FLT} type]:
 	DECIMAL_INTEGER_LITERAL {$type=NumContext::DEC;} |

@@ -164,8 +164,9 @@ shared_ptr<Object> CodeFunction::execute(const shared_ptr<Object> &self, const v
 		const auto &param = params[i];
 		if (!param.rest) {
 			if (param.type && !value->instanceOf(param.type)) {
-				throw compile_error("Function argument '" + param.id + "' must be of class '" + param.type->name
-									+ "', but argument of class '" + value->getClass()->name + " was given", location);
+				throw compile_error(
+						"Argument for function parameter '" + param.id + "' must be of class '" + param.type->name
+						+ "', but value of class '" + value->getClass()->name + "' was given", location);
 			} else context->set(param.id, value);
 		} else {
 			context->set(param.id, ArrayClass->newInstance(context, location, {args.begin() + i, args.end()}, nullptr));
@@ -201,8 +202,9 @@ shared_ptr<Object> NativeFunction::execute(const shared_ptr<Object> &self, const
 		const auto &value = other[i];
 		const auto &param = params[i + delta];
 		if (!param.rest && param.type && !value->instanceOf(param.type)) {
-			throw compile_error("Function argument '" + param.id + "' must be of class '" + param.type->name
-								+ "', but argument of class '" + value->getClass()->name + " was given", location);
+			throw compile_error(
+					"Argument for function parameter '" + param.id + "' must be of class '" + param.type->name
+					+ "', but value of class '" + value->getClass()->name + "' was given", location);
 		}
 	}
 	auto returnValue = code(self, other, location);
