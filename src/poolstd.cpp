@@ -72,9 +72,7 @@ Class::Class(const shared_ptr<Context> &context, creator_t creator, string name,
 		: Object(context, ClassClass), creator(move(creator)), name(move(name)), super(move(super)) {}
 
 shared_ptr<Class> Class::extend(const creator_t &_creator, const string &className, const shared_ptr<Block> &block, const Location &location) const {
-	const auto &self = this->as<Class>();
-	const auto &cls = ClassClass->newInstance(context, location, {}, ClassData{_creator ? _creator
-																						: creator, className, self})->as<Class>();
+	const auto &cls = ClassClass->newInstance(context, location, {}, ClassData{_creator, className, this->as<Class>()})->as<Class>();
 	if (block) {
 		block->execute(location);
 		for (const auto&[name, value] : *block->context) {
@@ -85,8 +83,7 @@ shared_ptr<Class> Class::extend(const creator_t &_creator, const string &classNa
 }
 
 shared_ptr<Object> Class::newInstance(const shared_ptr<Context> &parent, const Location &location, const vector<shared_ptr<Object>> &other, const any &data) const {
-	auto context = Context::create(parent);
-	auto ptr = creator(context, data);
+	auto ptr = creator(Context::create(parent), data);
 	if (auto init = ptr->findMethod("init")) {
 		init->execute(ptr, other, location);
 	}
@@ -258,18 +255,18 @@ void initializeContext() {
 
 void initializeBaseObjects() {
 	ClassClass = Class::CREATOR(Context::create(Context::global), Class::ClassData{Class::CREATOR, "Class", nullptr}); // ObjectClass is not yet created, so we pass nullptr as super
-	ObjectClass = ClassClass->newInstance(Context::global, Location::UNKNOWN, {}, Class::ClassData{Object::CREATOR, "Object", nullptr})->as<Class>(); // ObjectClass is the base class, so it has no super
+	ObjectClass = Class::CREATOR(Context::create(Context::global), Class::ClassData{Object::CREATOR, "Object", nullptr}); // ObjectClass is the base class, so it has no super
 	ClassClass->super = ObjectClass; // Now ObjectClass exists, so we can assign it to ClassClass->super
 	BoolClass = ObjectClass->extend(Bool::CREATOR, "Bool", nullptr, Location::UNKNOWN);
-	NumberClass = ObjectClass->extend(nullptr, "Number", nullptr, Location::UNKNOWN);
+	NumberClass = ObjectClass->extend(Object::CREATOR, "Number", nullptr, Location::UNKNOWN);
 	IntegerClass = NumberClass->extend(Integer::CREATOR, "Integer", nullptr, Location::UNKNOWN);
 	DecimalClass = NumberClass->extend(Decimal::CREATOR, "Decimal", nullptr, Location::UNKNOWN);
 	StringClass = ObjectClass->extend(String::CREATOR, "String", nullptr, Location::UNKNOWN);
 	ArrayClass = ObjectClass->extend(Array::CREATOR, "Array", nullptr, Location::UNKNOWN);
 	BlockClass = ObjectClass->extend(Block::CREATOR, "Block", nullptr, Location::UNKNOWN);
 	FunctionClass = ObjectClass->extend(CodeFunction::CREATOR, "Function", nullptr, Location::UNKNOWN);
-	VoidClass = ObjectClass->extend(nullptr, "Void", nullptr, Location::UNKNOWN);
-	NothingClass = ObjectClass->extend(nullptr, "Nothing", nullptr, Location::UNKNOWN);
+	VoidClass = ObjectClass->extend(Object::CREATOR, "Void", nullptr, Location::UNKNOWN);
+	NothingClass = ObjectClass->extend(Object::CREATOR, "Nothing", nullptr, Location::UNKNOWN);
 	Void = VoidClass->newInstance(Context::global, Location::UNKNOWN, {}, VoidClass);
 	Null = NothingClass->newInstance(Context::global, Location::UNKNOWN, {}, NothingClass);
 	True = BoolClass->newInstance(Context::global, Location::UNKNOWN, {}, true)->as<Bool>();
