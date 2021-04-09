@@ -1,4 +1,4 @@
 import(":std");
-dlopenx("./pool-external-test");
+loadLibrary("./pool-external-test");
 externalTest ::= `externalTest`;
 externalTest();

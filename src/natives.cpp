@@ -1,7 +1,6 @@
-#include "natives.hpp"
-#include "pool.hpp"
+#include <natives.hpp>
 #include "poolstd_private.hpp"
-#include "util/errors.hpp"
+#include <util/errors.hpp>
 #include "util/dylib.hpp"
 #include <ctgmath>
 
@@ -33,16 +32,10 @@ struct NativesImpl : public Natives {
 		add("Nothing", NothingClass);
 		add("void", Void);
 		add("null", Null);
-		addFun("throw", {{"message"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) -> shared_ptr<Object> {
-			if (!(other[0]->instanceOf(StringClass)))
-				throw compile_error("throw argument must be a String", location);
+		addFun("throw", {{"message", StringClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) -> shared_ptr<Object> {
 			throw compile_error(other[0]->as<String>()->value, location);
 		});
-		addFun("tryCatch", {{"try"}, {"catch"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			if (!(other[0]->instanceOf(BlockClass)))
-				throw compile_error("tryCatch first argument must be a Block", location);
-			if (!(other[1]->instanceOf(FunctionClass)))
-				throw compile_error("tryCatch second argument must be a Function", location);
+		addFun("tryCatch", {{"try", BlockClass}, {"catch", FunctionClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			try {
 				return other[0]->as<Block>()->execute(location);
 			} catch (const compile_error &error) {
@@ -50,17 +43,13 @@ struct NativesImpl : public Natives {
 				return ptr->execute(ptr, {String::newInstance(ptr->context, location, error.what())}, location);
 			}
 		});
-		addFun("input", {{"prompt"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) -> shared_ptr<Object> {
-			if (!(other[0]->instanceOf(StringClass)))
-				throw compile_error("input argument must be a String", location);
+		addFun("input", {{"prompt", StringClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) -> shared_ptr<Object> {
 			cout << other[0]->as<String>()->value;
 			string in;
 			cin >> in;
 			return String::newInstance(self->context, location, in);
 		});
-		addFun("dlopen", {{"file"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) -> shared_ptr<Object> {
-			if (!(other[0]->instanceOf(StringClass)))
-				throw compile_error("dlopen argument must be a String", location);
+		addFun("loadLibraryFile", {{"file", StringClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) -> shared_ptr<Object> {
 			try {
 				DynamicLibrariesManager::loadPath(other[0]->as<String>()->value);
 			} catch (const runtime_error &error) {
@@ -68,9 +57,7 @@ struct NativesImpl : public Natives {
 			}
 			return Void;
 		});
-		addFun("dlopenx", {{"file"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) -> shared_ptr<Object> {
-			if (!(other[0]->instanceOf(StringClass)))
-				throw compile_error("dlopenx argument must be a String", location);
+		addFun("loadLibrary", {{"file", StringClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) -> shared_ptr<Object> {
 			try {
 				DynamicLibrariesManager::load(other[0]->as<String>()->value);
 			} catch (const runtime_error &error) {
@@ -94,6 +81,10 @@ struct NativesImpl : public Natives {
 			auto cls = self->as<Class>();
 			return cls->newInstance(self->context, location, other, cls);
 		});
+		addFun("Class.getSuper", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			auto cls = self->as<Class>();
+			return cls->super ? cls->super : Null;
+		});
 		addFun("Class.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			return String::newInstance(self->context, location, "Class:" + self->as<Class>()->name);
 		});
@@ -112,15 +103,17 @@ struct NativesImpl : public Natives {
 	void initializeObject() {
 		add("Object", ObjectClass);
 		addFun("Object.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			return String::newInstance(self->context, location, self->toString());
+			return String::newInstance(self->context, location, self->getRepr());
 		});
 		addFun("Object.type", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			return String::newInstance(self->context, location, self->as<Object>()->context->toString());
+			return String::newInstance(self->context, location, self->context->toString());
+		});
+		addFun("Object.getClass", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			return self->getClass();
 		});
 		addFun("Object.print", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			shared_ptr<Object> ptr = self->as<Object>();
-			if (auto method = ptr->findMethod("toString")) {
-				auto result = method->execute(ptr, {}, location);
+			if (auto method = self->findMethod("toString")) {
+				auto result = method->execute(self, {}, location);
 				if (result->instanceOf(StringClass)) {
 					cout << result->as<String>()->value;
 				}
@@ -128,9 +121,8 @@ struct NativesImpl : public Natives {
 			return Void;
 		});
 		addFun("Object.println", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			shared_ptr<Object> ptr = self->as<Object>();
-			if (auto method = ptr->findMethod("toString")) {
-				auto result = method->execute(ptr, {}, location);
+			if (auto method = self->findMethod("toString")) {
+				auto result = method->execute(self, {}, location);
 				if (result->instanceOf(StringClass)) {
 					cout << result->as<String>()->value << endl;
 				}
@@ -140,14 +132,13 @@ struct NativesImpl : public Natives {
 		addFun("Object.instanceOf", {{"this"}, {"class"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			if (!(other[0]->instanceOf(ClassClass)))
 				throw compile_error("Object.instanceOf argument must be a Class", location);
-			return self->as<Object>()->instanceOf(other[0]->as<Class>()) ? True : False;
+			return self->instanceOf(other[0]->as<Class>()) ? True : False;
 		});
 		addFun("Object.get", {{"this"}, {"key"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			if (!(other[0]->instanceOf(StringClass)))
-				throw compile_error("Object.get argument must be a String", location);
-			shared_ptr<Object> ptr = self->as<Object>();
+				throw compile_error("Object.get argument must be a String", location);;
 			const auto &key = other[0]->as<String>()->value;
-			if (const auto &var = ptr->findLocal(key)) {
+			if (const auto &var = self->findLocal(key)) {
 				return var->getValue();
 			}
 			return Void;
@@ -155,29 +146,27 @@ struct NativesImpl : public Natives {
 		addFun("Object.set", {{"this"}, {"key"}, {"value"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) -> shared_ptr<Object> {
 			if (!(other[0]->instanceOf(StringClass)))
 				throw compile_error("Object.set 'key' argument must be a String", location);
-			shared_ptr<Object> ptr = self->as<Object>();
 			const auto &key = other[0]->as<String>()->value;
-			if (const auto &var = ptr->context->findLocal(key)) {
+			if (const auto &var = self->context->findLocal(key)) {
 				if (!var->isImmutable()) {
 					var->setValue(other[1]);
-					return var;
 				} else throw compile_error("Cannot set immutable variable '" + var->name + "'", location);
-			} else return ptr->context->set(key, other[1]);
+			} else self->context->set(key, other[1]);
+			return other[1];
 		});
 		addFun("Object.delete", {{"this"}, {"key"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			if (!(other[0]->instanceOf(StringClass)))
 				throw compile_error("Object.delete argument must be a String", location);
-			shared_ptr<Object> ptr = self->as<Object>();
 			const auto &key = other[0]->as<String>()->value;
-			if (const auto &var = ptr->findLocal(key)) {
+			if (const auto &var = self->findLocal(key)) {
 				if (!var->isImmutable()) {
-					ptr->remove(key);
+					self->remove(key);
 				} else throw compile_error("Cannot remove immutable variable '" + var->name + "'", location);
 			}
 			return Void;
 		});
 		addFun("Object.==", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			return self->as<Object>() == other[0]->as<Object>() ? True : False;
+			return self == other[0] ? True : False;
 		});
 	}
 
@@ -470,7 +459,7 @@ struct NativesImpl : public Natives {
 			return Integer::newInstance(self->context, location, self->as<String>()->value.length());
 		});
 		this->addFun("String.+", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			shared_ptr<Object> var = other[0]->as<Object>();
+			shared_ptr<Object> var = other[0];
 			if (auto method = var->findMethod("toString")) {
 				auto result = method->execute(var, {}, location);
 				if (result->instanceOf(StringClass)) {
@@ -495,9 +484,9 @@ struct NativesImpl : public Natives {
 		this->addFun("Function.classmethod", {{"this"}}, [](const shared_ptr<Object> &fself, const vector<shared_ptr<Object>> &fother, const Location &flocation) {
 			return NativeFunction::newInstance({{"this"}, {"args", true}}, [fself](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 				if (self->instanceOf(ClassClass)) {
-					return fself->as<Function>()->execute(self->as<Object>(), other, location);
+					return fself->as<Function>()->execute(self, other, location);
 				} else {
-					return fself->as<Function>()->execute(self->as<Object>()->context->find("class"), other, location);
+					return fself->as<Function>()->execute(self->getClass(), other, location);
 				}
 			});
 		});
@@ -513,7 +502,7 @@ struct NativesImpl : public Natives {
 		this->addFun("Function.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			stringstream ss;
 			auto fun = self->as<Function>();
-			ss << "Function@" << fun->id << "(";
+			ss << fun->getRepr() << "(";
 			if (!fun->params.empty()) {
 				for (auto &param : fun->params) {
 					if (param.rest) ss << "...";
@@ -531,7 +520,7 @@ struct NativesImpl : public Natives {
 		this->addFun("Array.init", {{"this"}, {"args", true}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			auto array = self->as<Array>();
 			for (auto &value : other) {
-				array->values.push_back(value->as<Object>());
+				array->values.push_back(value);
 			}
 			return Void;
 		});
@@ -548,7 +537,7 @@ struct NativesImpl : public Natives {
 		this->addFun("Array.push", {{"this"}, {"args", true}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			auto array = self->as<Array>();
 			for (auto &value : other) {
-				array->values.push_back(value->as<Object>());
+				array->values.push_back(value);
 			}
 			return Void;
 		});

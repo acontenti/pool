@@ -2,15 +2,13 @@
 
 #include <functional>
 #include <any>
-#include "callable.hpp"
 #include "context.hpp"
+#include "util/location.hpp"
 
 using namespace std;
 
 namespace pool {
 	class POOL_PUBLIC Class;
-
-	class POOL_PUBLIC Variable;
 
 	class POOL_PUBLIC Object;
 
@@ -38,47 +36,48 @@ namespace pool {
 	extern POOL_PUBLIC shared_ptr<Bool> False;
 
 	class POOL_PUBLIC Object : public enable_shared_from_this<Object> {
-		shared_ptr<Object> getVariableValue() const;
-
-	public:
-		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &cls, const any &, const any &) {
-			return make_shared<Object>(context, any_cast<shared_ptr<Class>>(cls));
-		};
+	protected:
 		const size_t id;
 		const shared_ptr<Class> cls;
+	public:
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &data) {
+			return make_shared<Object>(context, any_cast<shared_ptr<Class>>(data));
+		};
 		const shared_ptr<Context> context;
 
 		Object(const shared_ptr<Context> &context, shared_ptr<Class> cls);
 
-		virtual string_view getType();
+		shared_ptr<Class> getClass() const;
 
-		string toString();
+		string getRepr() const;
 
 		template<class T, typename enable_if<is_base_of<Object, T>::value, int>::type = 0>
-		shared_ptr<T> as() const {
-			if (isVariable())
-				return const_pointer_cast<T>(reinterpret_pointer_cast<const T>(getVariableValue()));
+		inline shared_ptr<T> as() const {
 			return const_pointer_cast<T>(reinterpret_pointer_cast<const T>(shared_from_this()));
 		}
 
-		virtual shared_ptr<Function> findMethod(const string &methodName) const;
+		shared_ptr<Function> findMethod(const string &methodName) const;
 
 		virtual shared_ptr<Variable> find(const string &name) const;
 
-		virtual shared_ptr<Variable> findLocal(const string &id) const;
-
-		virtual bool isVariable() const;
+		shared_ptr<Variable> findLocal(const string &id) const;
 
 		void remove(const string &name);
 
-		virtual bool instanceOf(const shared_ptr<Class> &_class);
+		bool instanceOf(const shared_ptr<Class> &_class) const;
 	};
 
 	class POOL_PUBLIC Class : public Object {
 	public:
-		using creator_t = function<shared_ptr<Object>(const shared_ptr<Context> &context, const any &p1, const any &p2, const any &p3)>;
-		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &creator, const any &name, const any &super) {
-			return make_shared<Class>(context, any_cast<Class::creator_t>(creator), any_cast<string>(name), any_cast<shared_ptr<Class>>(super));
+		using creator_t = function<shared_ptr<Object>(const shared_ptr<Context> &context, const any &data)>;
+		struct ClassData {
+			const Class::creator_t &creator;
+			const string &name;
+			const shared_ptr<Class> &super;
+		};
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &data) {
+			const auto &classData = any_cast<Class::ClassData>(data);
+			return make_shared<Class>(context, classData.creator, classData.name, classData.super);
 		};
 		size_t instances = 0;
 		string name;
@@ -91,52 +90,20 @@ namespace pool {
 
 		shared_ptr<Variable> findInClass(const string &id) const;
 
-		shared_ptr<Object> newInstance(const shared_ptr<Context> &parent, const Location &location, const vector<shared_ptr<Object>> &other = {}, const any &a1 = nullptr, const any &a2 = nullptr, const any &a3 = nullptr) const;
+		shared_ptr<Object> newInstance(const shared_ptr<Context> &parent, const Location &location, const vector<shared_ptr<Object>> &other, const any &data) const;
 
-		shared_ptr<Class> extend(const creator_t &creator, const string &className, const shared_ptr<Block> &other, const Location &location) const;
+		shared_ptr<Class> extend(const creator_t &creator, const string &className, const shared_ptr<Block> &block, const Location &location) const;
 
-		bool subclassOf(const shared_ptr<Class> &_class) const;
+		bool subclassOf(const shared_ptr<Class> &other) const;
 
-		bool superclassOf(const shared_ptr<Class> &_class) const;
+		bool superclassOf(const shared_ptr<Class> &other) const;
 	};
-
-	class POOL_PUBLIC Variable : public Object {
-		shared_ptr<Object> value;
-		bool immutable = false;
-	public:
-		const string name;
-
-		bool isImmutable() const;
-
-		void setImmutable(bool _immutable);
-
-		const shared_ptr<Object> &getValue() const;
-
-		void setValue(const shared_ptr<Object> &val);
-
-		shared_ptr<Function> findMethod(const string &methodName) const override;
-
-		shared_ptr<Variable> find(const string &id) const override;
-
-		shared_ptr<Variable> findLocal(const string &id) const override;
-
-		string_view getType() override;
-
-		bool isVariable() const override;
-
-		bool instanceOf(const shared_ptr<Class> &_class) override;
-
-		Variable(const shared_ptr<Context> &context, string name, shared_ptr<Object> value, bool immutable);
-	};
-
-	template<>
-	shared_ptr<Variable> Object::as<Variable>() const;
 
 	class POOL_PUBLIC Bool : public Object {
 	public:
 		bool value;
-		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &_value, const any &, const any &) {
-			return make_shared<Bool>(context, any_cast<bool>(_value));
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &data) {
+			return make_shared<Bool>(context, any_cast<bool>(data));
 		};
 
 		Bool(const shared_ptr<Context> &context, bool value);
@@ -145,7 +112,7 @@ namespace pool {
 	class POOL_PUBLIC Integer : public Object {
 	public:
 		long long int value;
-		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &_value, const any &, const any &) {
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &_value) {
 			return make_shared<Integer>(context, any_cast<long long int>(_value));
 		};
 
@@ -159,8 +126,8 @@ namespace pool {
 	class POOL_PUBLIC Decimal : public Object {
 	public:
 		long double value;
-		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &_value, const any &, const any &) {
-			return make_shared<Decimal>(context, any_cast<long double>(_value));
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &data) {
+			return make_shared<Decimal>(context, any_cast<long double>(data));
 		};
 
 		Decimal(const shared_ptr<Context> &context, long double value);
@@ -173,8 +140,8 @@ namespace pool {
 	class POOL_PUBLIC String : public Object {
 	public:
 		string value;
-		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &_value, const any &, const any &) {
-			return make_shared<String>(context, any_cast<string>(_value));
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &data) {
+			return make_shared<String>(context, any_cast<string>(data));
 		};
 
 		String(const shared_ptr<Context> &context, string value);
@@ -196,8 +163,11 @@ namespace pool {
 		struct Param {
 			string id;
 			bool rest;
+			shared_ptr<Class> type;
 
-			Param(string id, bool rest = false) : id(move(id)), rest(rest) {}
+			Param(string id, const bool &rest = false) : id(move(id)), type(nullptr), rest(rest) {}
+
+			Param(string id, shared_ptr<Class> type) : id(move(id)), type(move(type)), rest(false) {}
 		};
 
 		vector<Param> params;
@@ -221,7 +191,7 @@ namespace pool {
 	class POOL_PUBLIC Array : public Object {
 	public:
 		vector<shared_ptr<Object>> values;
-		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &, const any &, const any &) {
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &) {
 			return make_shared<Array>(context);
 		};
 

@@ -1,8 +1,31 @@
 #include <memory>
 #include <sstream>
-#include "poolstd.hpp"
+#include <poolstd.hpp>
+#include <util/errors.hpp>
 
 using namespace pool;
+
+Variable::Variable(string name, shared_ptr<Object> value, bool immutable)
+		: name(move(name)), value(move(value)), immutable(immutable) {
+}
+
+void Variable::setValue(const shared_ptr<Object> &val) {
+	if (!immutable)
+		value = val;
+	else throw compile_error("Cannot assign immutable variable '" + name + "'", Location::UNKNOWN);
+}
+
+bool Variable::isImmutable() const {
+	return immutable;
+}
+
+void Variable::setImmutable(bool _immutable) {
+	immutable = _immutable;
+}
+
+const shared_ptr<Object> &Variable::getValue() const {
+	return value;
+}
 
 shared_ptr<Context> Context::global = nullptr;
 
@@ -23,16 +46,16 @@ shared_ptr<Variable> Context::findLocal(const string &name) const {
 }
 
 shared_ptr<Variable> Context::add(const string &name) {
-	const auto &variable = make_shared<Variable>(Context::create(shared_from_this()), name, Null, false);
+	const auto &variable = make_shared<Variable>(name, Null, false);
 	return heap.try_emplace(name, variable).first->second;
 }
 
 shared_ptr<Variable> Context::set(const string &name, const shared_ptr<Object> &value, bool immutable) {
 	if (const auto &var = this->findLocal(name)) {
-		var->setValue(value->as<Object>());
+		var->setValue(value);
 		return var;
 	} else {
-		return heap[name] = make_shared<Variable>(Context::create(shared_from_this()), name, value->as<Object>(), immutable);
+		return heap[name] = make_shared<Variable>(name, value, immutable);
 	}
 }
 
@@ -45,7 +68,7 @@ string Context::toString() const {
 	ss << "{";
 	if (!heap.empty()) {
 		for (auto&[name, value] : *this) {
-			ss << name << ":" << value->toString() << ",";
+			ss << name << ":" << value->getValue()->getRepr() << ",";
 		}
 		ss.seekp(-1, stringstream::cur); //remove last comma
 	}

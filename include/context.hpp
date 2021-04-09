@@ -10,9 +10,24 @@ using namespace std;
 namespace pool {
 	class POOL_PUBLIC Object;
 
-	class POOL_PUBLIC Variable;
+	class POOL_PUBLIC Variable {
+		shared_ptr<Object> value;
+		bool immutable = false;
+	public:
+		const string name;
 
-	class POOL_PUBLIC Context : public enable_shared_from_this<Context> {
+		[[nodiscard]] bool isImmutable() const;
+
+		void setImmutable(bool _immutable);
+
+		[[nodiscard]] const shared_ptr<Object> &getValue() const;
+
+		void setValue(const shared_ptr<Object> &val);
+
+		Variable(string name, shared_ptr<Object> value, bool immutable);
+	};
+
+	class POOL_PUBLIC Context {
 		unordered_map<string, shared_ptr<Variable>> heap;
 		const shared_ptr<Context> parent;
 	public:
@@ -20,9 +35,9 @@ namespace pool {
 
 		explicit Context(shared_ptr<Context> parent);
 
-		shared_ptr<Variable> find(const string &name) const;
+		[[nodiscard]] shared_ptr<Variable> find(const string &name) const;
 
-		shared_ptr<Variable> findLocal(const string &name) const;
+		[[nodiscard]] shared_ptr<Variable> findLocal(const string &name) const;
 
 		shared_ptr<Variable> add(const string &name);
 
@@ -30,17 +45,17 @@ namespace pool {
 
 		void remove(const string &name);
 
-		string toString() const;
+		[[nodiscard]] string toString() const;
 
-		inline auto begin() const {
+		[[nodiscard]] inline auto begin() const {
 			return heap.begin();
 		}
 
-		inline auto end() const {
+		[[nodiscard]] inline auto end() const {
 			return heap.end();
 		}
 
-		inline auto empty() const {
+		[[nodiscard]] inline auto empty() const {
 			return heap.empty();
 		}
 

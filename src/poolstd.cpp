@@ -1,6 +1,7 @@
 #include "poolstd_private.hpp"
 #include "pool.hpp"
-#include "util/errors.hpp"
+#include <callable.hpp>
+#include <util/errors.hpp>
 
 using namespace pool;
 
@@ -24,14 +25,10 @@ shared_ptr<Bool> pool::False = nullptr;
 Object::Object(const shared_ptr<Context> &context, shared_ptr<Class> cls)
 		: context(context), cls(move(cls)), id(cls ? cls->instances++ : 0) {}
 
-string_view Object::getType() {
-	return cls ? cls->name : as<Class>()->name;
-}
-
 shared_ptr<Function> Object::findMethod(const string &methodName) const {
 	if (cls) {
 		if (auto object = cls->findInClass(methodName)) {
-			if (auto executable = dynamic_pointer_cast<Function>(object->as<Object>())) {
+			if (auto executable = dynamic_pointer_cast<Function>(object->getValue())) {
 				return executable;
 			}
 		}
@@ -57,52 +54,39 @@ void Object::remove(const string &name) {
 	context->remove(name);
 }
 
-shared_ptr<Object> Object::getVariableValue() const {
-	return const_pointer_cast<Object>(reinterpret_pointer_cast<const Variable>(shared_from_this())->getValue());
+string Object::getRepr() const {
+	return getClass()->name + "@" + to_string(id);
 }
 
-bool Object::isVariable() const {
-	return false;
-}
-
-string Object::toString() {
-	return string(getType()) + "@" + to_string(id);
-}
-
-bool Object::instanceOf(const shared_ptr<Class> &_class) {
+bool Object::instanceOf(const shared_ptr<Class> &_class) const {
 	if (cls) {
 		return cls == _class || cls->subclassOf(_class);
 	} else return _class == ObjectClass;
 }
 
-template<>
-shared_ptr<Variable> Object::as<Variable>() const {
-	return const_pointer_cast<Variable>(reinterpret_pointer_cast<const Variable>(shared_from_this()));
+shared_ptr<Class> Object::getClass() const {
+	return cls ? cls : as<Class>();
 }
 
 Class::Class(const shared_ptr<Context> &context, creator_t creator, string name, shared_ptr<Class> super)
 		: Object(context, ClassClass), creator(move(creator)), name(move(name)), super(move(super)) {}
 
-shared_ptr<Class> Class::extend(const creator_t &_creator, const string &className, const shared_ptr<Block> &other, const Location &location) const {
-	auto self = this->as<Class>();
-	auto cls = ClassClass->newInstance(context, location, {}, _creator ? _creator
-																	   : creator, className, self)->as<Class>();
-	cls->context->set("super", self);
-	if (other) {
-		other->execute(location);
-		for (auto[name, value] : *other->context) {
-			cls->context->set(name, value->as<Object>());
+shared_ptr<Class> Class::extend(const creator_t &_creator, const string &className, const shared_ptr<Block> &block, const Location &location) const {
+	const auto &self = this->as<Class>();
+	const auto &cls = ClassClass->newInstance(context, location, {}, ClassData{_creator ? _creator
+																						: creator, className, self})->as<Class>();
+	if (block) {
+		block->execute(location);
+		for (const auto&[name, value] : *block->context) {
+			cls->context->set(name, value->getValue(), value->isImmutable());
 		}
 	}
 	return cls;
 }
 
-shared_ptr<Object> Class::newInstance(const shared_ptr<Context> &parent, const Location &location, const vector<shared_ptr<Object>> &other, const any &a1, const any &a2, const any &a3) const {
+shared_ptr<Object> Class::newInstance(const shared_ptr<Context> &parent, const Location &location, const vector<shared_ptr<Object>> &other, const any &data) const {
 	auto context = Context::create(parent);
-	auto ptr = creator(context, a1, a2, a3);
-	if (ptr->cls) {
-		ptr->context->set("class", ptr->cls);
-	}
+	auto ptr = creator(context, data);
 	if (auto init = ptr->findMethod("init")) {
 		init->execute(ptr, other, location);
 	}
@@ -129,58 +113,12 @@ shared_ptr<Variable> Class::findInClass(const string &id) const {
 	return nullptr;
 }
 
-bool Class::subclassOf(const shared_ptr<Class> &_class) const {
-	return super && (super == _class || super->subclassOf(_class));
+bool Class::subclassOf(const shared_ptr<Class> &other) const {
+	return super && (super == other || super->subclassOf(other));
 }
 
-bool Class::superclassOf(const shared_ptr<Class> &_class) const {
-	return _class->super && (this == _class->super.get() || superclassOf(_class->super));
-}
-
-Variable::Variable(const shared_ptr<Context> &context, string name, shared_ptr<Object> value, bool immutable)
-		: Object(context, nullptr), name(move(name)), value(move(value)), immutable(immutable) {
-}
-
-bool Variable::instanceOf(const shared_ptr<Class> &_class) {
-	return value->instanceOf(_class);
-}
-
-void Variable::setValue(const shared_ptr<Object> &val) {
-	if (!immutable)
-		value = val->as<Object>();
-	else throw compile_error("Cannot assign immutable variable '" + name + "'", Location::UNKNOWN);
-}
-
-bool Variable::isImmutable() const {
-	return immutable;
-}
-
-void Variable::setImmutable(bool _immutable) {
-	immutable = _immutable;
-}
-
-const shared_ptr<Object> &Variable::getValue() const {
-	return value;
-}
-
-shared_ptr<Function> Variable::findMethod(const string &methodName) const {
-	return value->findMethod(methodName);
-}
-
-shared_ptr<Variable> Variable::find(const string &id) const {
-	return value->find(id);
-}
-
-shared_ptr<Variable> Variable::findLocal(const string &id) const {
-	return value->findLocal(id);
-}
-
-string_view Variable::getType() {
-	return value->getType();
-}
-
-bool Variable::isVariable() const {
-	return true;
+bool Class::superclassOf(const shared_ptr<Class> &other) const {
+	return other->super && (this == other->super.get() || superclassOf(other->super));
 }
 
 Bool::Bool(const shared_ptr<Context> &context, bool value)
@@ -207,36 +145,34 @@ CodeFunction::CodeFunction(const shared_ptr<Context> &context, const vector<Para
 shared_ptr<Object> CodeFunction::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 	shared_ptr<Object> returnValue = Void;
 	vector<shared_ptr<Object>> args;
-	auto ptr = self->as<Object>();
-	if (ptr != shared_from_this()) {
+	if (self.get() != this) {
 		args.reserve(other.size() + 1);
-		args.push_back(ptr);
+		args.push_back(self);
 	} else {
 		args.reserve(other.size());
 	}
 	args.insert(args.end(), other.begin(), other.end());
-	if (!params.empty() && params.back().rest) {
-		if (params.size() - 1 > args.size())
-			throw compile_error("Function takes at least " + to_string(params.size() - 1)
+	const auto hasRest = !params.empty() && params.back().rest;
+	const auto paramsSize = hasRest ? params.size() - 1 : params.size();
+	if (hasRest) {
+		if (paramsSize > args.size())
+			throw compile_error("Function takes at least " + to_string(paramsSize)
 								+ " arguments, but " + to_string(args.size()) + " were given", location);
-	} else if (params.size() != args.size()) {
-		throw compile_error("Function takes " + to_string(params.size())
+	} else if (paramsSize != args.size()) {
+		throw compile_error("Function takes " + to_string(paramsSize)
 							+ " arguments, but " + to_string(args.size()) + " were given", location);
 	}
-	for (int i = 0; i < params.size(); ++i) {
-		shared_ptr<Object> value;
-		auto name = params[i].id;
-		if (params[i].rest) {
-			vector<shared_ptr<Object>> rest;
-			rest.reserve(args.size() - i);
-			for (int j = i; j < args.size(); ++j) {
-				rest.emplace_back(args[j]);
-			}
-			value = ArrayClass->newInstance(context, location, rest);
+	for (int i = 0; i < paramsSize; ++i) {
+		const auto &value = args[i];
+		const auto &param = params[i];
+		if (!param.rest) {
+			if (param.type && !value->instanceOf(param.type)) {
+				throw compile_error("Function argument '" + param.id + "' must be of class '" + param.type->name
+									+ "', but argument of class '" + value->getClass()->name + " was given", location);
+			} else context->set(param.id, value);
 		} else {
-			value = args[i];
+			context->set(param.id, ArrayClass->newInstance(context, location, {args.begin() + i, args.end()}, nullptr));
 		}
-		context->set(name, value);
 	}
 	for (auto &call: calls) {
 		if (auto exp = call->expression()) {
@@ -252,25 +188,24 @@ NativeFunction::NativeFunction(const shared_ptr<Context> &context, const vector<
 		: Function(context, params), code(move(code)) {}
 
 shared_ptr<Object> NativeFunction::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-	if (self->as<Object>() == shared_from_this()) {
-		if (!params.empty() && params.back().rest) {
-			if (params.size() - 1 > other.size())
-				throw compile_error("Function takes at least " + to_string(params.size() - 1)
-									+ " arguments, but " + to_string(other.size()) + " were given", location);
-		} else {
-			if (params.size() != other.size())
-				throw compile_error("Function takes " + to_string(params.size())
-									+ " arguments, but " + to_string(other.size()) + " were given", location);
-		}
-	} else {
-		if (!params.empty() && params.back().rest) {
-			if (params.size() - 1 > other.size() + 1)
-				throw compile_error("Function takes at least " + to_string(params.size() - 1)
-									+ " arguments, but " + to_string(other.size() + 1) + " were given", location);
-		} else {
-			if (params.size() != other.size() + 1)
-				throw compile_error("Function takes " + to_string(params.size())
-									+ " arguments, but " + to_string(other.size() + 1) + " were given", location);
+	bool thisIsSelf = self.get() == this;
+	bool hasRest = !params.empty() && params.back().rest;
+	auto otherSize = thisIsSelf ? other.size() : other.size() + 1;
+	auto paramsSize = hasRest ? params.size() - 1 : params.size();
+	if (hasRest) {
+		if (paramsSize > otherSize)
+			throw compile_error("Function takes at least " + to_string(paramsSize)
+								+ " arguments, but " + to_string(otherSize) + " were given", location);
+	} else if (paramsSize != otherSize) {
+		throw compile_error("Function takes " + to_string(paramsSize)
+							+ " arguments, but " + to_string(otherSize) + " were given", location);
+	}
+	for (int i = 0, delta = thisIsSelf ? 0 : 1; i < paramsSize - delta; ++i) {
+		const auto &value = other[i];
+		const auto &param = params[i + delta];
+		if (!param.rest && param.type && !value->instanceOf(param.type)) {
+			throw compile_error("Function argument '" + param.id + "' must be of class '" + param.type->name
+								+ "', but argument of class '" + value->getClass()->name + " was given", location);
 		}
 	}
 	auto returnValue = code(self, other, location);
@@ -304,7 +239,7 @@ Array::Array(const shared_ptr<Context> &context) : Object(context, ArrayClass) {
 
 void initializeContext() {
 	Context::global = Context::create(nullptr);
-	Context::global->set("import", NativeFunction::newInstance({{"moduleName"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+	Context::global->set("import", NativeFunction::newInstance({{"moduleName", StringClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 		auto arg = other[0];
 		if (arg->instanceOf(StringClass)) {
 			auto moduleName = arg->as<String>()->value;
@@ -322,19 +257,19 @@ void initializeContext() {
 }
 
 void initializeBaseObjects() {
-	ClassClass = make_shared<Class>(Context::create(Context::global), Class::CREATOR, "Class", shared_ptr<Class>(nullptr))->as<Class>(); // ObjectClass is not yet created, so we pass nullptr as super
-	ObjectClass = ClassClass->newInstance(Context::global, Location::UNKNOWN, {}, static_cast<Class::creator_t>(Object::CREATOR), string("Object"), shared_ptr<Class>(nullptr))->as<Class>(); // ObjectClass is the base class, so it has no super
+	ClassClass = Class::CREATOR(Context::create(Context::global), Class::ClassData{Class::CREATOR, "Class", nullptr}); // ObjectClass is not yet created, so we pass nullptr as super
+	ObjectClass = ClassClass->newInstance(Context::global, Location::UNKNOWN, {}, Class::ClassData{Object::CREATOR, "Object", nullptr})->as<Class>(); // ObjectClass is the base class, so it has no super
 	ClassClass->super = ObjectClass; // Now ObjectClass exists, so we can assign it to ClassClass->super
-	BoolClass = ObjectClass->extend(Bool::CREATOR, "Bool", {}, Location::UNKNOWN);
-	NumberClass = ObjectClass->extend(nullptr, "Number", {}, Location::UNKNOWN);
-	IntegerClass = NumberClass->extend(Integer::CREATOR, "Integer", {}, Location::UNKNOWN);
-	DecimalClass = NumberClass->extend(Decimal::CREATOR, "Decimal", {}, Location::UNKNOWN);
-	StringClass = ObjectClass->extend(String::CREATOR, "String", {}, Location::UNKNOWN);
-	ArrayClass = ObjectClass->extend(Array::CREATOR, "Array", {}, Location::UNKNOWN);
-	BlockClass = ObjectClass->extend(Block::CREATOR, "Block", {}, Location::UNKNOWN);
-	FunctionClass = ObjectClass->extend(CodeFunction::CREATOR, "Function", {}, Location::UNKNOWN);
-	VoidClass = ObjectClass->extend(nullptr, "Void", {}, Location::UNKNOWN);
-	NothingClass = ObjectClass->extend(nullptr, "Nothing", {}, Location::UNKNOWN);
+	BoolClass = ObjectClass->extend(Bool::CREATOR, "Bool", nullptr, Location::UNKNOWN);
+	NumberClass = ObjectClass->extend(nullptr, "Number", nullptr, Location::UNKNOWN);
+	IntegerClass = NumberClass->extend(Integer::CREATOR, "Integer", nullptr, Location::UNKNOWN);
+	DecimalClass = NumberClass->extend(Decimal::CREATOR, "Decimal", nullptr, Location::UNKNOWN);
+	StringClass = ObjectClass->extend(String::CREATOR, "String", nullptr, Location::UNKNOWN);
+	ArrayClass = ObjectClass->extend(Array::CREATOR, "Array", nullptr, Location::UNKNOWN);
+	BlockClass = ObjectClass->extend(Block::CREATOR, "Block", nullptr, Location::UNKNOWN);
+	FunctionClass = ObjectClass->extend(CodeFunction::CREATOR, "Function", nullptr, Location::UNKNOWN);
+	VoidClass = ObjectClass->extend(nullptr, "Void", nullptr, Location::UNKNOWN);
+	NothingClass = ObjectClass->extend(nullptr, "Nothing", nullptr, Location::UNKNOWN);
 	Void = VoidClass->newInstance(Context::global, Location::UNKNOWN, {}, VoidClass);
 	Null = NothingClass->newInstance(Context::global, Location::UNKNOWN, {}, NothingClass);
 	True = BoolClass->newInstance(Context::global, Location::UNKNOWN, {}, true)->as<Bool>();

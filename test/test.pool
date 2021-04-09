@@ -50,22 +50,22 @@ Test ::= Object.extend("Test", {
 		this.long := 0;
 		this.int := 0;
 		"init: this := ".+(this).println();
-		"init: class := ".+(this.class).println();
-		"init: super := ".+(this.class.super).println();
+		"init: class := ".+(this.getClass()).println();
+		"init: super := ".+(this.getClass().getSuper()).println();
 		"init: who := ".+(who).println();
 	};
 	++ := (this) : {
 		"++: this := ".+(this).println();
-		"++: class := ".+(this.class).println();
+		"++: class := ".+(this.getClass()).println();
 		this.long := this.long.+(10);
 	};
 	print := (this) : {
 		"print: this := ".+(this).println();
-		"print: class := ".+(this.class).println();
+		"print: class := ".+(this.getClass()).println();
 		this.long.println();
 	};
 	toString := (this) : {
-		"This is an instance of class Test, ".+(this.class.toString());
+		"This is an instance of class Test, ".+(this.getClass().toString());
 	};
 	number := 0;
 	no := (class, who) : {
@@ -82,13 +82,13 @@ Test ::= Object.extend("Test", {
 });
 n := Test.new("yes");
 "n: ".+(n).println();
-"Test.class: ".+(Test.class).println();
-"Test.class.super := ".+(Test.class.super).println();
+"Test.getClass(): ".+(Test.getClass()).println();
+"Test.getClass().getSuper() := ".+(Test.getClass().getSuper()).println();
 "Test: ".+(Test).println();
-"Test.super := ".+(Test.super).println();
-"n.class: ".+(n.class).println();
-"n.class.super := ".+(n.class.super).println();
-"Object.class: ".+(Object.class).println();
+"Test.getSuper() := ".+(Test.getSuper()).println();
+"n.getClass(): ".+(n.getClass()).println();
+"n.getClass().getSuper() := ".+(n.getClass().getSuper()).println();
+"Object.getClass(): ".+(Object.getClass()).println();
 Test.no("you");
 n.no("me");
 Test.yes("you");

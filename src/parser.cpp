@@ -1,9 +1,9 @@
-#include "natives.hpp"
+#include <natives.hpp>
 #include "pool.hpp"
-#include "parser.hpp"
 #include "poolstd_private.hpp"
-#include "util/strings.hpp"
-#include "util/errors.hpp"
+#include "callable_private.hpp"
+#include <util/strings.hpp>
+#include <util/errors.hpp>
 
 using namespace pool;
 using namespace antlr4;
@@ -17,27 +17,24 @@ string getId(tree::TerminalNode *ast) {
 shared_ptr<Object> parseIdentifier(tree::TerminalNode *ast, const shared_ptr<Context> &context) {
 	auto id = getId(ast);
 	if (auto find = context->find(id)) {
-		return find;
+		return find->getValue();
 	} else {
-		return context->add(id);
+		return context->add(id)->getValue();
 	}
 }
 
-shared_ptr<Callable> parseAccess(PoolParser::AccessContext *ast, const shared_ptr<Context> &context) {
+shared_ptr<AssignmentAccess> parseAccess(PoolParser::AccessContext *ast, const shared_ptr<Context> &context) {
 	switch (ast->type) {
-		case PoolParser::AccessContext::G: {
-			auto caller = parseCall(ast->callee, context);
-			auto id = getId(ast->ID());
-			return Access::create({ast->start, ast->stop}, caller, id);
-		}
+		case PoolParser::AccessContext::G:
 		case PoolParser::AccessContext::L: {
-			auto caller = parseCall(ast->callee, context);
-			auto id = getId(ast->ID());
-			return LocalAccess::create({ast->start, ast->stop}, caller, id);
+			const auto &caller = parseCall(ast->callee, context);
+			const auto &id = getId(ast->ID());
+			return AssignmentAccess::create({ast->start, ast->stop}, context, caller, id,
+											ast->type == PoolParser::AccessContext::L);
 		}
 		case PoolParser::AccessContext::I: {
-			auto id = parseIdentifier(ast->ID(), context);
-			return Identity::create({ast->start, ast->stop}, id);
+			const auto &id = getId(ast->ID());
+			return AssignmentAccess::create({ast->start, ast->stop}, context, nullptr, id, false);
 		}
 		default:
 			throw compile_error("invalid access", {ast->start, ast->stop});
@@ -212,24 +209,16 @@ shared_ptr<Callable> parseCall(PoolParser::CallContext *ast, const shared_ptr<Co
 			auto args = parseArgs(ast->a, context);
 			return Invocation::create({ast->start, ast->stop}, caller, args);
 		}
-		case PoolParser::CallContext::IA: {
-			auto caller = parseCall(ast->callee, context);
-			auto id = getId(ast->ID());
-			if (ast->a) {
-				auto args = parseArgs(ast->a, context);
-				return InvocationAccess::create({ast->start, ast->stop}, ast->ID()->getSymbol(), caller, id, args);
-			} else {
-				return Access::create({ast->start, ast->stop}, caller, id);
-			}
-		}
+		case PoolParser::CallContext::IA:
 		case PoolParser::CallContext::ILA: {
 			auto caller = parseCall(ast->callee, context);
 			auto id = getId(ast->ID());
 			if (ast->a) {
 				auto args = parseArgs(ast->a, context);
-				return InvocationLocalAccess::create({ast->start, ast->stop}, ast->ID()->getSymbol(), caller, id, args);
+				return InvocationAccess::create({ast->start, ast->stop}, ast->ID()->getSymbol(), caller, id, args,
+												ast->type == PoolParser::CallContext::ILA);
 			} else {
-				return LocalAccess::create({ast->start, ast->stop}, caller, id);
+				return Access::create({ast->start, ast->stop}, caller, id, true);
 			}
 		}
 		default:

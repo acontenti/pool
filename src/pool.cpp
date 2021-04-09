@@ -1,12 +1,11 @@
 #include <iostream>
 #include <filesystem>
-#include <memory>
-#include "poolstd.hpp"
+#include <poolstd.hpp>
 #include "pool.hpp"
 #include "parser.hpp"
 #include "PoolLexer.h"
-#include "util/strings.hpp"
-#include "util/errors.hpp"
+#include <util/strings.hpp>
+#include <util/errors.hpp>
 #include "util/ErrorListener.hpp"
 #include <cpplocate/cpplocate.h>
 
@@ -42,10 +41,10 @@ public:
 			}
 			Context::global->set("debug", settings.debug ? True : False);
 			const auto &oldArgs = Context::global->find("args");
-			Context::global->set("args", ArrayClass->newInstance(Context::global, Location::UNKNOWN, arguments));
+			Context::global->set("args", ArrayClass->newInstance(Context::global, Location::UNKNOWN, arguments, nullptr));
 			parseProgram(parser->program(), Context::global);
 			if (oldArgs) {
-				Context::global->set("args", oldArgs);
+				Context::global->set("args", oldArgs->getValue());
 			}
 			result = true;
 		} catch (const compile_error &error) {
