@@ -7,6 +7,7 @@ using namespace pool;
 shared_ptr<Class> pool::ClassClass = nullptr;
 shared_ptr<Class> pool::ObjectClass = nullptr;
 shared_ptr<Class> pool::BoolClass = nullptr;
+shared_ptr<Class> pool::NumberClass = nullptr;
 shared_ptr<Class> pool::IntegerClass = nullptr;
 shared_ptr<Class> pool::DecimalClass = nullptr;
 shared_ptr<Class> pool::StringClass = nullptr;
@@ -325,8 +326,9 @@ void initializeBaseObjects() {
 	ObjectClass = ClassClass->newInstance(Context::global, Location::UNKNOWN, {}, static_cast<Class::creator_t>(Object::CREATOR), string("Object"), shared_ptr<Class>(nullptr))->as<Class>(); // ObjectClass is the base class, so it has no super
 	ClassClass->super = ObjectClass; // Now ObjectClass exists, so we can assign it to ClassClass->super
 	BoolClass = ObjectClass->extend(Bool::CREATOR, "Bool", {}, Location::UNKNOWN);
-	IntegerClass = ObjectClass->extend(Integer::CREATOR, "Integer", {}, Location::UNKNOWN);
-	DecimalClass = ObjectClass->extend(Decimal::CREATOR, "Decimal", {}, Location::UNKNOWN);
+	NumberClass = ObjectClass->extend(nullptr, "Number", {}, Location::UNKNOWN);
+	IntegerClass = NumberClass->extend(Integer::CREATOR, "Integer", {}, Location::UNKNOWN);
+	DecimalClass = NumberClass->extend(Decimal::CREATOR, "Decimal", {}, Location::UNKNOWN);
 	StringClass = ObjectClass->extend(String::CREATOR, "String", {}, Location::UNKNOWN);
 	ArrayClass = ObjectClass->extend(Array::CREATOR, "Array", {}, Location::UNKNOWN);
 	BlockClass = ObjectClass->extend(Block::CREATOR, "Block", {}, Location::UNKNOWN);

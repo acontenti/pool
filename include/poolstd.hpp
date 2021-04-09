@@ -23,6 +23,7 @@ namespace pool {
 	extern POOL_PUBLIC shared_ptr<Class> ClassClass;
 	extern POOL_PUBLIC shared_ptr<Class> ObjectClass;
 	extern POOL_PUBLIC shared_ptr<Class> BoolClass;
+	extern POOL_PUBLIC shared_ptr<Class> NumberClass;
 	extern POOL_PUBLIC shared_ptr<Class> IntegerClass;
 	extern POOL_PUBLIC shared_ptr<Class> DecimalClass;
 	extern POOL_PUBLIC shared_ptr<Class> StringClass;

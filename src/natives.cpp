@@ -3,6 +3,7 @@
 #include "poolstd_private.hpp"
 #include "util/errors.hpp"
 #include "util/dylib.hpp"
+#include <ctgmath>
 
 using namespace pool;
 
@@ -18,6 +19,7 @@ struct NativesImpl : public Natives {
 		initializeClass();
 		initializeObject();
 		initializeBool();
+		initializeNumber();
 		initializeInteger();
 		initializeDecimal();
 		initializeString();
@@ -174,6 +176,9 @@ struct NativesImpl : public Natives {
 			}
 			return Void;
 		});
+		addFun("Object.==", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			return self->as<Object>() == other[0]->as<Object>() ? True : False;
+		});
 	}
 
 	void initializeBool() {
@@ -228,44 +233,224 @@ struct NativesImpl : public Natives {
 		});
 	}
 
+	void initializeNumber() {
+		this->add("Number", NumberClass);
+		this->addFun("Number.<", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf(IntegerClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Integer>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return (value < oth->as<Integer>()->value) ? True : False;
+				} else if (oth->instanceOf(DecimalClass)) {
+					return (value < oth->as<Decimal>()->value) ? True : False;
+				} else throw compile_error("Number.< argument must be a Number", location);
+			} else if (self->instanceOf(DecimalClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Decimal>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return (value < oth->as<Integer>()->value) ? True : False;
+				} else if (oth->instanceOf(DecimalClass)) {
+					return (value < oth->as<Decimal>()->value) ? True : False;
+				} else throw compile_error("Decimal.< argument must be a Number", location);
+			} else throw compile_error("Number.< error: invalid subclass", location);
+		});
+		this->addFun("Number.==", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf(IntegerClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Integer>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return (value == oth->as<Integer>()->value) ? True : False;
+				} else if (oth->instanceOf(DecimalClass)) {
+					return (value == oth->as<Decimal>()->value) ? True : False;
+				} else return False;
+			} else if (self->instanceOf(DecimalClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Decimal>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return (value == oth->as<Integer>()->value) ? True : False;
+				} else if (oth->instanceOf(DecimalClass)) {
+					return (value == oth->as<Decimal>()->value) ? True : False;
+				} else return False;
+			} else throw compile_error("Number.== error: invalid subclass", location);
+		});
+		this->addFun("Number.+", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf(IntegerClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Integer>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return Integer::newInstance(self->context, location, value + oth->as<Integer>()->value);
+				} else if (oth->instanceOf(DecimalClass)) {
+					return Decimal::newInstance(self->context, location, value + oth->as<Decimal>()->value);
+				} else if (oth->instanceOf(StringClass)) {
+					return String::newInstance(self->context, location, to_string(value) + oth->as<String>()->value);
+				} else throw compile_error("Number.+ argument must be a Number or a String", location);
+			} else if (self->instanceOf(DecimalClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Decimal>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return Decimal::newInstance(self->context, location, value + oth->as<Integer>()->value);
+				} else if (oth->instanceOf(DecimalClass)) {
+					return Decimal::newInstance(self->context, location, value + oth->as<Decimal>()->value);
+				} else if (oth->instanceOf(StringClass)) {
+					return String::newInstance(self->context, location, to_string(value) + oth->as<String>()->value);
+				} else throw compile_error("Number.+ argument must be a Number or a String", location);
+			} else throw compile_error("Number.+ error: invalid subclass", location);
+		});
+		this->addFun("Number.-", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf(IntegerClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Integer>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return Integer::newInstance(self->context, location, value - oth->as<Integer>()->value);
+				} else if (oth->instanceOf(DecimalClass)) {
+					return Decimal::newInstance(self->context, location, value - oth->as<Decimal>()->value);
+				} else throw compile_error("Number.- argument must be a Number", location);
+			} else if (self->instanceOf(DecimalClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Decimal>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return Decimal::newInstance(self->context, location, value - oth->as<Integer>()->value);
+				} else if (oth->instanceOf(DecimalClass)) {
+					return Decimal::newInstance(self->context, location, value - oth->as<Decimal>()->value);
+				} else throw compile_error("Number.- argument must be a Number", location);
+			} else throw compile_error("Number.- error: invalid subclass", location);
+		});
+		this->addFun("Number.*", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf(IntegerClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Integer>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return Integer::newInstance(self->context, location, value * oth->as<Integer>()->value);
+				} else if (oth->instanceOf(DecimalClass)) {
+					return Decimal::newInstance(self->context, location, value * oth->as<Decimal>()->value);
+				} else throw compile_error("Number.* argument must be a Number", location);
+			} else if (self->instanceOf(DecimalClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Decimal>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return Decimal::newInstance(self->context, location, value * oth->as<Integer>()->value);
+				} else if (oth->instanceOf(DecimalClass)) {
+					return Decimal::newInstance(self->context, location, value * oth->as<Decimal>()->value);
+				} else throw compile_error("Number.* argument must be a Number", location);
+			} else throw compile_error("Number.* error: invalid subclass", location);
+		});
+		this->addFun("Number./", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf(IntegerClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Integer>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return Decimal::newInstance(self->context, location,
+												value / static_cast<long double>(oth->as<Integer>()->value));
+				} else if (oth->instanceOf(DecimalClass)) {
+					return Decimal::newInstance(self->context, location, value / oth->as<Decimal>()->value);
+				} else throw compile_error("Number./ argument must be a Number", location);
+			} else if (self->instanceOf(DecimalClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Decimal>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return Decimal::newInstance(self->context, location, value / oth->as<Integer>()->value);
+				} else if (oth->instanceOf(DecimalClass)) {
+					return Decimal::newInstance(self->context, location, value / oth->as<Decimal>()->value);
+				} else throw compile_error("Number./ argument must be a Number", location);
+			} else throw compile_error("Number./ error: invalid subclass", location);
+		});
+		this->addFun("Number.%", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf(IntegerClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Integer>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return Integer::newInstance(self->context, location, value % oth->as<Integer>()->value);
+				} else if (oth->instanceOf(DecimalClass)) {
+					return Decimal::newInstance(self->context, location, fmod(value, oth->as<Decimal>()->value));
+				} else throw compile_error("Number.% argument must be a Number", location);
+			} else if (self->instanceOf(DecimalClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Decimal>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return Decimal::newInstance(self->context, location, fmod(value, oth->as<Integer>()->value));
+				} else if (oth->instanceOf(DecimalClass)) {
+					return Decimal::newInstance(self->context, location, fmod(value, oth->as<Decimal>()->value));
+				} else throw compile_error("Number.% argument must be a Number", location);
+			} else throw compile_error("Number.% error: invalid subclass", location);
+		});
+		this->addFun("Number.**", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf(IntegerClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Integer>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return Integer::newInstance(self->context, location, pow(value, oth->as<Integer>()->value));
+				} else if (oth->instanceOf(DecimalClass)) {
+					return Decimal::newInstance(self->context, location, pow(value, oth->as<Decimal>()->value));
+				} else throw compile_error("Number.** argument must be a Number", location);
+			} else if (self->instanceOf(DecimalClass)) {
+				const auto &oth = other[0];
+				const auto &value = self->as<Decimal>()->value;
+				if (oth->instanceOf(IntegerClass)) {
+					return Decimal::newInstance(self->context, location, pow(value, oth->as<Integer>()->value));
+				} else if (oth->instanceOf(DecimalClass)) {
+					return Decimal::newInstance(self->context, location, pow(value, oth->as<Decimal>()->value));
+				} else throw compile_error("Number.** argument must be a Number", location);
+			} else throw compile_error("Number.** error: invalid subclass", location);
+		});
+		this->addFun("Number.abs", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf(IntegerClass)) {
+				const auto &value = self->as<Integer>()->value;
+				return Integer::newInstance(self->context, location, abs(value));
+			} else if (self->instanceOf(DecimalClass)) {
+				const auto &value = self->as<Decimal>()->value;
+				return Decimal::newInstance(self->context, location, abs(value));
+			} else throw compile_error("Number.abs error: invalid subclass", location);
+		});
+		this->addFun("Number.neg", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf(IntegerClass)) {
+				const auto &value = self->as<Integer>()->value;
+				return Integer::newInstance(self->context, location, -value);
+			} else if (self->instanceOf(DecimalClass)) {
+				const auto &value = self->as<Decimal>()->value;
+				return Decimal::newInstance(self->context, location, -value);
+			} else throw compile_error("Number.neg error: invalid subclass", location);
+		});
+	}
+
 	void initializeInteger() {
 		this->add("Integer", IntegerClass);
-		this->addFun("Integer.<", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			auto value = self->as<Integer>()->value;
-			auto par = other[0];
-			if (par->instanceOf(IntegerClass)) {
-				return (value < par->as<Integer>()->value) ? True : False;
-			} else if (par->instanceOf(DecimalClass)) {
-				return (value < par->as<Decimal>()->value) ? True : False;
-			} else throw compile_error("Integer.< argument must be a Number", location);
-		});
-		this->addFun("Integer.==", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+		this->addFun("Integer.|", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			const auto &oth = other[0];
-			if (oth->instanceOf(IntegerClass)) {
-				return (self->as<Integer>()->value == oth->as<Integer>()->value) ? True : False;
-			} else if (oth->instanceOf(DecimalClass)) {
-				return (self->as<Integer>()->value == oth->as<Decimal>()->value) ? True : False;
-			} else return False;
+			if (!oth->instanceOf(IntegerClass))
+				throw compile_error("Integer.| argument must be a Integer", location);
+			const auto &value = self->as<Integer>()->value;
+			return Integer::newInstance(self->context, location, value | oth->as<Integer>()->value);
 		});
-		this->addFun("Integer.+", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			auto value = self->as<Integer>()->value;
-			auto par = other[0];
-			if (par->instanceOf(IntegerClass)) {
-				return Integer::newInstance(self->context, location, value + par->as<Integer>()->value);
-			} else if (par->instanceOf(DecimalClass)) {
-				return Decimal::newInstance(self->context, location, value + par->as<Decimal>()->value);
-			} else if (par->instanceOf(StringClass)) {
-				return String::newInstance(self->context, location, to_string(value) + par->as<String>()->value);
-			} else return Null;
+		this->addFun("Integer.&", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			const auto &oth = other[0];
+			if (!oth->instanceOf(IntegerClass))
+				throw compile_error("Integer.& argument must be a Integer", location);
+			const auto &value = self->as<Integer>()->value;
+			return Integer::newInstance(self->context, location, value & oth->as<Integer>()->value);
 		});
-		this->addFun("Integer.-", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			auto value = self->as<Integer>()->value;
-			auto par = other[0];
-			if (par->instanceOf(IntegerClass)) {
-				return Integer::newInstance(self->context, location, value - par->as<Integer>()->value);
-			} else if (par->instanceOf(DecimalClass)) {
-				return Decimal::newInstance(self->context, location, value - par->as<Decimal>()->value);
-			} else return Null;
+		this->addFun("Integer.^", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			const auto &oth = other[0];
+			if (!oth->instanceOf(IntegerClass))
+				throw compile_error("Integer.^ argument must be a Integer", location);
+			const auto &value = self->as<Integer>()->value;
+			return Integer::newInstance(self->context, location, value ^ oth->as<Integer>()->value);
+		});
+		this->addFun("Integer.~", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			return Integer::newInstance(self->context, location, ~self->as<Integer>()->value);
+		});
+		this->addFun("Integer.<<", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			const auto &oth = other[0];
+			if (!oth->instanceOf(IntegerClass))
+				throw compile_error("Integer.<< argument must be a Integer", location);
+			const auto &value = self->as<Integer>()->value;
+			return Integer::newInstance(self->context, location, value << oth->as<Integer>()->value);
+		});
+		this->addFun("Integer.>>", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			const auto &oth = other[0];
+			if (!oth->instanceOf(IntegerClass))
+				throw compile_error("Integer.>> argument must be a Integer", location);
+			const auto &value = self->as<Integer>()->value;
+			return Integer::newInstance(self->context, location, value >> oth->as<Integer>()->value);
 		});
 		this->addFun("Integer.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			return String::newInstance(self->context, location, to_string(self->as<Integer>()->value));
@@ -274,43 +459,6 @@ struct NativesImpl : public Natives {
 
 	void initializeDecimal() {
 		this->add("Decimal", DecimalClass);
-		this->addFun("Decimal.<", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			auto value = self->as<Decimal>()->value;
-			auto par = other[0];
-			if (par->instanceOf(IntegerClass)) {
-				return (value < par->as<Integer>()->value) ? True : False;
-			} else if (par->instanceOf(DecimalClass)) {
-				return (value < par->as<Decimal>()->value) ? True : False;
-			} else throw compile_error("Decimal.< argument must be a Number", location);
-		});
-		this->addFun("Decimal.==", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			const auto &oth = other[0];
-			if (oth->instanceOf(IntegerClass)) {
-				return (self->as<Decimal>()->value == oth->as<Integer>()->value) ? True : False;
-			} else if (oth->instanceOf(DecimalClass)) {
-				return (self->as<Decimal>()->value == oth->as<Decimal>()->value) ? True : False;
-			} else return False;
-		});
-		this->addFun("Decimal.+", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			auto value = self->as<Decimal>()->value;
-			auto par = other[0];
-			if (par->instanceOf(IntegerClass)) {
-				return Decimal::newInstance(self->context, location, value + par->as<Integer>()->value);
-			} else if (par->instanceOf(DecimalClass)) {
-				return Decimal::newInstance(self->context, location, value + par->as<Decimal>()->value);
-			} else if (par->instanceOf(StringClass)) {
-				return String::newInstance(self->context, location, to_string(value) + par->as<String>()->value);
-			} else return Null;
-		});
-		this->addFun("Decimal.-", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			auto value = self->as<Decimal>()->value;
-			auto par = other[0];
-			if (par->instanceOf(IntegerClass)) {
-				return Decimal::newInstance(self->context, location, value - par->as<Integer>()->value);
-			} else if (par->instanceOf(DecimalClass)) {
-				return Decimal::newInstance(self->context, location, value - par->as<Decimal>()->value);
-			} else return Null;
-		});
 		this->addFun("Decimal.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			return String::newInstance(self->context, location, to_string(self->as<Decimal>()->value));
 		});

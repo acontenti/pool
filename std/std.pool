@@ -7,8 +7,8 @@ Class ::= `Class`;
 Class..extend ::= `Class.extend`;
 Class..new ::= `Class.new`;
 Class..toString ::= `Class.toString`;
-Class.subclassOf ::= `Class.subclassOf`;
-Class.superclassOf ::= `Class.superclassOf`;
+Class..subclassOf ::= `Class.subclassOf`;
+Class..superclassOf ::= `Class.superclassOf`;
 
 Object ::= `Object`;
 Object..instanceOf ::= `Object.instanceOf`;
@@ -16,6 +16,7 @@ Object..toString ::= `Object.toString`;
 Object..type ::= `Object.type`;
 Object..print ::= `Object.print`;
 Object..println ::= `Object.println`;
+Object..== ::= `Object.==`;
 Object..!= ::= (this, other) : {
     this.==(other).!();
 };
@@ -34,10 +35,9 @@ Bool..and ::= `Bool.&&`;
 Bool..== ::= `Bool.==`;
 Bool..then ::= `Bool.then`;
 Bool..thenElse ::= `Bool.thenElse`;
+Bool..extend ::= null;
 Bool..new ::= null;
-Bool..get ::= null;
 Bool..delete ::= null;
-Bool..set ::= null;
 
 Array ::= `Array`;
 Array..init ::= `Array.init`;
@@ -46,24 +46,40 @@ Array..forEach ::= `Array.forEach`;
 Array..push ::= `Array.push`;
 Array..toString ::= `Array.toString`;
 Array..length ::= `Array.length`;
-Array..get ::= null;
 Array..delete ::= null;
-Array..set ::= null;
 
-Integer ::= `Integer`;
-Integer..+ ::= `Integer.+`;
-Integer..- ::= `Integer.-`;
-Integer..== ::= `Integer.==`;
-Integer..< ::= `Integer.<`;
-Integer..<= ::= (this, other) : {
-    this.<(other).||(this.==(other)).!();
+Number ::= `Number`;
+Number..== ::= `Number.==`;
+Number..< ::= `Number.<`;
+Number..<= ::= (this, other) : {
+    this.<(other).||(this.==(other));
 };
-Integer..> ::= (this, other) : {
+Number..> ::= (this, other) : {
     this.<=(other).!();
 };
-Integer..>= ::= (this, other) : {
+Number..>= ::= (this, other) : {
     this.<(other).!();
 };
+Number..+ ::= `Number.+`;
+Number..- ::= `Number.-`;
+Number..* ::= `Number.*`;
+Number../ ::= `Number./`;
+Number..% ::= `Number.%`;
+Number..** ::= `Number.**`;
+Number..pow ::= `Number.**`;
+Number..abs ::= `Number.abs`;
+Number..neg ::= `Number.neg`;
+Number..extend ::= null;
+Number..new ::= null;
+Number..delete ::= null;
+
+Integer ::= `Integer`;
+Integer..| ::= `Integer.|`;
+Integer..& ::= `Integer.&`;
+Integer..^ ::= `Integer.^`;
+Integer..~ ::= `Integer.~`;
+Integer..<< ::= `Integer.<<`;
+Integer..>> ::= `Integer.>>`;
 Integer..toString ::= `Integer.toString`;
 Integer..to ::= (this, end) : {
     end.instanceOf(Integer).!().then({
@@ -80,57 +96,45 @@ Integer..to ::= (this, end) : {
 Integer..toInclusive ::= (this, end) : {
     this.to(end.+(1));
 };
+Integer..extend ::= null;
 Integer..new ::= null;
-Integer..get ::= null;
 Integer..delete ::= null;
-Integer..set ::= null;
 
 Decimal ::= `Decimal`;
-Decimal..+ ::= `Decimal.+`;
-Decimal..- ::= `Decimal.-`;
-Decimal..== ::= `Decimal.==`;
-Decimal..< ::= `Decimal.<`;
-Decimal..<= ::= (this, other) : {
-    this.<(other).||(this.==(other)).!();
-};
-Decimal..> ::= (this, other) : {
-    this.<=(other).!();
-};
-Decimal..>= ::= (this, other) : {
-    this.<(other).!();
-};
 Decimal..toString ::= `Decimal.toString`;
+Decimal..extend ::= null;
 Decimal..new ::= null;
-Decimal..get ::= null;
 Decimal..delete ::= null;
-Decimal..set ::= null;
 
 String ::= `String`;
 String..+ ::= `String.+`;
 String..== ::= `String.==`;
 String..toString ::= `String.toString`;
 String..length ::= `String.length`;
+String..extend ::= null;
 String..new ::= null;
-String..get ::= null;
 String..delete ::= null;
-String..set ::= null;
 
 Block ::= `Block`;
-Block..new ::= null;
 Block..whileDo ::= `Block.whileDo`;
 Block..doWhile ::= `Block.doWhile`;
+Block..extend ::= null;
+Block..new ::= null;
 
 Function ::= `Function`;
 Function..classmethod ::= `Function.classmethod`;
 Function..staticmethod ::= `Function.staticmethod`;
 Function..toString ::= `Function.toString`;
+Function..extend ::= null;
 Function..new ::= null;
-Function..get ::= null;
 Function..delete ::= null;
-Function..set ::= null;
 
 Void ::= `Void`;
 Void..toString ::= (this) : {"void";};
+Void..== ::= (this, other) : {
+    void.==(other);
+};
+Void..extend ::= null;
 Void..new ::= null;
 Void..get ::= null;
 Void..delete ::= null;
@@ -138,6 +142,10 @@ Void..set ::= null;
 
 Nothing ::= `Nothing`;
 Nothing..toString ::= (this) : {"null";};
+Nothing..== ::= (this, other) : {
+    null.==(other);
+};
+Nothing..extend ::= null;
 Nothing..new ::= null;
 Nothing..delete ::= null;
 Nothing..get ::= null;
