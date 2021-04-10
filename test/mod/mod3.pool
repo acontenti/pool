@@ -1,6 +1,6 @@
-"\u250C\n\u2502  Called from mod3.pool with args:\n\u2502\t\""
-	.+(args.at(0))
-	.+("\"\n\u2502\t\"")
-	.+(args.at(1))
-	.+("\"\n\u2514")
+"\u250C\n\u2502 Called from "
+    .+(file)
+    .+(" with args:\n\u2502\t")
+	.+(args)
+	.+("\n\u2514")
 	.println();

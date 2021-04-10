@@ -1,5 +1,5 @@
-#include "poolstd_private.hpp"
 #include "pool.hpp"
+#include <poolstd.hpp>
 #include <callable.hpp>
 #include <util/errors.hpp>
 
@@ -136,8 +136,8 @@ Executable::Executable(const shared_ptr<Context> &context, const shared_ptr<Clas
 Function::Function(const shared_ptr<Context> &context, const vector<Param> &params)
 		: Executable(context, FunctionClass), params(params) {}
 
-CodeFunction::CodeFunction(const shared_ptr<Context> &context, const vector<Param> &params, vector<PoolParser::StatementContext *> calls)
-		: Function(context, params), calls(move(calls)) {}
+CodeFunction::CodeFunction(const shared_ptr<Context> &context, const vector<Param> &params, const vector<shared_ptr<Callable>> &calls)
+		: Function(context, params), calls(calls) {}
 
 shared_ptr<Object> CodeFunction::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 	shared_ptr<Object> returnValue = Void;
@@ -150,36 +150,36 @@ shared_ptr<Object> CodeFunction::execute(const shared_ptr<Object> &self, const v
 	}
 	args.insert(args.end(), other.begin(), other.end());
 	const auto hasRest = !params.empty() && params.back().rest;
-	const auto paramsSize = hasRest ? params.size() - 1 : params.size();
+	const auto paramsSize = params.size();
 	if (hasRest) {
-		if (paramsSize > args.size())
-			throw compile_error("Function takes at least " + to_string(paramsSize)
+		if (args.size() < paramsSize - 1)
+			throw compile_error("Function takes at least " + to_string(paramsSize - 1)
 								+ " arguments, but " + to_string(args.size()) + " were given", location);
 	} else if (paramsSize != args.size()) {
 		throw compile_error("Function takes " + to_string(paramsSize)
 							+ " arguments, but " + to_string(args.size()) + " were given", location);
 	}
 	for (int i = 0; i < paramsSize; ++i) {
-		const auto &value = args[i];
 		const auto &param = params[i];
 		if (!param.rest) {
+			const auto &value = args[i];
 			if (param.type && !value->instanceOf(param.type)) {
 				throw compile_error(
 						"Argument for function parameter '" + param.id + "' must be of class '" + param.type->name
 						+ "', but value of class '" + value->getClass()->name + "' was given", location);
 			} else context->set(param.id, value);
 		} else {
-			context->set(param.id, ArrayClass->newInstance(context, location, {args.begin() + i, args.end()}, nullptr));
+			context->set(param.id, Array::newInstance(context, location, {args.begin() + i, args.end()}));
 		}
 	}
 	for (auto &call: calls) {
-		if (auto exp = call->expression()) {
-			returnValue = parseExpression(exp, context)->invoke();
-		} else {
-			returnValue = Void;
-		}
+		returnValue = call->invoke(context);
 	}
 	return returnValue;
+}
+
+shared_ptr<Object> CodeFunction::newInstance(const shared_ptr<Context> &context, const Location &location, const vector<Param> &params, const vector<shared_ptr<Callable>> &calls) {
+	return FunctionClass->newInstance(context, location, {}, CodeFunctionData{params, calls});
 }
 
 NativeFunction::NativeFunction(const shared_ptr<Context> &context, const vector<Param> &params, method_t code)
@@ -189,22 +189,24 @@ shared_ptr<Object> NativeFunction::execute(const shared_ptr<Object> &self, const
 	bool thisIsSelf = self.get() == this;
 	bool hasRest = !params.empty() && params.back().rest;
 	auto otherSize = thisIsSelf ? other.size() : other.size() + 1;
-	auto paramsSize = hasRest ? params.size() - 1 : params.size();
+	auto paramsSize = params.size();
 	if (hasRest) {
-		if (paramsSize > otherSize)
-			throw compile_error("Function takes at least " + to_string(paramsSize)
+		if (otherSize < paramsSize - 1)
+			throw compile_error("Function takes at least " + to_string(paramsSize - 1)
 								+ " arguments, but " + to_string(otherSize) + " were given", location);
 	} else if (paramsSize != otherSize) {
 		throw compile_error("Function takes " + to_string(paramsSize)
 							+ " arguments, but " + to_string(otherSize) + " were given", location);
 	}
 	for (int i = 0, delta = thisIsSelf ? 0 : 1; i < paramsSize - delta; ++i) {
-		const auto &value = other[i];
 		const auto &param = params[i + delta];
-		if (!param.rest && param.type && !value->instanceOf(param.type)) {
-			throw compile_error(
-					"Argument for function parameter '" + param.id + "' must be of class '" + param.type->name
-					+ "', but value of class '" + value->getClass()->name + "' was given", location);
+		if (!param.rest && param.type) {
+			const auto &value = other[i];
+			if (!value->instanceOf(param.type)) {
+				throw compile_error(
+						"Argument for function parameter '" + param.id + "' must be of class '" + param.type->name
+						+ "', but value of class '" + value->getClass()->name + "' was given", location);
+			}
 		}
 	}
 	auto returnValue = code(self, other, location);
@@ -215,17 +217,13 @@ shared_ptr<NativeFunction> NativeFunction::newInstance(const vector<Param> &para
 	return make_shared<NativeFunction>(Context::global, params, code);
 }
 
-Block::Block(const shared_ptr<Context> &context, vector<PoolParser::StatementContext *> calls)
-		: Executable(context, BlockClass), calls(move(calls)) {}
+Block::Block(const shared_ptr<Context> &context, const vector<shared_ptr<Callable>> &calls)
+		: Executable(context, BlockClass), calls(calls) {}
 
 shared_ptr<Object> Block::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 	shared_ptr<Object> returnValue = Void;
 	for (auto &call: calls) {
-		if (auto exp = call->expression()) {
-			returnValue = parseExpression(exp, context)->invoke();
-		} else {
-			returnValue = Void;
-		}
+		returnValue = call->invoke(context);
 	}
 	return returnValue;
 }
@@ -234,7 +232,16 @@ shared_ptr<Object> Block::execute(const Location &location) {
 	return execute(shared_from_this(), {}, location);
 }
 
-Array::Array(const shared_ptr<Context> &context) : Object(context, ArrayClass) {}
+shared_ptr<Object> Block::newInstance(const shared_ptr<Context> &context, const Location &location, const vector<shared_ptr<Callable>> &calls) {
+	return BlockClass->newInstance(context, location, {}, calls);
+}
+
+Array::Array(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &values)
+		: Object(context, ArrayClass), values(values) {}
+
+shared_ptr<Object> Array::newInstance(const shared_ptr<Context> &context, const Location &location, const vector<shared_ptr<Object>> &values) {
+	return ArrayClass->newInstance(context, location, {}, values);
+}
 
 void initializeContext() {
 	Context::global = Context::create(nullptr);

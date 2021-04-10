@@ -42,12 +42,12 @@ Bool..new ::= null;
 Bool..delete ::= null;
 
 Array ::= `Array`;
-Array..init ::= `Array.init`;
 Array..at ::= `Array.at`;
 Array..forEach ::= `Array.forEach`;
 Array..push ::= `Array.push`;
 Array..toString ::= `Array.toString`;
 Array..length ::= `Array.length`;
+Array..new ::= null;
 Array..delete ::= null;
 
 Number ::= `Number`;
@@ -85,7 +85,7 @@ Integer..>> ::= `Integer.>>`;
 Integer..toString ::= `Integer.toString`;
 Integer..to ::= (this, end: Integer) : {
     i := this;
-    array := Array.new();
+    array := [];
     {i.<(end);}.whileDo({
         array.push(i);
         i := i.+(1);

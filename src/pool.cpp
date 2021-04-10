@@ -34,17 +34,14 @@ public:
 		parser->removeErrorListeners();
 		parser->addErrorListener(ErrorListener::INSTANCE());
 		try {
-			vector<shared_ptr<Object>> arguments;
-			arguments.push_back(String::newInstance(Context::global, Location::UNKNOWN, filename));
-			for (const auto &arg : settings.args) {
-				arguments.push_back(String::newInstance(Context::global, Location::UNKNOWN, arg));
+			const auto &oldFilename = Context::global->find("file");
+			Context::global->set("file", String::newInstance(Context::global, Location::UNKNOWN, filename));
+			const auto &statements = parseProgram(parser->program());
+			for (const auto &statement :statements) {
+				statement->invoke(Context::global);
 			}
-			Context::global->set("debug", settings.debug ? True : False);
-			const auto &oldArgs = Context::global->find("args");
-			Context::global->set("args", ArrayClass->newInstance(Context::global, Location::UNKNOWN, arguments, nullptr));
-			parseProgram(parser->program(), Context::global);
-			if (oldArgs) {
-				Context::global->set("args", oldArgs->getValue());
+			if (oldFilename) {
+				Context::global->set("file", oldFilename->getValue());
 			}
 			result = true;
 		} catch (const compile_error &error) {
@@ -57,6 +54,12 @@ public:
 void PoolVM::initialiaze(const Settings &_settings) {
 	PoolVM::settings = _settings;
 	initializeStdLib();
+	Context::global->set("debug", settings.debug ? True : False);
+	vector<shared_ptr<Object>> arguments;
+	for (const auto &arg : settings.args) {
+		arguments.push_back(String::newInstance(Context::global, Location::UNKNOWN, arg));
+	}
+	Context::global->set("args", Array::newInstance(Context::global, Location::UNKNOWN, arguments));
 }
 
 bool PoolVM::execute(const string &module) {

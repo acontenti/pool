@@ -1,8 +1,9 @@
 #include <natives.hpp>
-#include "poolstd_private.hpp"
+#include <poolstd.hpp>
 #include <util/errors.hpp>
 #include "util/dylib.hpp"
 #include <ctgmath>
+#include <iostream>
 
 using namespace pool;
 
@@ -434,7 +435,7 @@ struct NativesImpl : public Natives {
 			} else return False;
 		});
 		this->addFun("String.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			return String::newInstance(self->context, location, self->as<String>()->value);
+			return self;
 		});
 	}
 
@@ -472,13 +473,6 @@ struct NativesImpl : public Natives {
 
 	void initializeArray() {
 		this->add("Array", ArrayClass);
-		this->addFun("Array.init", {{"this"}, {"args", true}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			const auto &array = self->as<Array>();
-			for (const auto &value : other) {
-				array->values.push_back(value);
-			}
-			return Void;
-		});
 		this->addFun("Array.at", {{"this"}, {"index", IntegerClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			const auto &index = other[0]->as<Integer>()->value;
 			const auto &array = self->as<Array>();

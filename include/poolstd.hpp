@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <any>
+#include "callable.hpp"
 #include "context.hpp"
 #include "util/location.hpp"
 
@@ -188,13 +189,50 @@ namespace pool {
 		static shared_ptr<NativeFunction> newInstance(const vector<Param> &params, const method_t &code);
 	};
 
+	class POOL_PUBLIC CodeFunction : public Function {
+		vector<shared_ptr<Callable>> calls;
+	public:
+		struct CodeFunctionData {
+			const vector<Param> &params;
+			const vector<shared_ptr<Callable>> &calls;
+		};
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &data) {
+			const auto &functionData = any_cast<CodeFunctionData>(data);
+			return make_shared<CodeFunction>(context, functionData.params, functionData.calls);
+		};
+
+		CodeFunction(const shared_ptr<Context> &context, const vector<Param> &params, const vector<shared_ptr<Callable>> &calls);
+
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) override;
+
+		static shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const Location &location, const vector<Param> &params, const vector<shared_ptr<Callable>> &calls);
+	};
+
+	class POOL_PUBLIC Block : public Executable {
+	public:
+		vector<shared_ptr<Callable>> calls;
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &data) {
+			return make_shared<Block>(context, any_cast<vector<shared_ptr<Callable>>>(data));
+		};
+
+		Block(const shared_ptr<Context> &context, const vector<shared_ptr<Callable>> &calls);
+
+		shared_ptr<Object> execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) override;
+
+		shared_ptr<Object> execute(const Location &location);
+
+		static shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const Location &location, const vector<shared_ptr<Callable>> &calls);
+	};
+
 	class POOL_PUBLIC Array : public Object {
 	public:
 		vector<shared_ptr<Object>> values;
-		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &) {
-			return make_shared<Array>(context);
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &data) {
+			return make_shared<Array>(context, any_cast<vector<shared_ptr<Object>>>(data));
 		};
 
-		explicit Array(const shared_ptr<Context> &context);
+		explicit Array(const shared_ptr<Context> &context, const vector<shared_ptr<Object>> &values);
+
+		static shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const Location &location, const vector<shared_ptr<Object>> &values);
 	};
 }

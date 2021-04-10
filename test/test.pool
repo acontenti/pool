@@ -1,11 +1,11 @@
 import(":std");
 
-f := (x) : {
+f := (...x) : {
 	x.println();
 };
 f("x");
 
-a := Array.new(0, 1, 2, 3);
+a := [0, 1, 2, 3];
 b := 1.+(a.length());
 b.println();
 
@@ -115,7 +115,7 @@ b.println();
 b..aaaa.println();
 b.aaaa.ffff.println();
 
-Array.new(0,1,2,3,4,5,6,8,9).forEach((it) : {
+[0,1,2,3,4,5,6,8,9].forEach((it) : {
 	"i: ".+(it).println();
 });
 0.to(10).println();
@@ -133,8 +133,8 @@ assert(acc.==(45), "acc should be equal to 45");
 
 "".length().println();
 "aaaa".length().println();
-Array.new(1, 2).length().println();
-Array.new().length().println();
+[1, 2].length().println();
+[].length().println();
 
 //in_test := input("insert somthing: ");
 //in_test.println();

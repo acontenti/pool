@@ -30,18 +30,21 @@ args: LP arg? (COMMA arg)* RP;
 
 arg: DOTS? call;
 
-term returns [enum Type {NUM,STR,FUN,PAR,BLK,NSM,IDT} type]:
+term returns [enum Type {NUM,STR,FUN,PAR,BLK,ARR,NSM,IDT} type]:
 	num {$type=TermContext::NUM;} |
 	string {$type=TermContext::STR;} |
 	fun {$type=TermContext::FUN;} |
 	par {$type=TermContext::PAR;} |
 	block {$type=TermContext::BLK;} |
+	array {$type=TermContext::ARR;} |
 	NATIVE_SYMBOL {$type=TermContext::NSM;} |
 	ID {$type=TermContext::IDT;};
 
 par: LP expression RP;
 
 block: LB statement* RB;
+
+array: LSB arg? (COMMA arg)* RSB;
 
 fun: LP param? (COMMA param)* RP COLON LB statement* RB;
 

@@ -1,8 +1,8 @@
-"\u250C\n\u2502  Called from mod2.pool with args:\n\u2502\t\""
-	.+(args.at(0))
-	.+("\"\n\u2502\t\"")
-	.+(args.at(1))
-	.+("\"\n\u2514")
+"\u250C\n\u2502 Called from "
+    .+(file)
+    .+(" with args:\n\u2502\t")
+	.+(args)
+	.+("\n\u2514")
 	.println();
 
 vtest := (a1, b1, ...c): {
@@ -10,10 +10,11 @@ vtest := (a1, b1, ...c): {
 	c.println();
 };
 vtest(1, 2);
-vtest(1, 2, 3, 4, 5, 6);
-vargs := Array.new(2, 3, 4, 5, 6, 7, 8);
+vtest(10, 2, 3, 4, 5, 6);
+vargs := [2, 3, 4, 5, 6, 7, 8];
 vtest(100, 200, ...vargs, 3000);
-vtest(...Array.new(0, 1, 2));
+[...vargs].println();
+vtest(...[0, 1, 2], ...[...vargs]);
 vtest2 := (a1, b1): {
 	a1.-(b1).println();
 };

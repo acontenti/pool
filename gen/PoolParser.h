@@ -22,8 +22,8 @@ public:
   enum {
     RuleProgram = 0, RuleStatement = 1, RuleExpression = 2, RuleAssignment = 3, 
     RuleAccess = 4, RuleCall = 5, RuleArgs = 6, RuleArg = 7, RuleTerm = 8, 
-    RulePar = 9, RuleBlock = 10, RuleFun = 11, RuleParam = 12, RuleNum = 13, 
-    RuleString = 14
+    RulePar = 9, RuleBlock = 10, RuleArray = 11, RuleFun = 12, RuleParam = 13, 
+    RuleNum = 14, RuleString = 15
   };
 
   explicit PoolParser(antlr4::TokenStream *input);
@@ -47,6 +47,7 @@ public:
   class TermContext;
   class ParContext;
   class BlockContext;
+  class ArrayContext;
   class FunContext;
   class ParamContext;
   class NumContext;
@@ -173,7 +174,7 @@ public:
 
   class  TermContext : public antlr4::ParserRuleContext {
   public:
-    enum Type {NUM,STR,FUN,PAR,BLK,NSM,IDT} type;
+    enum Type {NUM,STR,FUN,PAR,BLK,ARR,NSM,IDT} type;
     TermContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     NumContext *num();
@@ -181,6 +182,7 @@ public:
     FunContext *fun();
     ParContext *par();
     BlockContext *block();
+    ArrayContext *array();
     antlr4::tree::TerminalNode *NATIVE_SYMBOL();
     antlr4::tree::TerminalNode *ID();
 
@@ -215,6 +217,22 @@ public:
   };
 
   BlockContext* block();
+
+  class  ArrayContext : public antlr4::ParserRuleContext {
+  public:
+    ArrayContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *LSB();
+    antlr4::tree::TerminalNode *RSB();
+    std::vector<ArgContext *> arg();
+    ArgContext* arg(size_t i);
+    std::vector<antlr4::tree::TerminalNode *> COMMA();
+    antlr4::tree::TerminalNode* COMMA(size_t i);
+
+   
+  };
+
+  ArrayContext* array();
 
   class  FunContext : public antlr4::ParserRuleContext {
   public:

@@ -2,10 +2,10 @@
 
 #include <PoolParser.h>
 
+using namespace std;
+
 namespace pool {
 	class Callable;
 
-	shared_ptr<Callable> parseExpression(PoolParser::ExpressionContext *ast, const shared_ptr<Context> &context);
-
-	void parseProgram(PoolParser::ProgramContext *ast, const shared_ptr<Context> &context);
+	[[nodiscard]] vector<shared_ptr<Callable>> parseProgram(PoolParser::ProgramContext *ast);
 }
