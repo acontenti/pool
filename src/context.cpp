@@ -63,12 +63,12 @@ void Context::remove(const string &name) {
 	heap.erase(name);
 }
 
-string Context::toString() const {
+string Context::toString(const Location &location) const {
 	stringstream ss;
 	ss << "{";
 	if (!heap.empty()) {
 		for (auto&[name, value] : *this) {
-			ss << name << ":" << value->getValue()->getRepr() << ",";
+			ss << name << ":" << value->getValue()->getRepr(location) << ",";
 		}
 		ss.seekp(-1, stringstream::cur); //remove last comma
 	}

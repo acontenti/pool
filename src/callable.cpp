@@ -23,7 +23,7 @@ shared_ptr<Object> Invocation::invoke(const shared_ptr<Context> &context) {
 	if (const auto &executable = dynamic_pointer_cast<Executable>(ptr)) {
 		const auto &values = args->invoke(context);
 		return executable->execute(ptr, values, location);
-	} else throw compile_error(ptr->getRepr() + " is not executable", caller->location);
+	} else throw compile_error(ptr->getRepr(location) + " is not executable", caller->location);
 }
 
 shared_ptr<Object> InvocationAccess::invoke(const shared_ptr<Context> &context) {
@@ -34,8 +34,8 @@ shared_ptr<Object> InvocationAccess::invoke(const shared_ptr<Context> &context) 
 		if (const auto &executable = dynamic_pointer_cast<Executable>(ptr)) {
 			const auto &values = args->invoke(context);
 			return executable->execute(selfPtr, values, location);
-		} else throw compile_error(ptr->getRepr() + " is not executable", {idToken, idToken});
-	} else throw compile_error(Null->getRepr() + " is not executable", {idToken, idToken});
+		} else throw compile_error(ptr->getRepr(location) + " is not executable", {idToken, idToken});
+	} else throw compile_error(Null->getRepr(location) + " is not executable", {idToken, idToken});
 }
 
 shared_ptr<Object> Access::invoke(const shared_ptr<Context> &context) {
@@ -46,7 +46,7 @@ shared_ptr<Object> Access::invoke(const shared_ptr<Context> &context) {
 	} else if (const auto &set = ptr->find("set")) {
 		if (const auto &function = dynamic_pointer_cast<Function>(set->getValue())) {
 			return function->execute(ptr, {String::newInstance(ptr->context, location, id), Null}, location);
-		} else throw compile_error("Cannot call method 'set' on '" + ptr->getRepr() + "'", location);
+		} else throw compile_error("Cannot call method 'set' on '" + ptr->getRepr(location) + "'", location);
 	} else {
 		return ptr->context->add(id)->getValue();
 	}
@@ -91,7 +91,7 @@ shared_ptr<Variable> AssignmentAccess::invoke(const shared_ptr<Context> &context
 			if (const auto &function = dynamic_pointer_cast<Function>(set->getValue())) {
 				function->execute(ptr, {String::newInstance(ptr->context, location, id), Null}, location);
 				return ptr->findLocal(id);
-			} else throw compile_error("Cannot call method 'set' on '" + ptr->getRepr() + "'", location);
+			} else throw compile_error("Cannot call method 'set' on '" + ptr->getRepr(location) + "'", location);
 		} else {
 			return ptr->context->add(id);
 		}

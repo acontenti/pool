@@ -13,8 +13,6 @@ namespace pool {
 
 	class POOL_PUBLIC Object;
 
-	class POOL_PUBLIC Bool;
-
 	class POOL_PUBLIC Block;
 
 	class POOL_PUBLIC Function;
@@ -33,12 +31,12 @@ namespace pool {
 	extern POOL_PUBLIC shared_ptr<Class> NothingClass;
 	extern POOL_PUBLIC shared_ptr<Object> Void;
 	extern POOL_PUBLIC shared_ptr<Object> Null;
-	extern POOL_PUBLIC shared_ptr<Bool> True;
-	extern POOL_PUBLIC shared_ptr<Bool> False;
+	extern POOL_PUBLIC shared_ptr<Object> True;
+	extern POOL_PUBLIC shared_ptr<Object> False;
 
 	class POOL_PUBLIC Object : public enable_shared_from_this<Object> {
 	protected:
-		const size_t id;
+		const intptr_t id;
 		const shared_ptr<Class> cls;
 	public:
 		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const any &data) {
@@ -50,10 +48,12 @@ namespace pool {
 
 		shared_ptr<Class> getClass() const;
 
-		string getRepr() const;
+		string getDefaultRepr() const;
+
+		string getRepr(const Location &location);
 
 		template<class T, typename enable_if<is_base_of<Object, T>::value, int>::type = 0>
-		inline shared_ptr<T> as() const {
+		constexpr inline shared_ptr<T> as() const {
 			return const_pointer_cast<T>(reinterpret_pointer_cast<const T>(shared_from_this()));
 		}
 
@@ -66,6 +66,8 @@ namespace pool {
 		void remove(const string &name);
 
 		bool instanceOf(const shared_ptr<Class> &_class) const;
+
+		string toString(const Location &location);
 	};
 
 	class POOL_PUBLIC Class : public Object {

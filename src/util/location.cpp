@@ -1,6 +1,6 @@
 #include "util/location.hpp"
-#include "Token.h"
-#include "CharStream.h"
+#include <Token.h>
+#include <CharStream.h>
 
 Location Location::UNKNOWN{};
 

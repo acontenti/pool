@@ -45,7 +45,7 @@ namespace pool {
 
 		void remove(const string &name);
 
-		[[nodiscard]] string toString() const;
+		[[nodiscard]] string toString(const Location &location) const;
 
 		[[nodiscard]] inline auto begin() const {
 			return heap.begin();

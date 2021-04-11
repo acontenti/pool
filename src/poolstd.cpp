@@ -2,6 +2,7 @@
 #include <poolstd.hpp>
 #include <callable.hpp>
 #include <util/errors.hpp>
+#include <util/strings.hpp>
 
 using namespace pool;
 
@@ -19,18 +20,16 @@ shared_ptr<Class> pool::VoidClass = nullptr;
 shared_ptr<Class> pool::NothingClass = nullptr;
 shared_ptr<Object> pool::Void = nullptr;
 shared_ptr<Object> pool::Null = nullptr;
-shared_ptr<Bool> pool::True = nullptr;
-shared_ptr<Bool> pool::False = nullptr;
+shared_ptr<Object> pool::True = nullptr;
+shared_ptr<Object> pool::False = nullptr;
 
 Object::Object(const shared_ptr<Context> &context, shared_ptr<Class> cls)
-		: context(context), cls(move(cls)), id(cls ? cls->instances++ : 0) {}
+		: context(context), cls(move(cls)), id(reinterpret_cast<intptr_t>(this)) {}
 
 shared_ptr<Function> Object::findMethod(const string &methodName) const {
-	if (cls) {
-		if (auto object = cls->findInClass(methodName)) {
-			if (auto executable = dynamic_pointer_cast<Function>(object->getValue())) {
-				return executable;
-			}
+	if (auto object = getClass()->findInClass(methodName)) {
+		if (auto executable = dynamic_pointer_cast<Function>(object->getValue())) {
+			return executable;
 		}
 	}
 	return nullptr;
@@ -54,14 +53,33 @@ void Object::remove(const string &name) {
 	context->remove(name);
 }
 
-string Object::getRepr() const {
-	return getClass()->name + "@" + to_string(id);
+string Object::getDefaultRepr() const {
+	return getClass()->name + "@" + to_string_base<62>(id);
+}
+
+string Object::getRepr(const Location &location) {
+	if (auto init = findMethod("getRepr")) {
+		const auto &result = init->execute(shared_from_this(), {}, location);
+		if (result->instanceOf(StringClass)) {
+			return result->as<String>()->value;
+		}
+	}
+	return getDefaultRepr();
+}
+
+string Object::toString(const Location &location) {
+	if (const auto &method = findMethod("toString")) {
+		const auto &result = method->execute(shared_from_this(), {}, location);
+		if (result->instanceOf(StringClass)) {
+			return result->as<String>()->value;
+		}
+	}
+	return getRepr(location);
 }
 
 bool Object::instanceOf(const shared_ptr<Class> &_class) const {
-	if (cls) {
-		return cls == _class || cls->subclassOf(_class);
-	} else return _class == ObjectClass;
+	const auto &thisClass = getClass();
+	return thisClass == _class || thisClass->subclassOf(_class);
 }
 
 shared_ptr<Class> Object::getClass() const {
@@ -94,7 +112,7 @@ shared_ptr<Variable> Class::find(const string &id) const {
 	if (auto local = findInClass(id)) {
 		return local;
 	}
-	if (cls) {
+	if (cls) { // if not ClassClass
 		return cls->find(id);
 	}
 	return nullptr;

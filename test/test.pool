@@ -1,9 +1,10 @@
 import(":std");
 
-f := (...x) : {
-	x.println();
+f := (x: String) : {
+    x.println();
 };
-f("x");
+f.println();
+f("testx");
 
 a := [0, 1, 2, 3];
 b := 1.+(a.length());
@@ -11,16 +12,16 @@ b.println();
 
 fun := (x) : {x;};
 fun := (x, y) : {
-  	b := x.+(y);
-  	c := {
-  		d := 2;
-	};
+      b := x.+(y);
+      c := {
+          d := 2;
+    };
 };
 z := {
-	b := 300;
-	c := {
-		d := 2;
-	};;
+    b := 300;
+    c := {
+        d := 2;
+    };;
 };
 empty := ():{};
 empty().println();
@@ -46,39 +47,43 @@ z.c := 5;
 z.c.println();
 z.println();
 Test ::= Object.extend("Test", {
-	init := (this, who) : {
-		this.long := 0;
-		this.int := 0;
-		"init: this := ".+(this).println();
-		"init: class := ".+(this.getClass()).println();
-		"init: super := ".+(this.getClass().getSuper()).println();
-		"init: who := ".+(who).println();
-	};
-	++ := (this) : {
-		"++: this := ".+(this).println();
-		"++: class := ".+(this.getClass()).println();
-		this.long := this.long.+(10);
-	};
-	print := (this) : {
-		"print: this := ".+(this).println();
-		"print: class := ".+(this.getClass()).println();
-		this.long.println();
-	};
-	toString := (this) : {
-		"This is an instance of class Test, ".+(this.getClass());
-	};
-	number := 0;
-	no := (class, who) : {
-		"no: class := ".+(class).println();
-		"no: who := ".+(who).println();
-	}.classmethod();
-	yes := (who: String) : {
-		"yes: who := ".+(who).println();
-	}.staticmethod();
-	maybe := (this, who) : {
-		"maybe: this := ".+(this).println();
-		"maybe: who := ".+(who).println();
-	};
+    init := (this, who) : {
+        this.long := 0;
+        this.int := 0;
+        this.stest := () : {
+            "stest".println();
+        }.staticmethod();
+        "init: this := ".+(this).println();
+        "init: class := ".+(this.getClass()).println();
+        "init: super := ".+(this.getClass().getSuper()).println();
+        "init: who := ".+(who).println();
+    };
+    ++ := (this) : {
+        "++: this := ".+(this).println();
+        "++: class := ".+(this.getClass()).println();
+        this.long := this.long.+(10);
+    };
+    print := (this) : {
+        "print: this := ".+(this).println();
+        "print: class := ".+(this.getClass()).println();
+        this.long.println();
+    };
+    toString := (this) : {
+        this.stest();
+        "This is an instance of class Test, ".+(this.getClass());
+    };
+    number := 0;
+    no := (class, who) : {
+        "no: class := ".+(class).println();
+        "no: who := ".+(who).println();
+    }.classmethod();
+    yes := (who: String) : {
+        "yes: who := ".+(who).println();
+    }.staticmethod();
+    maybe := (this, who) : {
+        "maybe: this := ".+(this).println();
+        "maybe: who := ".+(who).println();
+    };
 });
 n := Test.new("yes");
 "n: ".+(n).println();
@@ -89,24 +94,24 @@ n := Test.new("yes");
 "n.getClass(): ".+(n.getClass()).println();
 "n.getClass().getSuper() := ".+(n.getClass().getSuper()).println();
 "Object.getClass(): ".+(Object.getClass()).println();
+"prop test: ".+(Test.getContextInfo()).println();
 Test.no("you");
 n.no("me");
 Test.yes("you");
 n.yes("me");
 Test.maybe("you");
 n.maybe("me");
-"prop test: ".+(Test.getContextInfo()).println();
 //z.c.d.e.println();
 (x := true.!()).println();
 abc := {a := x.!();}();
 abc.println();
 x := 1;
 b := {
-	x := x.+(123);
-	x.println();
-	aaaa := {ffff := x.+(124);};
-	aaaa();
-	this.println();
+    x := x.+(123);
+    x.println();
+    aaaa := {ffff := x.+(124);};
+    aaaa();
+    this.println();
 };
 b();
 aaaa.println();
@@ -116,13 +121,13 @@ b..aaaa.println();
 b.aaaa.ffff.println();
 
 [0,1,2,3,4,5,6,8,9].forEach((it) : {
-	"i: ".+(it).println();
+    "i: ".+(it).println();
 });
 0.to(10).println();
 0.toInclusive(10).println();
 acc := 0;
 0.to(10).forEach((it) : {
-	acc := acc.+(it);
+    acc := acc.+(it);
 });
 acc.println();
 acc.to(acc.+(5)).println();
@@ -153,11 +158,11 @@ dtest.t.println();
 //qw.er.println();
 
 iftest := (12.==("12")).thenElse({
-	"equal".println();
-	1;
+    "equal".println();
+    1;
 },{
-	"different".println();
-	0;
+    "different".println();
+    0;
 });
 assert(0.==(iftest), "iftest should be equal to 0");
 
@@ -166,8 +171,8 @@ import("mod2");
 
 qqqq.println();
 tryCatch({
-	qqqq.qqqq := 0;
+    qqqq.qqqq := 0;
 }, (error) : {
-	"Correctly caught error with 'tryCatch': ".print();
-	error.println();
+    "Correctly caught error with 'tryCatch': ".print();
+    error.println();
 });

@@ -3,7 +3,7 @@
 #include <poolstd.hpp>
 #include "pool.hpp"
 #include "parser.hpp"
-#include "PoolLexer.h"
+#include <PoolLexer.h>
 #include <util/strings.hpp>
 #include <util/errors.hpp>
 #include "util/ErrorListener.hpp"
