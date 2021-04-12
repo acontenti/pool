@@ -7,5 +7,7 @@ using namespace std;
 namespace pool {
 	class Callable;
 
-	[[nodiscard]] vector<shared_ptr<Callable>> parseProgram(PoolParser::ProgramContext *ast);
+	class PoolInstanceImpl;
+
+	[[nodiscard]] vector<shared_ptr<Callable>> parseProgram(PoolParser::ProgramContext *ast, const shared_ptr<PoolInstanceImpl> &poolInstance);
 }

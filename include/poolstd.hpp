@@ -82,10 +82,9 @@ namespace pool {
 			const auto &classData = any_cast<Class::ClassData>(data);
 			return make_shared<Class>(context, classData.creator, classData.name, classData.super);
 		};
-		size_t instances = 0;
-		string name;
-		shared_ptr<Class> super;
-		creator_t creator;
+		const string name;
+		const shared_ptr<Class> super;
+		const creator_t creator;
 
 		Class(const shared_ptr<Context> &context, creator_t creator, string name, shared_ptr<Class> super);
 

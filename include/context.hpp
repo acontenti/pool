@@ -14,8 +14,6 @@ namespace pool {
 		shared_ptr<Object> value;
 		bool immutable = false;
 	public:
-		const string name;
-
 		[[nodiscard]] bool isImmutable() const;
 
 		void setImmutable(bool _immutable);
@@ -24,7 +22,7 @@ namespace pool {
 
 		void setValue(const shared_ptr<Object> &val);
 
-		Variable(string name, shared_ptr<Object> value, bool immutable);
+		Variable(shared_ptr<Object> value, bool immutable);
 	};
 
 	class POOL_PUBLIC Context {
@@ -39,13 +37,13 @@ namespace pool {
 
 		[[nodiscard]] shared_ptr<Variable> findLocal(const string &name) const;
 
-		shared_ptr<Variable> add(const string &name);
+		shared_ptr<Variable> findOrAdd(const string &name, bool local);
 
-		shared_ptr<Variable> set(const string &name, const shared_ptr<Object> &value, bool immutable = false);
+		shared_ptr<Variable> forceSet(const string &name, const shared_ptr<Object> &value, bool immutable);
+
+		shared_ptr<Variable> set(const string &name, const shared_ptr<Object> &value, bool immutable, const Location &location = Location::UNKNOWN);
 
 		void remove(const string &name);
-
-		[[nodiscard]] string toString(const Location &location) const;
 
 		[[nodiscard]] inline auto begin() const {
 			return heap.begin();
@@ -55,7 +53,7 @@ namespace pool {
 			return heap.end();
 		}
 
-		[[nodiscard]] inline auto empty() const {
+		[[nodiscard]] inline bool empty() const {
 			return heap.empty();
 		}
 

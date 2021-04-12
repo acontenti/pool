@@ -13,13 +13,13 @@ namespace pool {
 
 	class AssignmentAccess {
 		shared_ptr<Callable> caller;
-		string id;
 		bool local;
 	public:
+		string id;
 		Location location;
 
-		AssignmentAccess(const Location &location, shared_ptr<Callable> caller, string id, const bool &local)
-				: location(location), caller(move(caller)), id(move(id)), local(local) {}
+		AssignmentAccess(Location location, shared_ptr<Callable> caller, string id, const bool &local)
+				: location(move(location)), caller(move(caller)), id(move(id)), local(local) {}
 
 		shared_ptr<Variable> invoke(const shared_ptr<Context> &context);
 
@@ -91,16 +91,17 @@ namespace pool {
 		shared_ptr<Callable> caller;
 		shared_ptr<Args> args;
 		string id;
-		antlr4::Token *const idToken;
+		Location idLocation;
 		bool local;
 	public:
-		InvocationAccess(const Location &location, antlr4::Token *idToken, const shared_ptr<Callable> &caller, string id, const shared_ptr<Args> &args, const bool &local)
-				: Callable(location), caller(caller), args(args), idToken(idToken), id(move(id)), local(local) {}
+		InvocationAccess(const Location &location, Location idLocation, const shared_ptr<Callable> &caller, string id, const shared_ptr<Args> &args, const bool &local)
+				: Callable(location), caller(caller), args(args), idLocation(move(idLocation)), id(move(id)),
+				  local(local) {}
 
 		shared_ptr<Object> invoke(const shared_ptr<Context> &context) override;
 
-		static shared_ptr<InvocationAccess> create(const Location &location, antlr4::Token *idToken, const shared_ptr<Callable> &caller, const string &id, const shared_ptr<Args> &args, const bool &local) {
-			return make_shared<InvocationAccess>(location, idToken, caller, id, args, local);
+		static shared_ptr<InvocationAccess> create(const Location &location, const Location &idLocation, const shared_ptr<Callable> &caller, const string &id, const shared_ptr<Args> &args, const bool &local) {
+			return make_shared<InvocationAccess>(location, idLocation, caller, id, args, local);
 		}
 	};
 
@@ -162,8 +163,10 @@ namespace pool {
 	class ParseFunction : public Callable {
 	public:
 		struct ParamInfo {
-			antlr4::Token *name;
-			antlr4::Token *type;
+			string name;
+			Location nameLocation;
+			string type;
+			Location typeLocation;
 			bool rest;
 		};
 	private:

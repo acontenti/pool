@@ -101,7 +101,16 @@ struct NativesImpl : public Natives {
 			return String::newInstance(self->context, location, self->getRepr(location));
 		});
 		addFun("Object.getContextInfo", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			return String::newInstance(self->context, location, self->context->toString(location));
+			stringstream ss;
+			ss << "{";
+			if (!self->context->empty()) {
+				for (const auto&[name, value] : *self->context) {
+					ss << name << ":" << value->getValue()->getRepr(location) << ",";
+				}
+				ss.seekp(-1, stringstream::cur); //remove last comma
+			}
+			ss << "}";
+			return String::newInstance(self->context, location, ss.str());
 		});
 		addFun("Object.getClass", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			return self->getClass();
@@ -122,18 +131,14 @@ struct NativesImpl : public Natives {
 		});
 		addFun("Object.get", {{"this"}, {"key", StringClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			const auto &key = other[0]->as<String>()->value;
-			if (const auto &var = self->findLocal(key)) {
+			if (const auto &var = self->find(key)) {
 				return var->getValue();
 			}
-			return Void;
+			return Null;
 		});
 		addFun("Object.set", {{"this"}, {"key", StringClass}, {"value"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) -> shared_ptr<Object> {
 			const auto &key = other[0]->as<String>()->value;
-			if (const auto &var = self->context->findLocal(key)) {
-				if (!var->isImmutable()) {
-					var->setValue(other[1]);
-				} else throw compile_error("Cannot set immutable variable '" + var->name + "'", location);
-			} else self->context->set(key, other[1]);
+			self->context->set(key, other[1], false, location);
 			return other[1];
 		});
 		addFun("Object.delete", {{"this"}, {"key", StringClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
@@ -141,7 +146,7 @@ struct NativesImpl : public Natives {
 			if (const auto &var = self->findLocal(key)) {
 				if (!var->isImmutable()) {
 					self->remove(key);
-				} else throw compile_error("Cannot remove immutable variable '" + var->name + "'", location);
+				} else throw compile_error("Cannot remove immutable variable '" + key + "'", location);
 			}
 			return Void;
 		});

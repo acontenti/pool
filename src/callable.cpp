@@ -15,7 +15,7 @@ shared_ptr<Object> Assignment::invoke(const shared_ptr<Context> &context) {
 		var->setImmutable(immutable);
 		return val;
 	} else
-		throw compile_error("Cannot assign immutable variable '" + var->name + "'", assignee->location);
+		throw compile_error("Cannot assign immutable variable '" + assignee->id + "'", assignee->location);
 }
 
 shared_ptr<Object> Invocation::invoke(const shared_ptr<Context> &context) {
@@ -34,8 +34,8 @@ shared_ptr<Object> InvocationAccess::invoke(const shared_ptr<Context> &context) 
 		if (const auto &executable = dynamic_pointer_cast<Executable>(ptr)) {
 			const auto &values = args->invoke(context);
 			return executable->execute(selfPtr, values, location);
-		} else throw compile_error(ptr->getRepr(location) + " is not executable", {idToken, idToken});
-	} else throw compile_error(Null->getRepr(location) + " is not executable", {idToken, idToken});
+		} else throw compile_error(ptr->getRepr(location) + " is not executable", idLocation);
+	} else throw compile_error(Null->getRepr(location) + " is not executable", idLocation);
 }
 
 shared_ptr<Object> Access::invoke(const shared_ptr<Context> &context) {
@@ -48,7 +48,7 @@ shared_ptr<Object> Access::invoke(const shared_ptr<Context> &context) {
 			return function->execute(ptr, {String::newInstance(ptr->context, location, id), Null}, location);
 		} else throw compile_error("Cannot call method 'set' on '" + ptr->getRepr(location) + "'", location);
 	} else {
-		return ptr->context->add(id)->getValue();
+		return ptr->context->set(id, Null, false)->getValue();
 	}
 }
 
@@ -93,14 +93,10 @@ shared_ptr<Variable> AssignmentAccess::invoke(const shared_ptr<Context> &context
 				return ptr->findLocal(id);
 			} else throw compile_error("Cannot call method 'set' on '" + ptr->getRepr(location) + "'", location);
 		} else {
-			return ptr->context->add(id);
+			return ptr->context->set(id, Null, false);
 		}
 	} else {
-		if (auto find = context->find(id)) {
-			return find;
-		} else {
-			return context->add(id);
-		}
+		return context->findOrAdd(id, false);
 	}
 }
 
@@ -112,33 +108,30 @@ shared_ptr<Object> ParseFunction::invoke(const shared_ptr<Context> &context) {
 	vector<Function::Param> params;
 	params.reserve(paramInfos.size());
 	for (auto paramInfo = paramInfos.begin(); paramInfo != paramInfos.end(); ++paramInfo) {
-		const auto &nameToken = paramInfo->name;
-		const auto &typeToken = paramInfo->type;
-		const auto &id = nameToken->getText();
-		const auto &find = find_if(params.begin(), params.end(), [id](const Function::Param &p) { return p.id == id; });
+		const auto &name = paramInfo->name;
+		const auto &find = find_if(params.begin(), params.end(), [name](const Function::Param &p) { return p.id == name; });
 		if (find != params.end()) {
-			throw compile_error("Duplicate parameter '" + id + "'", {nameToken, nameToken});
+			throw compile_error("Duplicate parameter '" + name + "'", paramInfo->nameLocation);
 		}
 		if (paramInfo->rest) {
-			if (typeToken) {
-				throw compile_error("Cannot specify type hint on rest parameter '" + id + "'", {typeToken, typeToken});
+			if (paramInfo->typeLocation.valid) {
+				throw compile_error("Cannot specify type hint on rest parameter '" + name + "'", paramInfo->typeLocation);
 			}
 			if (next(paramInfo) != paramInfos.end()) {
-				throw compile_error("Rest parameter '" + id +
-									"' must be the last parameter in the function definition", {nameToken, nameToken});
+				throw compile_error("Rest parameter '" + name +
+									"' must be the last parameter in the function definition", paramInfo->nameLocation);
 			} else {
-				params.emplace_back(id, true);
+				params.emplace_back(name, true);
 			}
-		} else if (typeToken) {
-			const auto &type = typeToken->getText();
-			if (const auto &var = context->find(type)) {
+		} else if (paramInfo->typeLocation.valid) {
+			if (const auto &var = context->find(paramInfo->type)) {
 				const auto &ptr = var->getValue();
 				if (ptr->instanceOf(ClassClass)) {
-					params.emplace_back(id, ptr->as<Class>());
-				} else throw compile_error("Parameter '" + id + "' type hint must be a Class", {typeToken, typeToken});
-			} else throw compile_error("Parameter '" + id + "' type hint is undefined", {typeToken, typeToken});
+					params.emplace_back(name, ptr->as<Class>());
+				} else throw compile_error("Parameter '" + name + "' type hint must be a Class", paramInfo->typeLocation);
+			} else throw compile_error("Parameter '" + name + "' type hint is undefined", paramInfo->typeLocation);
 		} else {
-			params.emplace_back(id);
+			params.emplace_back(name);
 		}
 	}
 	return CodeFunction::newInstance(context, location, params, statements);
@@ -156,11 +149,7 @@ shared_ptr<Object> ParseNative::invoke(const shared_ptr<Context> &context) {
 }
 
 shared_ptr<Object> ParseIdentifier::invoke(const shared_ptr<Context> &context) {
-	if (const auto &find = context->find(id)) {
-		return find->getValue();
-	} else {
-		return context->add(id)->getValue();
-	}
+	return context->findOrAdd(id, false)->getValue();
 }
 
 shared_ptr<Object> ParseNumber::invoke(const shared_ptr<Context> &context) {

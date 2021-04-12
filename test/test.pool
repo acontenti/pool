@@ -161,7 +161,8 @@ iftest := (12.==("12")).thenElse({
     "equal".println();
     1;
 },{
-    "different".println();
+    print_:="different".get("println");
+    print_("different");
     0;
 });
 assert(0.==(iftest), "iftest should be equal to 0");

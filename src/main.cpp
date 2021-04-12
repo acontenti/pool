@@ -1,8 +1,9 @@
-#include <iostream>
-#include "pool.hpp"
+#include <pool.hpp>
 #include "util/time.hpp"
+#include <util/errors.hpp>
 #include "../lib/argagg.hpp"
 #include "../lib/termcolor.hpp"
+#include <iostream>
 
 using namespace pool;
 
@@ -12,7 +13,7 @@ int main(int argc, char **argv) {
 	try {
 		vector<argagg::definition> options{
 				{"debug", vector<string>{"-d", "--debug"}, "enables debug options", 0},
-				{"help",  vector<string>{"-h", "--help"},  "shows this help",       0}
+				{"help", vector<string>{"-h", "--help"}, "shows this help", 0}
 		};
 		argagg::parser argparser{options};
 		argagg::parser_results arguments = argparser.parse(argc, argv);
@@ -27,28 +28,31 @@ int main(int argc, char **argv) {
 				args.emplace_back(arguments.pos[i]);
 			}
 			PoolVM::initialiaze({debug, args});
-			auto result = PoolVM::execute(filename);
+			PoolVM::get()->execute(filename);
 			if (debug) {
 				auto executionTime = getExecutionTime(startTime, high_resolution_clock::now());
-				if (result) {
-					cerr << endl << termcolor::bright_green << "Execution successful" << termcolor::reset;
-				} else {
-					cerr << endl << termcolor::red << "Execution failed" << termcolor::reset;
-				}
+				cerr << endl << termcolor::bright_green << "Execution successful" << termcolor::reset;
 				cerr << " in " << executionTime << endl << endl;
 			}
-			return result ? EXIT_SUCCESS : EXIT_FAILURE;
+			return EXIT_SUCCESS;
 		} else {
-			argagg::fmt_ostream fmt(cerr);
-			fmt << "Usage: pool [options] file" << endl << argparser;
+			cerr << "Usage: pool [options] file" << endl << argparser;
 			return EXIT_SUCCESS;
 		}
+	} catch (const compile_error &e) {
+		cerr << e << endl;
+		if (debug) {
+			auto executionTime = getExecutionTime(startTime, high_resolution_clock::now());
+			cerr << endl << termcolor::red << "Execution failed" << termcolor::reset;
+			cerr << " in " << executionTime << endl << endl;
+		}
+		return EXIT_FAILURE;
 	} catch (const exception &e) {
 		cerr << termcolor::red << e.what() << termcolor::reset << endl;
 		if (debug) {
-			cerr << termcolor::red << "Execution failed" << termcolor::reset
-				 << " in " << getExecutionTime(startTime, high_resolution_clock::now())
-				 << endl << endl;
+			auto executionTime = getExecutionTime(startTime, high_resolution_clock::now());
+			cerr << endl << termcolor::red << "Execution failed" << termcolor::reset;
+			cerr << " in " << executionTime << endl << endl;
 		}
 		return EXIT_FAILURE;
 	}

@@ -14,7 +14,7 @@ namespace pool {
 	public:
 		Location location;
 
-		explicit Callable(const Location &location) : location(location) {}
+		explicit Callable(Location location) : location(move(location)) {}
 
 		virtual shared_ptr<Object> invoke(const shared_ptr<Context> &context) = 0;
 	};

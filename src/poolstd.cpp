@@ -1,7 +1,6 @@
-#include "pool.hpp"
+#include "pool_private.hpp"
 #include <poolstd.hpp>
 #include <callable.hpp>
-#include <util/errors.hpp>
 #include <util/strings.hpp>
 
 using namespace pool;
@@ -27,8 +26,8 @@ Object::Object(const shared_ptr<Context> &context, shared_ptr<Class> cls)
 		: context(context), cls(move(cls)), id(reinterpret_cast<intptr_t>(this)) {}
 
 shared_ptr<Function> Object::findMethod(const string &methodName) const {
-	if (auto object = getClass()->findInClass(methodName)) {
-		if (auto executable = dynamic_pointer_cast<Function>(object->getValue())) {
+	if (auto var = getClass()->findInClass(methodName)) {
+		if (auto executable = dynamic_pointer_cast<Function>(var->getValue())) {
 			return executable;
 		}
 	}
@@ -39,10 +38,7 @@ shared_ptr<Variable> Object::find(const string &name) const {
 	if (auto local = context->findLocal(name)) {
 		return local;
 	}
-	if (cls) {
-		return cls->findInClass(name);
-	}
-	return nullptr;
+	return getClass()->findInClass(name);
 }
 
 shared_ptr<Variable> Object::findLocal(const string &name) const {
@@ -94,7 +90,7 @@ shared_ptr<Class> Class::extend(const creator_t &_creator, const string &classNa
 	if (block) {
 		block->execute(location);
 		for (const auto&[name, value] : *block->context) {
-			cls->context->set(name, value->getValue(), value->isImmutable());
+			cls->context->set(name, value->getValue(), value->isImmutable(), location);
 		}
 	}
 	return cls;
@@ -185,9 +181,10 @@ shared_ptr<Object> CodeFunction::execute(const shared_ptr<Object> &self, const v
 				throw compile_error(
 						"Argument for function parameter '" + param.id + "' must be of class '" + param.type->name
 						+ "', but value of class '" + value->getClass()->name + "' was given", location);
-			} else context->set(param.id, value);
+			} else context->set(param.id, value, false, location);
 		} else {
-			context->set(param.id, Array::newInstance(context, location, {args.begin() + i, args.end()}));
+			context->set(param.id, Array::newInstance(context, location, {args.begin() + i, args.end()}),
+						 false, location);
 		}
 	}
 	for (auto &call: calls) {
@@ -268,22 +265,20 @@ void initializeContext() {
 		if (arg->instanceOf(StringClass)) {
 			auto moduleName = arg->as<String>()->value;
 			try {
-				auto result = PoolVM::execute(moduleName);
-				if (!result) {
-					throw runtime_error("execution error");
-				}
-			} catch (const runtime_error &e) {
+				PoolVM::get()->execute(moduleName);
+			} catch (const compile_error &e) {
+				cerr << e;
 				throw compile_error("Cannot import module '" + moduleName + "': " + e.what(), location);
 			}
 		} else throw compile_error("import argument must be a String", location);
 		return Void;
-	}));
+	}), true);
 }
 
 void initializeBaseObjects() {
 	ClassClass = Class::CREATOR(Context::create(Context::global), Class::ClassData{Class::CREATOR, "Class", nullptr}); // ObjectClass is not yet created, so we pass nullptr as super
 	ObjectClass = Class::CREATOR(Context::create(Context::global), Class::ClassData{Object::CREATOR, "Object", nullptr}); // ObjectClass is the base class, so it has no super
-	ClassClass->super = ObjectClass; // Now ObjectClass exists, so we can assign it to ClassClass->super
+	const_pointer_cast<Class>(ClassClass->super) = ObjectClass; // Now ObjectClass exists, so we can assign it to ClassClass->super
 	BoolClass = ObjectClass->extend(Bool::CREATOR, "Bool", nullptr, Location::UNKNOWN);
 	NumberClass = ObjectClass->extend(Object::CREATOR, "Number", nullptr, Location::UNKNOWN);
 	IntegerClass = NumberClass->extend(Integer::CREATOR, "Integer", nullptr, Location::UNKNOWN);

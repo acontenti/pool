@@ -1,5 +1,6 @@
 #pragma once
 
+#include <util/macro.hpp>
 #include <vector>
 #include <memory>
 #include <string>
@@ -7,23 +8,26 @@
 using namespace std;
 
 namespace pool {
+	class POOL_PUBLIC PoolInstance {
+	public:
+		const string path;
 
-	class PoolVM {
-		class PoolInstance;
+		PoolInstance(string path);
+	};
 
-		static struct Settings {
+	class POOL_PUBLIC PoolVM {
+	public:
+		struct Settings {
 			bool debug;
 			vector<string> args;
-		} settings;
-		static vector<shared_ptr<PoolInstance>> instances;
-	public:
+		};
 		constexpr static const string_view VERSION = POOL_VERSION;
 		constexpr static const string_view EXT = ".pool";
 
 		static void initialiaze(const Settings &settings);
 
-		static bool execute(const string &filename);
-	};
+		virtual void execute(const string &module) noexcept(false) = 0;
 
-	extern void initializeStdLib();
+		static shared_ptr<PoolVM> get();
+	};
 }

@@ -5,14 +5,13 @@
 
 using namespace pool;
 
-Variable::Variable(string name, shared_ptr<Object> value, bool immutable)
-		: name(move(name)), value(move(value)), immutable(immutable) {
+Variable::Variable(shared_ptr<Object> value, bool immutable)
+		: value(move(value)), immutable(immutable) {
 }
 
 void Variable::setValue(const shared_ptr<Object> &val) {
 	if (!immutable)
 		value = val;
-	else throw compile_error("Cannot assign immutable variable '" + name + "'", Location::UNKNOWN);
 }
 
 bool Variable::isImmutable() const {
@@ -45,35 +44,34 @@ shared_ptr<Variable> Context::findLocal(const string &name) const {
 	} else return nullptr;
 }
 
-shared_ptr<Variable> Context::add(const string &name) {
-	const auto &variable = make_shared<Variable>(name, Null, false);
-	return heap.try_emplace(name, variable).first->second;
-}
-
-shared_ptr<Variable> Context::set(const string &name, const shared_ptr<Object> &value, bool immutable) {
-	if (const auto &var = this->findLocal(name)) {
-		var->setValue(value);
+shared_ptr<Variable> Context::findOrAdd(const string &name, bool local) {
+	if (const auto &var = local ? this->findLocal(name) : this->find(name)) {
 		return var;
 	} else {
-		return heap[name] = make_shared<Variable>(name, value, immutable);
+		return heap[name] = make_shared<Variable>(Null, false);
 	}
+}
+
+shared_ptr<Variable> Context::set(const string &name, const shared_ptr<Object> &value, bool immutable, const Location &location) {
+	if (const auto &var = this->findLocal(name)) {
+		if (!var->isImmutable()) {
+			var->setValue(value);
+			var->setImmutable(immutable);
+		} else throw compile_error("Cannot assign immutable variable '" + name + "'", location);
+		return var;
+	} else return heap[name] = make_shared<Variable>(value, immutable);
+}
+
+shared_ptr<Variable> Context::forceSet(const string &name, const shared_ptr<Object> &value, bool immutable) {
+	if (const auto &var = this->findLocal(name)) {
+		var->setValue(value);
+		var->setImmutable(immutable);
+		return var;
+	} else return heap[name] = make_shared<Variable>(value, immutable);
 }
 
 void Context::remove(const string &name) {
 	heap.erase(name);
-}
-
-string Context::toString(const Location &location) const {
-	stringstream ss;
-	ss << "{";
-	if (!heap.empty()) {
-		for (auto&[name, value] : *this) {
-			ss << name << ":" << value->getValue()->getRepr(location) << ",";
-		}
-		ss.seekp(-1, stringstream::cur); //remove last comma
-	}
-	ss << "}";
-	return ss.str();
 }
 
 Context::Context(shared_ptr<Context> parent) : parent(move(parent)) {}
