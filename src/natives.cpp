@@ -4,44 +4,50 @@
 #include "util/dylib.hpp"
 #include <ctgmath>
 #include <iostream>
+#include <unordered_map>
 
 using namespace pool;
 
 struct NativesImpl : public Natives {
-	unordered_map<string, shared_ptr<Object>> natives;
+	unordered_map<string, shared_ptr<any>> natives;
 
 	NativesImpl() {
 		initialize();
 	}
 
 	void initialize() {
+		initializeSymbols();
 		initializeUtilities();
 		initializeClass();
 		initializeObject();
 		initializeBool();
 		initializeNumber();
 		initializeInteger();
-		initializeDecimal();
 		initializeString();
-		initializeFun();
+		initializeFunction();
 		initializeArray();
-		initializeBlock();
+	}
+
+	void initializeSymbols() {
+		add("Integer", Integer::CREATOR);
+		add("Decimal", Decimal::CREATOR);
 	}
 
 	void initializeUtilities() {
-		add("Void", VoidClass);
-		add("Nothing", NothingClass);
-		add("void", Void);
-		add("null", Null);
 		addFun("throw", {{"message", StringClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) -> shared_ptr<Object> {
 			throw compile_error(other[0]->as<String>()->value, location);
 		});
-		addFun("tryCatch", {{"try", BlockClass}, {"catch", FunctionClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+		addFun("tryCatch", {{"try", FunctionClass}, {"catch", FunctionClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			try {
-				return other[0]->as<Block>()->execute(location);
+				auto ptr = other[0]->as<Function>();
+				return ptr->execute(ptr, {}, location);
 			} catch (const compile_error &error) {
 				const auto &ptr = other[1]->as<Function>();
-				return ptr->execute(ptr, {String::newInstance(ptr->context, location, error.what())}, location);
+				if (ptr->params.empty()) {
+					ptr->execute(ptr, {}, location);
+				} else {
+					return ptr->execute(ptr, {String::newInstance(ptr->context, location, error.what())}, location);
+				}
 			}
 		});
 		addFun("input", {{"prompt", StringClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) -> shared_ptr<Object> {
@@ -56,7 +62,7 @@ struct NativesImpl : public Natives {
 			} catch (const runtime_error &error) {
 				throw compile_error(error.what(), location);
 			}
-			return Void;
+			return Null;
 		});
 		addFun("loadLibrary", {{"file", StringClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) -> shared_ptr<Object> {
 			try {
@@ -64,16 +70,15 @@ struct NativesImpl : public Natives {
 			} catch (const runtime_error &error) {
 				throw compile_error(error.what(), location);
 			}
-			return Void;
+			return Null;
 		});
 	}
 
 	void initializeClass() {
-		add("Class", ClassClass);
-		addFun("Class.extend", {{"this"}, {"name", StringClass}, {"body", BlockClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+		addFun("Class.extend", {{"this"}, {"name", StringClass}, {"body", FunctionClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			const auto &name = other[0]->as<String>()->value;
 			const auto &cls = self->as<Class>();
-			return cls->extend(cls->creator, name, other[1]->as<Block>(), location);
+			return cls->extend(cls->creator, name, other[1]->as<Function>(), location);
 		});
 		addFun("Class.new", {{"this"}, {"arguments", true}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			const auto &cls = self->as<Class>();
@@ -96,7 +101,6 @@ struct NativesImpl : public Natives {
 	}
 
 	void initializeObject() {
-		add("Object", ObjectClass);
 		addFun("Object.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			return String::newInstance(self->context, location, self->getRepr(location));
 		});
@@ -104,7 +108,7 @@ struct NativesImpl : public Natives {
 			stringstream ss;
 			ss << "{";
 			if (!self->context->empty()) {
-				for (const auto&[name, value] : *self->context) {
+				for (const auto &[name, value]: *self->context) {
 					ss << name << ":" << value->getValue()->getRepr(location) << ",";
 				}
 				ss.seekp(-1, stringstream::cur); //remove last comma
@@ -120,11 +124,11 @@ struct NativesImpl : public Natives {
 		});
 		addFun("Object.print", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			cout << self->toString(location);
-			return Void;
+			return Null;
 		});
 		addFun("Object.println", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			cout << self->toString(location) << endl;
-			return Void;
+			return Null;
 		});
 		addFun("Object.instanceOf", {{"this"}, {"class", ClassClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			return self->instanceOf(other[0]->as<Class>()) ? True : False;
@@ -148,7 +152,7 @@ struct NativesImpl : public Natives {
 					self->remove(key);
 				} else throw compile_error("Cannot remove immutable variable '" + key + "'", location);
 			}
-			return Void;
+			return Null;
 		});
 		addFun("Object.==", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			return self == other[0] ? True : False;
@@ -156,9 +160,10 @@ struct NativesImpl : public Natives {
 	}
 
 	void initializeBool() {
-		add("true", True);
-		add("false", False);
-		add("Bool", BoolClass);
+		addFun("Bool.new", {{"value", "Integer"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			const auto &value = other[0]->as<Integer>()->value;
+			return value ? True : False;
+		});
 		addFun("Bool.getRepr", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			return String::newInstance(self->context, location, self->as<Bool>()->value ? "true" : "false");
 		});
@@ -176,73 +181,74 @@ struct NativesImpl : public Natives {
 				return (self->as<Bool>()->value == other[0]->as<Bool>()->value) ? True : False;
 			} else return False;
 		});
-		addFun("Bool.then", {{"this"}, {"action", BlockClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			return self->as<Bool>()->value ? other[0]->as<Block>()->execute(location) : Void;
+		addFun("Bool.then", {{"this"}, {"action", FunctionClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			auto fun = other[0]->as<Function>();
+			return self->as<Bool>()->value ? fun->execute(fun, {}, location) : Null;
 		});
-		addFun("Bool.thenElse", {{"this"}, {"trueAction", BlockClass}, {"falseAction", BlockClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			return (self->as<Bool>()->value ? other[0]->as<Block>() : other[1]->as<Block>())->execute(location);
+		addFun("Bool.thenElse", {{"this"}, {"trueAction", FunctionClass}, {"falseAction", FunctionClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			auto fun = self->as<Bool>()->value ? other[0]->as<Function>() : other[1]->as<Function>();
+			return fun->execute(fun, {}, location);
 		});
 	}
 
 	void initializeNumber() {
-		add("Number", NumberClass);
-		addFun("Number.<", {{"this"}, {"other", NumberClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			if (self->instanceOf(IntegerClass)) {
+		addFun("Number.<", {{"this"}, {"other", "Number"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf("Integer")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Integer>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return (value < oth->as<Integer>()->value) ? True : False;
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return (value < oth->as<Decimal>()->value) ? True : False;
 				}
-			} else if (self->instanceOf(DecimalClass)) {
+			} else if (self->instanceOf("Decimal")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Decimal>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return (value < oth->as<Integer>()->value) ? True : False;
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return (value < oth->as<Decimal>()->value) ? True : False;
 				}
 			}
 			throw compile_error("Number.< error: invalid subclass", location);
 		});
 		addFun("Number.==", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			if (self->instanceOf(IntegerClass)) {
+			if (self->instanceOf("Integer")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Integer>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return (value == oth->as<Integer>()->value) ? True : False;
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return (value == oth->as<Decimal>()->value) ? True : False;
 				} else return False;
-			} else if (self->instanceOf(DecimalClass)) {
+			} else if (self->instanceOf("Decimal")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Decimal>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return (value == oth->as<Integer>()->value) ? True : False;
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return (value == oth->as<Decimal>()->value) ? True : False;
 				} else return False;
 			}
 			throw compile_error("Number.== error: invalid subclass", location);
 		});
 		addFun("Number.+", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			if (self->instanceOf(IntegerClass)) {
+			if (self->instanceOf("Integer")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Integer>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return Integer::newInstance(self->context, location, value + oth->as<Integer>()->value);
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return Decimal::newInstance(self->context, location, value + oth->as<Decimal>()->value);
 				} else if (oth->instanceOf(StringClass)) {
 					return String::newInstance(self->context, location, to_string(value) + oth->as<String>()->value);
 				} else throw compile_error("Number.+ argument must be a Number or a String", location);
-			} else if (self->instanceOf(DecimalClass)) {
+			} else if (self->instanceOf("Decimal")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Decimal>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return Decimal::newInstance(self->context, location, value + oth->as<Integer>()->value);
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return Decimal::newInstance(self->context, location, value + oth->as<Decimal>()->value);
 				} else if (oth->instanceOf(StringClass)) {
 					return String::newInstance(self->context, location, to_string(value) + oth->as<String>()->value);
@@ -250,131 +256,131 @@ struct NativesImpl : public Natives {
 			}
 			throw compile_error("Number.+ error: invalid subclass", location);
 		});
-		addFun("Number.-", {{"this"}, {"other", NumberClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			if (self->instanceOf(IntegerClass)) {
+		addFun("Number.-", {{"this"}, {"other", "Number"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf("Integer")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Integer>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return Integer::newInstance(self->context, location, value - oth->as<Integer>()->value);
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return Decimal::newInstance(self->context, location, value - oth->as<Decimal>()->value);
 				}
-			} else if (self->instanceOf(DecimalClass)) {
+			} else if (self->instanceOf("Decimal")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Decimal>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return Decimal::newInstance(self->context, location, value - oth->as<Integer>()->value);
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return Decimal::newInstance(self->context, location, value - oth->as<Decimal>()->value);
 				}
 			}
 			throw compile_error("Number.- error: invalid subclass", location);
 		});
-		addFun("Number.*", {{"this"}, {"other", NumberClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			if (self->instanceOf(IntegerClass)) {
+		addFun("Number.*", {{"this"}, {"other", "Number"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf("Integer")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Integer>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return Integer::newInstance(self->context, location, value * oth->as<Integer>()->value);
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return Decimal::newInstance(self->context, location, value * oth->as<Decimal>()->value);
 				}
-			} else if (self->instanceOf(DecimalClass)) {
+			} else if (self->instanceOf("Decimal")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Decimal>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return Decimal::newInstance(self->context, location, value * oth->as<Integer>()->value);
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return Decimal::newInstance(self->context, location, value * oth->as<Decimal>()->value);
 				}
 			}
 			throw compile_error("Number.* error: invalid subclass", location);
 		});
-		addFun("Number./", {{"this"}, {"other", NumberClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			if (self->instanceOf(IntegerClass)) {
+		addFun("Number./", {{"this"}, {"other", "Number"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf("Integer")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Integer>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return Decimal::newInstance(self->context, location,
 												value / static_cast<long double>(oth->as<Integer>()->value));
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return Decimal::newInstance(self->context, location, value / oth->as<Decimal>()->value);
 				}
-			} else if (self->instanceOf(DecimalClass)) {
+			} else if (self->instanceOf("Decimal")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Decimal>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return Decimal::newInstance(self->context, location, value / oth->as<Integer>()->value);
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return Decimal::newInstance(self->context, location, value / oth->as<Decimal>()->value);
 				}
 			}
 			throw compile_error("Number./ error: invalid subclass", location);
 		});
-		addFun("Number.%", {{"this"}, {"other", NumberClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			if (self->instanceOf(IntegerClass)) {
+		addFun("Number.%", {{"this"}, {"other", "Number"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf("Integer")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Integer>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return Integer::newInstance(self->context, location, value % oth->as<Integer>()->value);
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return Decimal::newInstance(self->context, location, fmod(value, oth->as<Decimal>()->value));
 				}
-			} else if (self->instanceOf(DecimalClass)) {
+			} else if (self->instanceOf("Decimal")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Decimal>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return Decimal::newInstance(self->context, location, fmod(value, oth->as<Integer>()->value));
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return Decimal::newInstance(self->context, location, fmod(value, oth->as<Decimal>()->value));
 				}
 			}
 			throw compile_error("Number.% error: invalid subclass", location);
 		});
-		addFun("Number.**", {{"this"}, {"other", NumberClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			if (self->instanceOf(IntegerClass)) {
+		addFun("Number.**", {{"this"}, {"other", "Number"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (self->instanceOf("Integer")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Integer>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return Integer::newInstance(self->context, location, pow(value, oth->as<Integer>()->value));
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return Decimal::newInstance(self->context, location, pow(value, oth->as<Decimal>()->value));
 				}
-			} else if (self->instanceOf(DecimalClass)) {
+			} else if (self->instanceOf("Decimal")) {
 				const auto &oth = other[0];
 				const auto &value = self->as<Decimal>()->value;
-				if (oth->instanceOf(IntegerClass)) {
+				if (oth->instanceOf("Integer")) {
 					return Decimal::newInstance(self->context, location, pow(value, oth->as<Integer>()->value));
-				} else if (oth->instanceOf(DecimalClass)) {
+				} else if (oth->instanceOf("Decimal")) {
 					return Decimal::newInstance(self->context, location, pow(value, oth->as<Decimal>()->value));
 				}
 			}
 			throw compile_error("Number.** error: invalid subclass", location);
 		});
 		addFun("Number.abs", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			if (self->instanceOf(IntegerClass)) {
+			if (self->instanceOf("Integer")) {
 				const auto &value = self->as<Integer>()->value;
 				return Integer::newInstance(self->context, location, abs(value));
-			} else if (self->instanceOf(DecimalClass)) {
+			} else if (self->instanceOf("Decimal")) {
 				const auto &value = self->as<Decimal>()->value;
 				return Decimal::newInstance(self->context, location, abs(value));
 			}
 			throw compile_error("Number.abs error: invalid subclass", location);
 		});
 		addFun("Number.neg", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			if (self->instanceOf(IntegerClass)) {
+			if (self->instanceOf("Integer")) {
 				const auto &value = self->as<Integer>()->value;
 				return Integer::newInstance(self->context, location, -value);
-			} else if (self->instanceOf(DecimalClass)) {
+			} else if (self->instanceOf("Decimal")) {
 				const auto &value = self->as<Decimal>()->value;
 				return Decimal::newInstance(self->context, location, -value);
 			}
 			throw compile_error("Number.neg error: invalid subclass", location);
 		});
 		addFun("Number.getRepr", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			if (self->instanceOf(IntegerClass)) {
+			if (self->instanceOf("Integer")) {
 				return String::newInstance(self->context, location, to_string(self->as<Integer>()->value));
-			} else if (self->instanceOf(DecimalClass)) {
+			} else if (self->instanceOf("Decimal")) {
 				return String::newInstance(self->context, location, to_string(self->as<Decimal>()->value));
 			}
 			throw compile_error("Number.getDefaultRepr error: invalid subclass", location);
@@ -382,38 +388,32 @@ struct NativesImpl : public Natives {
 	}
 
 	void initializeInteger() {
-		add("Integer", IntegerClass);
-		addFun("Integer.|", {{"this"}, {"other", IntegerClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+		addFun("Integer.|", {{"this"}, {"other", "Integer"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			const auto &value = self->as<Integer>()->value;
 			return Integer::newInstance(self->context, location, value | other[0]->as<Integer>()->value);
 		});
-		addFun("Integer.&", {{"this"}, {"other", IntegerClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+		addFun("Integer.&", {{"this"}, {"other", "Integer"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			const auto &value = self->as<Integer>()->value;
 			return Integer::newInstance(self->context, location, value & other[0]->as<Integer>()->value);
 		});
-		addFun("Integer.^", {{"this"}, {"other", IntegerClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+		addFun("Integer.^", {{"this"}, {"other", "Integer"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			const auto &value = self->as<Integer>()->value;
 			return Integer::newInstance(self->context, location, value ^ other[0]->as<Integer>()->value);
 		});
 		addFun("Integer.~", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			return Integer::newInstance(self->context, location, ~self->as<Integer>()->value);
 		});
-		addFun("Integer.<<", {{"this"}, {"other", IntegerClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+		addFun("Integer.<<", {{"this"}, {"other", "Integer"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			const auto &value = self->as<Integer>()->value;
 			return Integer::newInstance(self->context, location, value << other[0]->as<Integer>()->value);
 		});
-		addFun("Integer.>>", {{"this"}, {"other", IntegerClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+		addFun("Integer.>>", {{"this"}, {"other", "Integer"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			const auto &value = self->as<Integer>()->value;
 			return Integer::newInstance(self->context, location, value >> other[0]->as<Integer>()->value);
 		});
 	}
 
-	void initializeDecimal() {
-		add("Decimal", DecimalClass);
-	}
-
 	void initializeString() {
-		add("String", StringClass);
 		addFun("String.length", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			return Integer::newInstance(self->context, location, self->as<String>()->value.length());
 		});
@@ -439,8 +439,7 @@ struct NativesImpl : public Natives {
 		});
 	}
 
-	void initializeFun() {
-		add("Function", FunctionClass);
+	void initializeFunction() {
 		addFun("Function.classmethod", {{"this"}}, [](const shared_ptr<Object> &fself, const vector<shared_ptr<Object>> &fother, const Location &flocation) {
 			const auto &ptr = fself->as<Function>();
 			return NativeFunction::newInstance(ptr->params, [ptr](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
@@ -460,10 +459,11 @@ struct NativesImpl : public Natives {
 			stringstream ss;
 			ss << self->getDefaultRepr() << "[";
 			if (!fun->params.empty()) {
-				for (const auto &param : fun->params) {
+				for (const auto &param: fun->params) {
 					if (param.rest) ss << "...";
 					ss << param.id;
 					if (param.type) ss << ":" << param.type->name;
+					else if (!param.typeName.empty()) ss << ":" << param.typeName;
 					ss << ",";
 				}
 				ss.seekp(-1, stringstream::cur); //remove last comma
@@ -471,11 +471,36 @@ struct NativesImpl : public Natives {
 			ss << "]";
 			return String::newInstance(self->context, location, ss.str());
 		});
+		addFun("Function.whileDo", {{"this"}, {"action", FunctionClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			const auto &action = other[0]->as<Function>();
+			const auto &test = self->as<Function>();
+			auto testResult = test->execute(test, {}, location);
+			if (!(testResult->instanceOf(BoolClass)))
+				throw compile_error("Function.whileDo: this must return a Bool", location);
+			while (testResult->as<Bool>()->value) {
+				action->execute(action, {}, location);
+				testResult = test->execute(test, {}, location);
+				if (!(testResult->instanceOf(BoolClass)))
+					throw compile_error("Function.whileDo: this must return a Bool", location);
+			}
+			return Null;
+		});
+		addFun("Function.doWhile", {{"this"}, {"action", FunctionClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			const auto &action = other[0]->as<Function>();
+			const auto &test = self->as<Function>();
+			shared_ptr<Object> testResult;
+			do {
+				action->execute(action, {}, location);
+				testResult = test->execute(test, {}, location);
+				if (!(testResult->instanceOf(BoolClass)))
+					throw compile_error("Function.doWhile: this must return a Bool", location);
+			} while (testResult->as<Bool>()->value);
+			return Null;
+		});
 	}
 
 	void initializeArray() {
-		add("Array", ArrayClass);
-		addFun("Array.at", {{"this"}, {"index", IntegerClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+		addFun("Array.at", {{"this"}, {"index", "Integer"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			const auto &index = other[0]->as<Integer>()->value;
 			const auto &array = self->as<Array>();
 			if (index >= 0 && index < array->values.size()) {
@@ -485,10 +510,10 @@ struct NativesImpl : public Natives {
 		});
 		addFun("Array.push", {{"this"}, {"args", true}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			const auto &array = self->as<Array>();
-			for (const auto &value : other) {
+			for (const auto &value: other) {
 				array->values.push_back(value);
 			}
-			return Void;
+			return Null;
 		});
 		addFun("Array.forEach", {{"this"}, {"action"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			const auto &fun = other[0]->as<Function>();
@@ -497,16 +522,16 @@ struct NativesImpl : public Natives {
 			if (fun->params.empty()) {
 				throw compile_error("Array.forEach: argument 'action' must have at least 1 paramenter", location);
 			} else if (fun->params.size() == 1) {
-				for (const auto &value : array->values) {
+				for (const auto &value: array->values) {
 					fun->execute(fun, {value}, location);
 				}
 			} else if (fun->params.size() == 2) {
-				for (const auto &value : array->values) {
+				for (const auto &value: array->values) {
 					fun->execute(fun, {value, Integer::newInstance(self->context, location, i)}, location);
 					i++;
 				}
 			} else if (fun->params.size() == 3) {
-				for (const auto &value : array->values) {
+				for (const auto &value: array->values) {
 					fun->execute(fun, {value, Integer::newInstance(self->context, location, i), array}, location);
 					i++;
 				}
@@ -522,7 +547,7 @@ struct NativesImpl : public Natives {
 			const auto &ptr = self->as<Array>();
 			ss << "[";
 			if (!ptr->values.empty()) {
-				for (const auto &value : ptr->values) {
+				for (const auto &value: ptr->values) {
 					ss << value->getRepr(location) << ",";
 				}
 				ss.seekp(-1, stringstream::cur); //remove last comma
@@ -535,49 +560,27 @@ struct NativesImpl : public Natives {
 		});
 	}
 
-	void initializeBlock() {
-		add("Block", BlockClass);
-		addFun("Block.whileDo", {{"this"}, {"action", BlockClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			const auto &action = other[0]->as<Block>();
-			const auto &test = self->as<Block>();
-			auto testResult = test->execute(location);
-			if (!(testResult->instanceOf(BoolClass)))
-				throw compile_error("Block.whileDo: this must return a Bool", location);
-			while (testResult->as<Bool>()->value) {
-				action->execute(location);
-				testResult = test->execute(location);
-				if (!(testResult->instanceOf(BoolClass)))
-					throw compile_error("Block.whileDo: this must return a Bool", location);
-			}
-			return Void;
-		});
-		addFun("Block.doWhile", {{"this"}, {"action", BlockClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			const auto &action = other[0]->as<Block>();
-			const auto &test = self->as<Block>();
-			shared_ptr<Object> testResult;
-			do {
-				action->execute(location);
-				testResult = test->execute(location);
-				if (!(testResult->instanceOf(BoolClass)))
-					throw compile_error("Block.doWhile: this must return a Bool", location);
-			} while (testResult->as<Bool>()->value);
-			return Void;
-		});
+	inline bool addValue(const string &name, const any &value) {
+		return natives.try_emplace(name, make_shared<any>(value)).second;
 	}
 
 	bool add(const string &name, const shared_ptr<Object> &value) override {
-		return natives.try_emplace(name, value).second;
+		return addValue(name, value);
+	}
+
+	bool add(const string &name, const Class::creator_t &value) override {
+		return addValue(name, value);
 	}
 
 	bool addFun(const string &name, const vector<Function::Param> &parameters, const NativeFunction::method_t &code) override {
 		return add(name, NativeFunction::newInstance(parameters, code));
 	}
 
-	shared_ptr<Object> find(const string &name) override {
+	any find(const string &name) override {
 		const auto &iterator = natives.find(name);
 		if (iterator != natives.end()) {
-			return iterator->second;
-		} else return nullptr;
+			return *iterator->second;
+		} else return any();
 	}
 };
 

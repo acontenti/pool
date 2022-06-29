@@ -134,19 +134,6 @@ namespace pool {
 		}
 	};
 
-	class ParseBlock : public Callable {
-		vector<shared_ptr<Callable>> statements;
-	public:
-		explicit ParseBlock(const Location &location, const vector<shared_ptr<Callable>> &statements)
-				: Callable(location), statements(statements) {}
-
-		shared_ptr<Object> invoke(const shared_ptr<Context> &context) override;
-
-		static shared_ptr<ParseBlock> create(const Location &location, const vector<shared_ptr<Callable>> &statements) {
-			return make_shared<ParseBlock>(location, statements);
-		}
-	};
-
 	class ParseArray : public Callable {
 		shared_ptr<Args> args;
 	public:

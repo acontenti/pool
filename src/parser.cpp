@@ -24,7 +24,7 @@ Location tptl(const shared_ptr<PoolInstanceImpl> &poolInstance, Token *start, To
 
 shared_ptr<Callable> parseCall(PoolParser::CallContext *ast, const shared_ptr<PoolInstanceImpl> &poolInstance);
 
-shared_ptr<Callable> parseIdentifier(Token *ast, const shared_ptr<PoolInstanceImpl>& poolInstance) {
+shared_ptr<Callable> parseIdentifier(Token *ast, const shared_ptr<PoolInstanceImpl> &poolInstance) {
 	const auto &id = ast->getText();
 	return ParseIdentifier::create(tptl(poolInstance, ast), id);
 }
@@ -79,13 +79,13 @@ vector<shared_ptr<Callable>> parseStatements(const vector<PoolParser::StatementC
 		if (const auto &exp = statement->expression()) {
 			result.emplace_back(parseExpression(exp, poolInstance));
 		} else {
-			result.emplace_back(Identity::create(tptl(poolInstance, statement->start, statement->stop), Void));
+			result.emplace_back(Identity::create(tptl(poolInstance, statement->start, statement->stop), Null));
 		}
 	}
 	return result;
 }
 
-shared_ptr<Args> parseArgs(const vector<PoolParser::ArgContext *> &ast, const shared_ptr<PoolInstanceImpl>& poolInstance) {
+shared_ptr<Args> parseArgs(const vector<PoolParser::ArgContext *> &ast, const shared_ptr<PoolInstanceImpl> &poolInstance) {
 	vector<Args::arg_t> args;
 	args.reserve(ast.size());
 	for (const auto &arg : ast) {
@@ -101,7 +101,7 @@ shared_ptr<Callable> parsePar(PoolParser::ParContext *ast, const shared_ptr<Pool
 	if (const auto &exp = ast->expression()) {
 		return parseExpression(exp, poolInstance);
 	} else {
-		return Identity::create(tptl(poolInstance, ast->start, ast->stop), Void);
+		return Identity::create(tptl(poolInstance, ast->start, ast->stop), Null);
 	}
 }
 
@@ -128,18 +128,18 @@ shared_ptr<Callable> parseNum(PoolParser::NumContext *ast, const shared_ptr<Pool
 	}
 }
 
-shared_ptr<Callable> parseString(PoolParser::StringContext *ast, const shared_ptr<PoolInstanceImpl>& poolInstance) {
+shared_ptr<Callable> parseString(PoolParser::StringContext *ast, const shared_ptr<PoolInstanceImpl> &poolInstance) {
 	const auto &token = ast->STRING_LITERAL()->getSymbol();
 	const auto &text = token->getText();
 	return ParseString::create(tptl(poolInstance, token), text.substr(1, text.size() - 2));
 }
 
-shared_ptr<Callable> parseBlock(PoolParser::BlockContext *ast, const shared_ptr<PoolInstanceImpl>& poolInstance) {
+shared_ptr<Callable> parseBlock(PoolParser::BlockContext *ast, const shared_ptr<PoolInstanceImpl> &poolInstance) {
 	const auto &statements = parseStatements(ast->statement(), poolInstance);
-	return ParseBlock::create(tptl(poolInstance, ast->start, ast->stop), statements);
+	return ParseFunction::create(tptl(poolInstance, ast->start, ast->stop), {}, statements);
 }
 
-shared_ptr<Callable> parseArray(PoolParser::ArrayContext *ast, const shared_ptr<PoolInstanceImpl>& poolInstance) {
+shared_ptr<Callable> parseArray(PoolParser::ArrayContext *ast, const shared_ptr<PoolInstanceImpl> &poolInstance) {
 	const auto &args = parseArgs(ast->arg(), poolInstance);
 	return ParseArray::create(tptl(poolInstance, ast->start, ast->stop), args);
 }
@@ -157,11 +157,11 @@ shared_ptr<Callable> parseFunction(PoolParser::FunContext *ast, const shared_ptr
 				param->DOTS() != nullptr
 		});
 	}
-	return ParseFunction::create(tptl(poolInstance, ast->start, ast->stop), params,
-								 parseStatements(ast->statement(), poolInstance));
+	const auto &statements = parseStatements(ast->statement(), poolInstance);
+	return ParseFunction::create(tptl(poolInstance, ast->start, ast->stop), params, statements);
 }
 
-shared_ptr<Callable> parseNative(tree::TerminalNode *ast, const shared_ptr<PoolInstanceImpl>& poolInstance) {
+shared_ptr<Callable> parseNative(tree::TerminalNode *ast, const shared_ptr<PoolInstanceImpl> &poolInstance) {
 	const auto &token = ast->getSymbol();
 	const auto &text = token->getText();
 	const auto &id = text.substr(1, text.length() - 2);

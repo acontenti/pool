@@ -2,7 +2,6 @@
 #include <poolstd.hpp>
 #include <util/errors.hpp>
 #include <util/strings.hpp>
-#include <natives.hpp>
 #include <Token.h>
 
 using namespace pool;
@@ -35,7 +34,7 @@ shared_ptr<Object> InvocationAccess::invoke(const shared_ptr<Context> &context) 
 			const auto &values = args->invoke(context);
 			return executable->execute(selfPtr, values, location);
 		} else throw compile_error(ptr->getRepr(location) + " is not executable", idLocation);
-	} else throw compile_error(Null->getRepr(location) + " is not executable", idLocation);
+	} else throw compile_error(selfPtr->getRepr(location) + ".\"" + id + "\" not found", idLocation);
 }
 
 shared_ptr<Object> Access::invoke(const shared_ptr<Context> &context) {
@@ -43,13 +42,7 @@ shared_ptr<Object> Access::invoke(const shared_ptr<Context> &context) {
 	const auto &result = local ? ptr->findLocal(id) : ptr->find(id);
 	if (result) {
 		return result->getValue();
-	} else if (const auto &set = ptr->find("set")) {
-		if (const auto &function = dynamic_pointer_cast<Function>(set->getValue())) {
-			return function->execute(ptr, {String::newInstance(ptr->context, location, id), Null}, location);
-		} else throw compile_error("Cannot call method 'set' on '" + ptr->getRepr(location) + "'", location);
-	} else {
-		return ptr->context->set(id, Null, false)->getValue();
-	}
+	} else throw compile_error(ptr->getRepr(location) + ".\"" + id + "\" not found", location);
 }
 
 shared_ptr<Object> Identity::invoke(const shared_ptr<Context> &context) {
@@ -58,12 +51,12 @@ shared_ptr<Object> Identity::invoke(const shared_ptr<Context> &context) {
 
 vector<shared_ptr<Object>> Args::invoke(const shared_ptr<Context> &context) {
 	vector<shared_ptr<Object>> result;
-	for (const arg_t &arg : args) {
+	for (const arg_t &arg: args) {
 		if (holds_alternative<shared_ptr<Callable>>(arg)) {
 			result.emplace_back(get<shared_ptr<Callable>>(arg)->invoke(context));
 		} else if (holds_alternative<shared_ptr<Expansion>>(arg)) {
 			const auto &expansion = get<shared_ptr<Expansion>>(arg)->invoke(context);
-			for (const auto &argarg : expansion) {
+			for (const auto &argarg: expansion) {
 				result.emplace_back(argarg);
 			}
 		} else
@@ -100,22 +93,21 @@ shared_ptr<Variable> AssignmentAccess::invoke(const shared_ptr<Context> &context
 	}
 }
 
-shared_ptr<Object> ParseBlock::invoke(const shared_ptr<Context> &context) {
-	return Block::newInstance(context, location, statements);
-}
-
 shared_ptr<Object> ParseFunction::invoke(const shared_ptr<Context> &context) {
 	vector<Function::Param> params;
 	params.reserve(paramInfos.size());
 	for (auto paramInfo = paramInfos.begin(); paramInfo != paramInfos.end(); ++paramInfo) {
 		const auto &name = paramInfo->name;
-		const auto &find = find_if(params.begin(), params.end(), [name](const Function::Param &p) { return p.id == name; });
+		const auto &find = find_if(params.begin(), params.end(), [name](const Function::Param &p) {
+			return p.id == name;
+		});
 		if (find != params.end()) {
 			throw compile_error("Duplicate parameter '" + name + "'", paramInfo->nameLocation);
 		}
 		if (paramInfo->rest) {
 			if (paramInfo->typeLocation.valid) {
-				throw compile_error("Cannot specify type hint on rest parameter '" + name + "'", paramInfo->typeLocation);
+				throw compile_error(
+						"Cannot specify type hint on rest parameter '" + name + "'", paramInfo->typeLocation);
 			}
 			if (next(paramInfo) != paramInfos.end()) {
 				throw compile_error("Rest parameter '" + name +
@@ -128,7 +120,8 @@ shared_ptr<Object> ParseFunction::invoke(const shared_ptr<Context> &context) {
 				const auto &ptr = var->getValue();
 				if (ptr->instanceOf(ClassClass)) {
 					params.emplace_back(name, ptr->as<Class>());
-				} else throw compile_error("Parameter '" + name + "' type hint must be a Class", paramInfo->typeLocation);
+				} else
+					throw compile_error("Parameter '" + name + "' type hint must be a Class", paramInfo->typeLocation);
 			} else throw compile_error("Parameter '" + name + "' type hint is undefined", paramInfo->typeLocation);
 		} else {
 			params.emplace_back(name);
@@ -143,9 +136,7 @@ shared_ptr<Object> ParseString::invoke(const shared_ptr<Context> &context) {
 }
 
 shared_ptr<Object> ParseNative::invoke(const shared_ptr<Context> &context) {
-	if (const auto &value = Natives::get().find(id)) {
-		return value;
-	} else throw compile_error("Native symbol '" + id + "' not found", location);
+	return Symbol::newInstance(context, location, id);
 }
 
 shared_ptr<Object> ParseIdentifier::invoke(const shared_ptr<Context> &context) {

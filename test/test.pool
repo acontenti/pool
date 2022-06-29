@@ -1,10 +1,15 @@
 import(":std");
 
+
+Number.getContextInfo().println();
+
 f := (x: String) : {
     x.println();
 };
 f.println();
 f("testx");
+
+"Integer.super = ".+(Integer.super.+).println();
 
 a := [0, 1, 2, 3];
 b := 1.+(a.length());
@@ -16,12 +21,6 @@ fun := (x, y) : {
       c := {
           d := 2;
     };
-};
-z := {
-    b := 300;
-    c := {
-        d := 2;
-    };;
 };
 empty := ():{};
 empty().println();
@@ -35,12 +34,23 @@ res := fun(100, 100);
 fun.println();
 //fun.b.println();
 res.println();
-z.println();
-z.b.println();
+
+z := {
+    bb := 300;
+    c := {
+        d := 2;
+    };;
+};
+"z.getContextInfo() = ".print();
+z.getContextInfo().println();
+//z.b.println();
 res := z();
-z.println();
-z.b.println();
-z.c.d.println();
+"res.getContextInfo() = ".print();
+res.getContextInfo().println();
+"z.getContextInfo() = ".print();
+z.getContextInfo().println();
+//z.b.println();
+//z.c.d.println();
 args.println();
 z.println();
 z.c := 5;
@@ -148,7 +158,11 @@ dtest := {};
 dtest.t := "dtest";
 dtest.t.println();
 dtest.delete("t");
-dtest.t.println();
+tryCatch({
+    dtest.t.println();
+}, {
+    "OK".println();
+});
 
 //qw.println();
 //qw.er := "qwer";

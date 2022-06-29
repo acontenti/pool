@@ -1,148 +1,122 @@
-null ::= `null`;
-void ::= `void`;
-true ::= `true`;
-false ::= `false`;
-
-Object ::= `Object`;
-Object..instanceOf ::= `Object.instanceOf`;
-Object..toString ::= `Object.toString`;
-Object..getContextInfo ::= `Object.getContextInfo`;
-Object..getClass ::= `Object.getClass`;
-Object..getRepr ::= `Object.getRepr`;
-Object..print ::= `Object.print`;
-Object..println ::= `Object.println`;
-Object..== ::= `Object.==`;
+Object..instanceOf ::= `Object.instanceOf`();
+Object..toString ::= `Object.toString`();
+Object..getContextInfo ::= `Object.getContextInfo`();
+Object..getClass ::= `Object.getClass`();
+Object..getRepr ::= `Object.getRepr`();
+Object..print ::= `Object.print`();
+Object..println ::= `Object.println`();
+Object..== ::= `Object.==`();
 Object..!= ::= (this, other) : {
     this.==(other).!();
 };
-Object..get ::= `Object.get`;
-Object..delete ::= `Object.delete`;
-Object..set ::= `Object.set`;
+Object..get ::= `Object.get`();
+Object..delete ::= `Object.delete`();
+Object..set ::= `Object.set`();
 
-Class ::= `Class`;
-Class..extend ::= `Class.extend`;
-Class..new ::= `Class.new`;
-Class..getSuper ::= `Class.getSuper`;
-Class..getRepr ::= `Class.getRepr`;
-Class..subclassOf ::= `Class.subclassOf`;
-Class..superclassOf ::= `Class.superclassOf`;
+Class..extend ::= `Class.extend`();
+Class..new ::= `Class.new`();
+Class..getSuper ::= `Class.getSuper`();
+Class..getRepr ::= `Class.getRepr`();
+Class..subclassOf ::= `Class.subclassOf`();
+Class..superclassOf ::= `Class.superclassOf`();
 
-Bool ::= `Bool`;
-Bool..getRepr ::= `Bool.getRepr`;
-Bool..! ::= `Bool.!`;
-Bool..not ::= `Bool.!`;
-Bool..|| ::= `Bool.||`;
-Bool..&& ::= `Bool.&&`;
-Bool..or ::= `Bool.||`;
-Bool..and ::= `Bool.&&`;
-Bool..== ::= `Bool.==`;
-Bool..then ::= `Bool.then`;
-Bool..thenElse ::= `Bool.thenElse`;
+Bool..getRepr ::= `Bool.getRepr`();
+Bool..! ::= `Bool.!`();
+Bool..not ::= `Bool.!`();
+Bool..|| ::= `Bool.||`();
+Bool..&& ::= `Bool.&&`();
+Bool..or ::= `Bool.||`();
+Bool..and ::= `Bool.&&`();
+Bool..== ::= `Bool.==`();
+Bool..then ::= `Bool.then`();
+Bool..thenElse ::= `Bool.thenElse`();
 Bool..extend ::= null;
 Bool..new ::= null;
 Bool..delete ::= null;
 
-Array ::= `Array`;
-Array..at ::= `Array.at`;
-Array..forEach ::= `Array.forEach`;
-Array..push ::= `Array.push`;
-Array..toString ::= `Array.toString`;
-Array..getRepr ::= `Array.getRepr`;
-Array..length ::= `Array.length`;
+Array..at ::= `Array.at`();
+Array..forEach ::= `Array.forEach`();
+Array..push ::= `Array.push`();
+Array..toString ::= `Array.toString`();
+Array..getRepr ::= `Array.getRepr`();
+Array..length ::= `Array.length`();
 Array..new ::= null;
 Array..delete ::= null;
 
-Number ::= `Number`;
-Number..== ::= `Number.==`;
-Number..< ::= `Number.<`;
-Number..<= ::= (this, other: Number) : {
-    this.<(other).||(this.==(other));
-};
-Number..> ::= (this, other: Number) : {
-    this.<=(other).!();
-};
-Number..>= ::= (this, other: Number) : {
-    this.<(other).!();
-};
-Number..+ ::= `Number.+`;
-Number..- ::= `Number.-`;
-Number..* ::= `Number.*`;
-Number../ ::= `Number./`;
-Number..% ::= `Number.%`;
-Number..** ::= `Number.**`;
-Number..pow ::= `Number.**`;
-Number..abs ::= `Number.abs`;
-Number..neg ::= `Number.neg`;
-Number..getRepr ::= `Number.getRepr`;
-Number..extend ::= null;
-Number..new ::= null;
-Number..delete ::= null;
+Number ::= Object.extend("Number", {
+    == ::= `Number.==`();
+    < ::= `Number.<`();
+    <= ::= (this, other: class) : {
+        this.<(other).||(this.==(other));
+    };
+    > ::= (this, other: class) : {
+        this.<=(other).!();
+    };
+    >= ::= (this, other: class) : {
+        this.<(other).!();
+    };
+    + ::= `Number.+`();
+    - ::= `Number.-`();
+    * ::= `Number.*`();
+    / ::= `Number./`();
+    % ::= `Number.%`();
+    ** ::= `Number.**`();
+    pow ::= `Number.**`();
+    abs ::= `Number.abs`();
+    neg ::= `Number.neg`();
+    getRepr ::= `Number.getRepr`();
+    extend ::= null;
+    new ::= null;
+    delete ::= null;
+});
 
-Integer ::= `Integer`;
-Integer..| ::= `Integer.|`;
-Integer..& ::= `Integer.&`;
-Integer..^ ::= `Integer.^`;
-Integer..~ ::= `Integer.~`;
-Integer..<< ::= `Integer.<<`;
-Integer..>> ::= `Integer.>>`;
-Integer..to ::= (this, end: Integer) : {
-    i := this;
-    array := [];
-    {i.<(end);}.whileDo({
-        array.push(i);
-        i := i.+(1);
-    });
-    array;
-};
-Integer..toInclusive ::= (this, end: Integer) : {
-    this.to(end.+(1));
-};
-Integer..extend ::= null;
-Integer..new ::= null;
-Integer..delete ::= null;
+Integer ::= newClass("Integer", `Integer`, Number, {
+    | ::= `Integer.|`();
+    & ::= `Integer.&`();
+    ^ ::= `Integer.^`();
+    ~ ::= `Integer.~`();
+    << ::= `Integer.<<`();
+    >> ::= `Integer.>>`();
+    to ::= (this, end: class) : {
+        i := this;
+        array := [];
+        {i.<(end);}.whileDo({
+            array.push(i);
+            i := i.+(1);
+        });
+        array;
+    };
+    toInclusive ::= (this, end: class) : {
+        this.to(end.+(1));
+    };
+    extend ::= null;
+    new ::= null;
+    delete ::= null;
+});
 
-Decimal ::= `Decimal`;
-Decimal..extend ::= null;
-Decimal..new ::= null;
-Decimal..delete ::= null;
+Decimal ::= newClass("Decimal", `Decimal`, Number, {
+    extend ::= null;
+    new ::= null;
+    delete ::= null;
+});
 
-String ::= `String`;
-String..+ ::= `String.+`;
-String..== ::= `String.==`;
-String..toString ::= `String.toString`;
-String..getRepr ::= `String.getRepr`;
-String..length ::= `String.length`;
+String..+ ::= `String.+`();
+String..== ::= `String.==`();
+String..toString ::= `String.toString`();
+String..getRepr ::= `String.getRepr`();
+String..length ::= `String.length`();
 String..extend ::= null;
 String..new ::= null;
 String..delete ::= null;
 
-Block ::= `Block`;
-Block..whileDo ::= `Block.whileDo`;
-Block..doWhile ::= `Block.doWhile`;
-Block..extend ::= null;
-Block..new ::= null;
-
-Function ::= `Function`;
-Function..classmethod ::= `Function.classmethod`;
-Function..staticmethod ::= `Function.staticmethod`;
-Function..getRepr ::= `Function.getRepr`;
+Function..classmethod ::= `Function.classmethod`();
+Function..staticmethod ::= `Function.staticmethod`();
+Function..getRepr ::= `Function.getRepr`();
+Function..whileDo ::= `Function.whileDo`();
+Function..doWhile ::= `Function.doWhile`();
 Function..extend ::= null;
 Function..new ::= null;
-Function..delete ::= null;
 
-Void ::= `Void`;
-Void..toString ::= (this) : {"void";};
-Void..getRepr ::= (this) : {"void";};
-Void..== ::= (this, other) : {
-    void.==(other);
-};
-Void..extend ::= null;
-Void..new ::= null;
-Void..get ::= null;
-Void..delete ::= null;
-Void..set ::= null;
-
-Nothing ::= `Nothing`;
 Nothing..toString ::= (this) : {"null";};
 Nothing..getRepr ::= (this) : {"null";};
 Nothing..== ::= (this, other) : {
@@ -154,13 +128,13 @@ Nothing..delete ::= null;
 Nothing..get ::= null;
 Nothing..set ::= null;
 
-input ::= `input`;
-throw ::= `throw`;
-tryCatch ::= `tryCatch`;
+input ::= `input`();
+throw ::= `throw`();
+tryCatch ::= `tryCatch`();
 assert ::= (test, message: String) : {
     test.!().then({
         throw(message);
     });
 };
-loadLibrary ::= `loadLibrary`;
-loadLibraryFile ::= `loadLibraryFile`;
+loadLibrary ::= `loadLibrary`();
+loadLibraryFile ::= `loadLibraryFile`();

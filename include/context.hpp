@@ -10,6 +10,8 @@ using namespace std;
 namespace pool {
 	class POOL_PUBLIC Object;
 
+	class POOL_PUBLIC Class;
+
 	class POOL_PUBLIC Variable {
 		shared_ptr<Object> value;
 		bool immutable = false;
@@ -36,6 +38,8 @@ namespace pool {
 		[[nodiscard]] shared_ptr<Variable> find(const string &name) const;
 
 		[[nodiscard]] shared_ptr<Variable> findLocal(const string &name) const;
+
+		[[nodiscard]] shared_ptr<Class> findClass(const string &name) const;
 
 		shared_ptr<Variable> findOrAdd(const string &name, bool local);
 

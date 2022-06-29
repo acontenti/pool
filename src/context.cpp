@@ -2,6 +2,8 @@
 #include <sstream>
 #include <poolstd.hpp>
 #include <util/errors.hpp>
+#include <context.hpp>
+
 
 using namespace pool;
 
@@ -78,4 +80,14 @@ Context::Context(shared_ptr<Context> parent) : parent(move(parent)) {}
 
 shared_ptr<Context> Context::create(const shared_ptr<Context> &parent) {
 	return make_shared<Context>(parent);
+}
+
+shared_ptr<Class> Context::findClass(const string &name) const {
+	if (const auto &var = find(name)) {
+		const auto &value = var->getValue();
+		if (const auto &_class = dynamic_pointer_cast<Class>(value)) {
+			return _class;
+		}
+	}
+	return nullptr;
 }
