@@ -19,6 +19,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
       - name: Ubuntu dependencies
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install uuid-dev
@@ -78,31 +84,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Powershell dependencies
-        run: |
-          Install-Module Pscx -Scope CurrentUser -Force -AllowClobber
-          Import-Module Pscx
+      - name: Enable Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Create build environment
         run: cmake -E make_directory ${{runner.workspace}}/build
 
       - name: Configure CMake
         working-directory: ${{runner.workspace}}/build
-        run: |
-          Invoke-BatchFile "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          cmake "${env:GITHUB_WORKSPACE}" -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION="10.0.18362"
+        run: cmake "${env:GITHUB_WORKSPACE}" -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         working-directory: ${{runner.workspace}}/build
-        run: |
-          Invoke-BatchFile "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          cmake --build . --config Release
+        run: cmake --build . --config Release
 
       - name: Dist
         working-directory: ${{runner.workspace}}/build
-        run: |
-          Invoke-BatchFile "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          cmake --build . --target install --config Release
+        run: cmake --build . --target install --config Release
 
       - name: Test
         working-directory: ${{runner.workspace}}/build
