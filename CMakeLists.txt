@@ -13,7 +13,7 @@ endif ()
 find_package(cpplocate REQUIRED)
 
 # ANTLR4 RUNTIME
-set(ANTLR4_VERSION "4.9.2")
+set(ANTLR4_VERSION "4.10.1")
 add_compile_definitions(_HAS_STD_BYTE=0)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 if (ANTLR4_BASE_DIR)
