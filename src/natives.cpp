@@ -44,7 +44,7 @@ struct NativesImpl : public Natives {
 			} catch (const compile_error &error) {
 				const auto &ptr = other[1]->as<Function>();
 				if (ptr->params.empty()) {
-					ptr->execute(ptr, {}, location);
+					return ptr->execute(ptr, {}, location);
 				} else {
 					return ptr->execute(ptr, {String::newInstance(ptr->context, location, error.what())}, location);
 				}
