@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <any>
+#include <stdexcept>
 #include "callable.hpp"
 #include "context.hpp"
 #include "util/location.hpp"
@@ -176,7 +177,7 @@ namespace pool {
 
 	class POOL_PUBLIC Function : public Executable {
 	public:
-		class return_exception : runtime_error {
+	class return_exception : public runtime_error {
 		public:
 			const shared_ptr <Function> self;
 			const shared_ptr <Object> value;
