@@ -2,7 +2,6 @@
 #include <poolstd.hpp>
 #include <util/errors.hpp>
 #include <util/strings.hpp>
-#include <Token.h>
 
 using namespace pool;
 
@@ -140,7 +139,9 @@ shared_ptr<Object> ParseNative::invoke(const shared_ptr<Context> &context) {
 }
 
 shared_ptr<Object> ParseIdentifier::invoke(const shared_ptr<Context> &context) {
-	return context->findOrAdd(id, false)->getValue();
+	if (const auto &ptr = context->find(id))
+		return ptr->getValue();
+	else throw compile_error("\"" + id + "\" is not defined", location);
 }
 
 shared_ptr<Object> ParseNumber::invoke(const shared_ptr<Context> &context) {

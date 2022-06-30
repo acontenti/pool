@@ -157,6 +157,9 @@ struct NativesImpl : public Natives {
 		addFun("Object.==", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			return self == other[0] ? True : False;
 		});
+		addFun("Object.??", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			return self != Null ? self : other[0];
+		});
 	}
 
 	void initializeBool() {
@@ -186,8 +189,11 @@ struct NativesImpl : public Natives {
 			return self->as<Bool>()->value ? fun->execute(fun, {}, location) : Null;
 		});
 		addFun("Bool.thenElse", {{"this"}, {"trueAction", FunctionClass}, {"falseAction", FunctionClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			auto fun = self->as<Bool>()->value ? other[0]->as<Function>() : other[1]->as<Function>();
+			auto fun = (self->as<Bool>()->value ? other[0] : other[1])->as<Function>();
 			return fun->execute(fun, {}, location);
+		});
+		addFun("Bool.?", {{"this"}, {"trueValue"}, {"falseValue"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			return self->as<Bool>()->value ? other[0] : other[1];
 		});
 	}
 
@@ -495,6 +501,12 @@ struct NativesImpl : public Natives {
 				if (!(testResult->instanceOf(BoolClass)))
 					throw compile_error("Function.doWhile: this must return a Bool", location);
 			} while (testResult->as<Bool>()->value);
+			return Null;
+		});
+		addFun("Function.return", {{"this"}, {"value", true}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			if (const auto &fun = self->as<Function>()) {
+				throw Function::return_exception(fun, other.empty() ? Null : other[0]);
+			}
 			return Null;
 		});
 	}

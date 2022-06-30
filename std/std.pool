@@ -5,6 +5,7 @@ Object..getClass ::= `Object.getClass`();
 Object..getRepr ::= `Object.getRepr`();
 Object..print ::= `Object.print`();
 Object..println ::= `Object.println`();
+Object..?? ::= `Object.??`();
 Object..== ::= `Object.==`();
 Object..!= ::= (this, other) : {
     this.==(other).!();
@@ -30,6 +31,7 @@ Bool..and ::= `Bool.&&`();
 Bool..== ::= `Bool.==`();
 Bool..then ::= `Bool.then`();
 Bool..thenElse ::= `Bool.thenElse`();
+Bool..? ::= `Bool.?`();
 Bool..extend ::= null;
 Bool..new ::= null;
 Bool..delete ::= null;
@@ -114,6 +116,7 @@ Function..staticmethod ::= `Function.staticmethod`();
 Function..getRepr ::= `Function.getRepr`();
 Function..whileDo ::= `Function.whileDo`();
 Function..doWhile ::= `Function.doWhile`();
+Function..return ::= `Function.return`();
 Function..extend ::= null;
 Function..new ::= null;
 

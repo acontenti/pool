@@ -75,7 +75,7 @@ shared_ptr<Callable> parseExpression(PoolParser::ExpressionContext *ast, const s
 vector<shared_ptr<Callable>> parseStatements(const vector<PoolParser::StatementContext *> &statements, const shared_ptr<PoolInstanceImpl> &poolInstance) {
 	vector<shared_ptr<Callable>> result;
 	result.reserve(statements.size());
-	for (const auto &statement : statements) {
+	for (const auto &statement: statements) {
 		if (const auto &exp = statement->expression()) {
 			result.emplace_back(parseExpression(exp, poolInstance));
 		} else {
@@ -88,7 +88,7 @@ vector<shared_ptr<Callable>> parseStatements(const vector<PoolParser::StatementC
 shared_ptr<Args> parseArgs(const vector<PoolParser::ArgContext *> &ast, const shared_ptr<PoolInstanceImpl> &poolInstance) {
 	vector<Args::arg_t> args;
 	args.reserve(ast.size());
-	for (const auto &arg : ast) {
+	for (const auto &arg: ast) {
 		const auto &ptr = parseCall(arg->call(), poolInstance);
 		if (arg->DOTS()) {
 			args.emplace_back(Expansion::create(ptr));
@@ -148,7 +148,7 @@ shared_ptr<Callable> parseFunction(PoolParser::FunContext *ast, const shared_ptr
 	auto paramsAst = ast->param();
 	vector<ParseFunction::ParamInfo> params;
 	params.reserve(paramsAst.size());
-	for (const auto &param : paramsAst) {
+	for (const auto &param: paramsAst) {
 		params.push_back(ParseFunction::ParamInfo{
 				param->name->getText(),
 				tptl(poolInstance, param->name),
@@ -210,7 +210,8 @@ shared_ptr<Callable> parseCall(PoolParser::CallContext *ast, const shared_ptr<Po
 				return InvocationAccess::create(tptl(poolInstance, ast->start, ast->stop), tptl(poolInstance, ast->ID()->getSymbol()),
 												caller, id, args, ast->type == PoolParser::CallContext::ILA);
 			} else {
-				return Access::create(tptl(poolInstance, ast->start, ast->stop), caller, id, true);
+				return Access::create(tptl(poolInstance, ast->start, ast->stop), caller, id,
+									  ast->type == PoolParser::CallContext::ILA);
 			}
 		}
 		default:

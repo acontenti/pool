@@ -1,5 +1,30 @@
 import(":std");
 
+Object..??0 := (this) : {
+    this.??(0);
+};
+
+Integer..>0 := (this) : {
+    this.>(0);
+};
+
+ret := (x) : {
+    x := x.??0();
+    x.println();
+    x.>0().thenElse({
+        "Out: OK".println();
+    },{
+        "Out: NO".println();
+        (x.<(0)).then({
+            ret.return();
+        });
+    });
+    x.>0().?("OK", "NO");
+};
+ret(+1).println();
+ret(0).println();
+ret(-1).println();
+ret(null).println();
 
 Number.getContextInfo().println();
 
@@ -121,10 +146,10 @@ b := {
     x.println();
     aaaa := {ffff := x.+(124);};
     aaaa();
-    this.println();
+    _.println();
 };
 b();
-aaaa.println();
+//aaaa.println();
 b.getContextInfo().println();
 b.println();
 b..aaaa.println();
@@ -175,8 +200,6 @@ iftest := (12.==("12")).thenElse({
     "equal".println();
     1;
 },{
-    print_:="different".get("println");
-    print_("different");
     0;
 });
 assert(0.==(iftest), "iftest should be equal to 0");
@@ -184,7 +207,6 @@ assert(0.==(iftest), "iftest should be equal to 0");
 import("mod/mod");
 import("mod2");
 
-qqqq.println();
 tryCatch({
     qqqq.qqqq := 0;
 }, (error) : {

@@ -19,9 +19,6 @@ namespace pool {
 	extern POOL_PUBLIC shared_ptr<Class> ObjectClass;
 	extern POOL_PUBLIC shared_ptr<Class> SymbolClass;
 	extern POOL_PUBLIC shared_ptr<Class> BoolClass;
-//	extern POOL_PUBLIC shared_ptr<Class> NumberClass;
-//	extern POOL_PUBLIC shared_ptr<Class> IntegerClass;
-//	extern POOL_PUBLIC shared_ptr<Class> DecimalClass;
 	extern POOL_PUBLIC shared_ptr<Class> StringClass;
 	extern POOL_PUBLIC shared_ptr<Class> ArrayClass;
 	extern POOL_PUBLIC shared_ptr<Class> FunctionClass;
@@ -179,6 +176,15 @@ namespace pool {
 
 	class POOL_PUBLIC Function : public Executable {
 	public:
+		class return_exception : runtime_error {
+		public:
+			const shared_ptr <Function> self;
+			const shared_ptr <Object> value;
+
+			return_exception(const shared_ptr <Function> &self, const shared_ptr <Object> &value)
+					: runtime_error(""), self(self), value(value) {}
+		};
+
 		struct Param {
 			string id;
 			bool rest;

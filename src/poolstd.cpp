@@ -12,9 +12,6 @@ shared_ptr<Class> pool::ClassClass = nullptr;
 shared_ptr<Class> pool::ObjectClass = nullptr;
 shared_ptr<Class> pool::SymbolClass = nullptr;
 shared_ptr<Class> pool::BoolClass = nullptr;
-//shared_ptr<Class> pool::NumberClass = nullptr;
-//shared_ptr<Class> pool::IntegerClass = nullptr;
-//shared_ptr<Class> pool::DecimalClass = nullptr;
 shared_ptr<Class> pool::StringClass = nullptr;
 shared_ptr<Class> pool::ArrayClass = nullptr;
 shared_ptr<Class> pool::FunctionClass = nullptr;
@@ -205,7 +202,6 @@ CodeFunction::CodeFunction(const shared_ptr<Context> &context, const shared_ptr<
 		: Function(context, cls, params), calls(calls) {}
 
 shared_ptr<Object> CodeFunction::execute(const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-	shared_ptr<Object> returnValue = Null;
 	vector<shared_ptr<Object>> args;
 	if (self.get() != this) {
 		args.reserve(other.size() + 1);
@@ -247,14 +243,25 @@ shared_ptr<Object> CodeFunction::execute(const shared_ptr<Object> &self, const v
 						 false, location);
 		}
 	}
-	for (auto &call: calls) {
-		returnValue = call->invoke(context);
+	shared_ptr<Object> returnValue = Null;
+	try {
+		for (auto &call: calls) {
+			returnValue = call->invoke(context);
+		}
+	} catch (const Function::return_exception &exception) {
+		if (exception.self == shared_from_this()) {
+			returnValue = exception.value;
+		} else {
+			throw exception;
+		}
 	}
 	return returnValue;
 }
 
 shared_ptr<Object> CodeFunction::newInstance(const shared_ptr<Context> &context, const Location &location, const vector<Param> &params, const vector<shared_ptr<Callable>> &calls) {
-	return FunctionClass->newInstance(context, location, {}, CodeFunctionData{params, calls});
+	auto ptr = FunctionClass->newInstance(context, location, {}, CodeFunctionData{params, calls});
+	ptr->context->set("_", ptr, true);
+	return ptr;
 }
 
 NativeFunction::NativeFunction(const shared_ptr<Context> &context, const shared_ptr<Class> &cls, const vector<Param> &params, method_t code)
