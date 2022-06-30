@@ -177,12 +177,12 @@ namespace pool {
 
 	class POOL_PUBLIC Function : public Executable {
 	public:
-	class return_exception : public runtime_error {
+		class return_exception : public runtime_error {
 		public:
-			const shared_ptr <Function> self;
-			const shared_ptr <Object> value;
+			const shared_ptr<Function> self;
+			const shared_ptr<Object> value;
 
-			return_exception(const shared_ptr <Function> &self, const shared_ptr <Object> &value)
+			return_exception(const shared_ptr<Function> &self, const shared_ptr<Object> &value)
 					: runtime_error(""), self(self), value(value) {}
 		};
 
