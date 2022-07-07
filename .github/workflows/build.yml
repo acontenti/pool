@@ -176,7 +176,7 @@ jobs:
         id: create_zip
         uses: TheDoctor0/zip-release@0.4.1
         with:
-          filename: dist-${{ matrix.os }}.zip
+          filename: pool-${{ matrix.os }}.zip
 
       - name: Upload Release Asset
         id: upload-release-asset
@@ -185,6 +185,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: dist-${{ matrix.os }}.zip
-          asset_name: dist-${{ matrix.os }}.zip
+          asset_path: pool-${{ matrix.os }}.zip
+          asset_name: pool-${{ matrix.os }}.zip
           asset_content_type: application/zip

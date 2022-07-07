@@ -1,8 +1,10 @@
-import(":std");
+std := importStd();
 
 Object..??0 := (this) : {
     this.??(0);
 };
+
+std.getContextInfo().println();
 
 Integer..>0 := (this) : {
     this.>(0);
@@ -76,7 +78,7 @@ res.getContextInfo().println();
 z.getContextInfo().println();
 //z.b.println();
 //z.c.d.println();
-args.println();
+__args__.println();
 z.println();
 z.c := 5;
 z.c.println();
@@ -204,8 +206,16 @@ iftest := (12.==("12")).thenElse({
 });
 assert(0.==(iftest), "iftest should be equal to 0");
 
-import("mod/mod");
+mod := import("mod/mod");
 import("mod2");
+
+mod.Sample.new("abc");
+
+mod.getId().println();
+mod.getContextInfo().println();
+mod.inject(_);
+
+Sample.new("def");
 
 tryCatch({
     qqqq.qqqq := 0;
@@ -213,3 +223,5 @@ tryCatch({
     "Correctly caught error with 'tryCatch': ".print();
     error.println();
 });
+
+assertFail({ qqqq.qqqq := 0; }, "This should have thrown an error");

@@ -8,9 +8,9 @@
 using namespace std;
 
 namespace pool {
-	class POOL_PUBLIC Object;
+	class Object;
 
-	class POOL_PUBLIC Class;
+	class Class;
 
 	class POOL_PUBLIC Variable {
 		shared_ptr<Object> value;

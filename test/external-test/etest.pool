@@ -1,4 +1,4 @@
-import(":std");
+importStd();
 loadLibrary("pool-external-test");
 externalTest ::= `externalTest`();
 externalTest();

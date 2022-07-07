@@ -11,6 +11,7 @@ using namespace pool;
 shared_ptr<Class> pool::ClassClass = nullptr;
 shared_ptr<Class> pool::ObjectClass = nullptr;
 shared_ptr<Class> pool::SymbolClass = nullptr;
+shared_ptr<Class> pool::ModuleClass = nullptr;
 shared_ptr<Class> pool::BoolClass = nullptr;
 shared_ptr<Class> pool::StringClass = nullptr;
 shared_ptr<Class> pool::ArrayClass = nullptr;
@@ -83,6 +84,18 @@ bool Object::instanceOf(const string &className) const {
 
 shared_ptr<Class> Object::getClass() const {
 	return cls ? cls : as<Class>();
+}
+
+string Object::getContextInfo(const Location &location) const {
+	stringstream ss;
+	ss << "{ ";
+	if (!context->empty()) {
+		for (const auto &[name, value]: *context) {
+			ss << name << ":" << value->getValue()->getRepr(location) << ", ";
+		}
+	}
+	ss << "}";
+	return ss.str();
 }
 
 Class::Class(const shared_ptr<Context> &context, creator_t creator, string name, shared_ptr<Class> super)
@@ -159,6 +172,40 @@ shared_ptr<Object> Symbol::execute(const shared_ptr<Object> &self, const vector<
 
 shared_ptr<Object> Symbol::newInstance(const shared_ptr<Context> &context, const Location &location, const string &id) {
 	return SymbolClass->newInstance(context, location, {}, id);
+}
+
+Module::Module(const shared_ptr<Context> &context, const shared_ptr<Class> &cls, string id)
+		: Object(context, cls), id(move(id)) {}
+
+void Module::load(const shared_ptr<Function> &body, const Location &location) {
+	exported = ObjectClass->newInstance(context, location, {}, nullptr);
+	body->context->set("__module__", shared_from_this(), true);
+	body->execute(body, {exported}, location);
+}
+
+void Module::inject(const shared_ptr<Context> &dest, const Location &location) const {
+	for (const auto &[k, v]: *exported->context) {
+		dest->set(k, v->getValue(), v->isImmutable(), location);
+	}
+}
+
+shared_ptr<Variable> Module::find(const string &name) const {
+	if (const auto &result = Object::find(name)) {
+		return result;
+	}
+	return exported->find(name);
+}
+
+shared_ptr<Object> Module::newInstance(const shared_ptr<Context> &context, const Location &location, const string &id, const shared_ptr<Function> &body) {
+	auto module = ModuleClass->newInstance(context, location, {}, id)->as<Module>();
+	module->load(body, location);
+	return module;
+}
+
+string Module::getContextInfo(const Location &location) const {
+	const auto &first = Object::getContextInfo(location);
+	const auto &second = exported->getContextInfo(location);
+	return first.substr(0, first.size() - 2) + second.substr(1);
 }
 
 Nothing::Nothing(const shared_ptr<Context> &context, const shared_ptr<Class> &cls)
@@ -321,14 +368,15 @@ void initializeBaseObjects() {
 	ObjectClass = Class::CREATOR(Context::create(Context::global), ClassClass, Class::ClassData{Object::CREATOR, "Object", nullptr}); // ObjectClass is the base class, so it has no super
 	const_pointer_cast<Class>(ClassClass->super) = ObjectClass; // Now ObjectClass exists, so we can assign it to ClassClass->super
 	SymbolClass = ObjectClass->extend(Symbol::CREATOR, "Symbol", nullptr, Location::UNKNOWN);
+	ModuleClass = ObjectClass->extend(Module::CREATOR, "Module", nullptr, Location::UNKNOWN);
 	BoolClass = ObjectClass->extend(Bool::CREATOR, "Bool", nullptr, Location::UNKNOWN);
 	StringClass = ObjectClass->extend(String::CREATOR, "String", nullptr, Location::UNKNOWN);
 	ArrayClass = ObjectClass->extend(Array::CREATOR, "Array", nullptr, Location::UNKNOWN);
 	FunctionClass = ObjectClass->extend(CodeFunction::CREATOR, "Function", nullptr, Location::UNKNOWN);
 	NothingClass = ObjectClass->extend(Nothing::CREATOR, "Nothing", nullptr, Location::UNKNOWN);
 	Null = NothingClass->newInstance(Context::global, Location::UNKNOWN, {}, nullptr);
-	True = BoolClass->newInstance(Context::global, Location::UNKNOWN, {}, true)->as<Bool>();
-	False = BoolClass->newInstance(Context::global, Location::UNKNOWN, {}, false)->as<Bool>();
+	True = BoolClass->newInstance(Context::global, Location::UNKNOWN, {}, true);
+	False = BoolClass->newInstance(Context::global, Location::UNKNOWN, {}, false);
 }
 
 void initializeContext() {
@@ -337,6 +385,7 @@ void initializeContext() {
 	Context::global->set("Object", ObjectClass, true);
 	Context::global->set("Class", ClassClass, true);
 	Context::global->set("Symbol", SymbolClass, true);
+	Context::global->set("Module", ModuleClass, true);
 	Context::global->set("Bool", BoolClass, true);
 	Context::global->set("String", StringClass, true);
 	Context::global->set("Array", ArrayClass, true);
@@ -353,18 +402,30 @@ void initializeContext() {
 			const auto &block = other[3]->as<Function>();
 			return super->extend(creator, name, block, location);
 		} catch (bad_any_cast &exception) {
-			throw compile_error("creator Symbol must refer to a Class:creator_t", location);
+			throw compile_error("Creator Symbol must refer to a Class:creator_t", location);
 		}
 	}), true);
 	Context::global->set("import", NativeFunction::newInstance({{"moduleName", StringClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-		auto moduleName = other[0]->as<String>()->value;
+		const auto &moduleName = other[0]->as<String>()->value;
 		try {
-			PoolVM::get()->execute(moduleName);
+			return PoolVM::get()->execute(moduleName)->as<Object>();
 		} catch (const compile_error &e) {
 			cerr << e;
 			throw compile_error("Cannot import module '" + moduleName + "': " + e.what(), location);
 		}
-		return Null;
+	}), true);
+	Context::global->set("importStd", NativeFunction::newInstance({}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+		try {
+			static shared_ptr<Module> module;
+			if (!module) {
+				module = PoolVM::get()->execute(":std");
+				module->inject(Context::global, location);
+			}
+			return module->as<Object>();
+		} catch (const compile_error &e) {
+			cerr << e;
+			throw compile_error("Cannot import module ':std': " + string(e), location);
+		}
 	}), true);
 }
 

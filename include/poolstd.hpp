@@ -10,15 +10,16 @@
 using namespace std;
 
 namespace pool {
-	class POOL_PUBLIC Class;
+	class Class;
 
-	class POOL_PUBLIC Object;
+	class Object;
 
-	class POOL_PUBLIC Function;
+	class Function;
 
 	extern POOL_PUBLIC shared_ptr<Class> ClassClass;
 	extern POOL_PUBLIC shared_ptr<Class> ObjectClass;
 	extern POOL_PUBLIC shared_ptr<Class> SymbolClass;
+	extern POOL_PUBLIC shared_ptr<Class> ModuleClass;
 	extern POOL_PUBLIC shared_ptr<Class> BoolClass;
 	extern POOL_PUBLIC shared_ptr<Class> StringClass;
 	extern POOL_PUBLIC shared_ptr<Class> ArrayClass;
@@ -45,6 +46,8 @@ namespace pool {
 		string getDefaultRepr() const;
 
 		string getRepr(const Location &location);
+
+		virtual string getContextInfo(const Location &location) const;
 
 		template<class T, typename enable_if<is_base_of<Object, T>::value, int>::type = 0>
 		constexpr inline shared_ptr<T> as() const {
@@ -175,6 +178,27 @@ namespace pool {
 		static shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const Location &location, const string &id);
 	};
 
+	class POOL_PUBLIC Module : public Object {
+	public:
+		string id;
+		shared_ptr<Object> exported;
+		constexpr static const auto CREATOR = [](const shared_ptr<Context> &context, const shared_ptr<Class> &cls, const any &data) {
+			return make_shared<Module>(context, cls, any_cast<string>(data));
+		};
+
+		Module(const shared_ptr<Context> &context, const shared_ptr<Class> &cls, string id);
+
+		void load(const shared_ptr<Function> &body, const Location &location);
+
+		void inject(const shared_ptr<Context> &dest, const Location &location) const;
+
+		shared_ptr<Variable> find(const string &name) const override;
+
+		string getContextInfo(const Location &location) const override;
+
+		static shared_ptr<Object> newInstance(const shared_ptr<Context> &context, const Location &location, const string &id, const shared_ptr<Function> &body);
+	};
+
 	class POOL_PUBLIC Function : public Executable {
 	public:
 		class return_exception : public runtime_error {
@@ -195,8 +219,6 @@ namespace pool {
 			Param(string id, const bool &rest = false) : id(move(id)), type(nullptr), typeName(), rest(rest) {}
 
 			Param(string id, shared_ptr<Class> type) : id(move(id)), type(move(type)), typeName(), rest(false) {}
-
-			//Param(string id, string type) : id(move(id)), type(nullptr), typeName(move(type)), rest(false) {}
 		};
 
 		vector<Param> params;

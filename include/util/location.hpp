@@ -7,7 +7,7 @@
 using namespace std;
 
 namespace pool {
-	class POOL_PUBLIC PoolInstance;
+	class PoolInstance;
 
 	class POOL_PUBLIC Location {
 		Location() = default;

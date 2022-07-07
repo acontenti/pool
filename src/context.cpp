@@ -12,8 +12,7 @@ Variable::Variable(shared_ptr<Object> value, bool immutable)
 }
 
 void Variable::setValue(const shared_ptr<Object> &val) {
-	if (!immutable)
-		value = val;
+	value = val;
 }
 
 bool Variable::isImmutable() const {

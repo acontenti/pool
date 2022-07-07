@@ -8,7 +8,7 @@
 
 #undef NOMINMAX
 
-ostream &pool::operator<<(ostream &stream, const compile_error &error) {
+POOL_PUBLIC ostream &pool::operator<<(ostream &stream, const compile_error &error) {
 	stream << termcolor::reset << endl;
 	if (error.location.valid) {
 		stream << error.location.module->path << ":" << error.location.start.line << ":"

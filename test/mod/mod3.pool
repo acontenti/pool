@@ -1,6 +1,6 @@
 "\u250C\n\u2502 Called from "
-    .+(file)
+    .+(__file__)
     .+(" with args:\n\u2502\t")
-	.+(args)
+	.+(__args__)
 	.+("\n\u2514")
 	.println();

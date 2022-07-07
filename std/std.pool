@@ -21,6 +21,13 @@ Class..getRepr ::= `Class.getRepr`();
 Class..subclassOf ::= `Class.subclassOf`();
 Class..superclassOf ::= `Class.superclassOf`();
 
+Module..getId ::= `Module.getId`();
+Module..inject ::= `Module.inject`();
+Module..extend ::= null;
+Module..new ::= null;
+Module..delete ::= null;
+Module..set ::= null;
+
 Bool..getRepr ::= `Bool.getRepr`();
 Bool..! ::= `Bool.!`();
 Bool..not ::= `Bool.!`();
@@ -71,6 +78,7 @@ Number ::= Object.extend("Number", {
     new ::= null;
     delete ::= null;
 });
+exported.Number ::= Number;
 
 Integer ::= newClass("Integer", `Integer`, Number, {
     | ::= `Integer.|`();
@@ -95,12 +103,14 @@ Integer ::= newClass("Integer", `Integer`, Number, {
     new ::= null;
     delete ::= null;
 });
+exported.Integer ::= Integer;
 
 Decimal ::= newClass("Decimal", `Decimal`, Number, {
     extend ::= null;
     new ::= null;
     delete ::= null;
 });
+exported.Decimal ::= Decimal;
 
 String..+ ::= `String.+`();
 String..== ::= `String.==`();
@@ -131,13 +141,27 @@ Nothing..delete ::= null;
 Nothing..get ::= null;
 Nothing..set ::= null;
 
-input ::= `input`();
-throw ::= `throw`();
-tryCatch ::= `tryCatch`();
-assert ::= (test, message: String) : {
+exported.input ::= `input`();
+exported.throw ::= `throw`();
+exported.tryCatch ::= `tryCatch`();
+exported.assert ::= (test: Bool, message: String) : {
     test.!().then({
         throw(message);
     });
 };
-loadLibrary ::= `loadLibrary`();
-loadLibraryFile ::= `loadLibraryFile`();
+exported.assertNot ::= (test: Bool, message: String) : {
+    test.then({
+        throw(message);
+    });
+};
+exported.assertFail ::= (test: Function, message: String) : {
+    thrown := false;
+    tryCatch({
+        test();
+    }, (error) : {
+        thrown := true;
+    });
+    assert(thrown, message);
+};
+exported.loadLibrary ::= `loadLibrary`();
+exported.loadLibraryFile ::= `loadLibraryFile`();

@@ -20,6 +20,7 @@ struct NativesImpl : public Natives {
 		initializeUtilities();
 		initializeClass();
 		initializeObject();
+		initializeModule();
 		initializeBool();
 		initializeNumber();
 		initializeInteger();
@@ -105,16 +106,8 @@ struct NativesImpl : public Natives {
 			return String::newInstance(self->context, location, self->getRepr(location));
 		});
 		addFun("Object.getContextInfo", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			stringstream ss;
-			ss << "{";
-			if (!self->context->empty()) {
-				for (const auto &[name, value]: *self->context) {
-					ss << name << ":" << value->getValue()->getRepr(location) << ",";
-				}
-				ss.seekp(-1, stringstream::cur); //remove last comma
-			}
-			ss << "}";
-			return String::newInstance(self->context, location, ss.str());
+			const auto &info = self->getContextInfo(location);
+			return String::newInstance(self->context, location, info);
 		});
 		addFun("Object.getClass", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			return self->getClass();
@@ -159,6 +152,19 @@ struct NativesImpl : public Natives {
 		});
 		addFun("Object.??", {{"this"}, {"other"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			return self != Null ? self : other[0];
+		});
+	}
+
+	void initializeModule() {
+		addFun("Module.inject", {{"this"}, {"moduleBlock", FunctionClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			const auto &imported = self->as<Module>();
+			const auto &host = other[0];
+			imported->inject(host->context, location);
+			return Null;
+		});
+		addFun("Module.getId", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
+			const auto &module = self->as<Module>();
+			return String::newInstance(self->context, location, module->id);
 		});
 	}
 
@@ -596,7 +602,7 @@ struct NativesImpl : public Natives {
 	}
 };
 
-Natives &Natives::get() {
+POOL_PUBLIC Natives &Natives::get() {
 	static NativesImpl instance;
 	return instance;
 }

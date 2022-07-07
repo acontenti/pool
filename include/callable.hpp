@@ -6,11 +6,11 @@
 using namespace std;
 
 namespace pool {
-	class POOL_PUBLIC Object;
+	class Object;
 
-	class POOL_PUBLIC Context;
+	class Context;
 
-	class POOL_PUBLIC Callable {
+	class Callable {
 	public:
 		Location location;
 

@@ -5,7 +5,7 @@
 using namespace std;
 
 namespace pool {
-	class POOL_PUBLIC Natives {
+	class Natives {
 	public:
 		virtual bool add(const string &name, const shared_ptr<Object> &value) = 0;
 
@@ -15,6 +15,6 @@ namespace pool {
 
 		virtual any find(const string &name) = 0;
 
-		static Natives &get();
+		POOL_PUBLIC static Natives &get();
 	};
 }

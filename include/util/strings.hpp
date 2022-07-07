@@ -32,8 +32,8 @@ static inline string trim(string s) {
 
 static constexpr const char alphabet[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-template<unsigned int base, typename T, typename enable_if<is_integral<T>::value, int>::type = 0, typename enable_if<
-		base < sizeof(alphabet), int>::type = 0>
+template<unsigned int base, typename T, typename enable_if<is_integral<T>::value, int>::type = 0,
+		typename enable_if<base < sizeof(alphabet), int>::type = 0>
 string to_string_base(T n) {
 	string result;
 	do {

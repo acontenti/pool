@@ -4,6 +4,7 @@
 #include "../lib/argagg.hpp"
 #include "../lib/termcolor.hpp"
 #include <iostream>
+#include <cpplocate/cpplocate.h>
 
 using namespace pool;
 
@@ -13,15 +14,23 @@ int main(int argc, char **argv) {
 	try {
 		vector<argagg::definition> options{
 				{"debug", vector<string>{"-d", "--debug"}, "enables debug options", 0},
-				{"help", vector<string>{"-h", "--help"}, "shows this help", 0}
+				{"help", vector<string>{"-h", "--help"}, "shows this help", 0},
+				{"locate", vector<string>{"-l", "--locate"}, "shows executable location", 0},
 		};
 		argagg::parser argparser{options};
 		argagg::parser_results arguments = argparser.parse(argc, argv);
 		debug = arguments["debug"];
-		if (debug || arguments.pos.empty()) {
-			cerr << "pool " << PoolVM::VERSION << endl;
+		if (debug && !arguments["help"]) {
+			cerr << "pool " << PoolVM::getVersion() << endl;
 		}
-		if (!arguments["help"] && !arguments.pos.empty()) {
+		if (arguments["locate"]) {
+			cerr << PoolVM::getSDKPath() << endl;
+			return EXIT_SUCCESS;
+		} else if (arguments["help"] || arguments.pos.empty()) {
+			cerr << "pool " << PoolVM::getVersion() << endl;
+			cerr << "Usage: pool [options] file" << endl << argparser;
+			return EXIT_SUCCESS;
+		} else {
 			vector<string> args;
 			string filename = arguments.pos[0];
 			for (int i = 1; i < arguments.pos.size(); ++i) {
@@ -34,9 +43,6 @@ int main(int argc, char **argv) {
 				cerr << endl << termcolor::bright_green << "Execution successful" << termcolor::reset;
 				cerr << " in " << executionTime << endl << endl;
 			}
-			return EXIT_SUCCESS;
-		} else {
-			cerr << "Usage: pool [options] file" << endl << argparser;
 			return EXIT_SUCCESS;
 		}
 	} catch (const compile_error &e) {

@@ -8,7 +8,7 @@
 using namespace std;
 
 namespace pool {
-	class POOL_PUBLIC compile_error : public runtime_error {
+	class compile_error : public runtime_error {
 	public:
 		Location location;
 
@@ -19,5 +19,5 @@ namespace pool {
 		}
 	};
 
-	ostream &operator<<(ostream &stream, const compile_error &error);
+	POOL_PUBLIC ostream &operator<<(ostream &stream, const compile_error &error);
 }

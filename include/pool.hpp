@@ -8,26 +8,36 @@
 using namespace std;
 
 namespace pool {
-	class POOL_PUBLIC PoolInstance {
+	class Module;
+
+	class PoolInstance {
 	public:
 		const string path;
+		const string directory;
 
-		PoolInstance(string path);
+		explicit PoolInstance(string path);
+
+		virtual shared_ptr<Module> execute() noexcept(false) = 0;
+
+		POOL_PUBLIC static shared_ptr<PoolInstance> load(const string &path);
 	};
 
-	class POOL_PUBLIC PoolVM {
+	class PoolVM {
 	public:
 		struct Settings {
 			bool debug;
 			vector<string> args;
 		};
-		constexpr static const string_view VERSION = POOL_VERSION;
 		constexpr static const string_view EXT = ".pool";
 
-		static void initialiaze(const Settings &settings);
+		virtual shared_ptr<Module> execute(const string &module) noexcept(false) = 0;
 
-		virtual void execute(const string &module) noexcept(false) = 0;
+		POOL_PUBLIC static void initialiaze(const Settings &settings);
 
-		static shared_ptr<PoolVM> get();
+		POOL_PUBLIC static shared_ptr<PoolVM> get();
+
+		POOL_PUBLIC static string getSDKPath();
+
+		POOL_PUBLIC static string getVersion();
 	};
 }
