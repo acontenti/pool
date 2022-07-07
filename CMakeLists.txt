@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(pool VERSION 0.1.0 LANGUAGES CXX)
+project(pool VERSION 0.2.0 LANGUAGES CXX)
 
 # CPPLOCATE
 include(FetchContent)
