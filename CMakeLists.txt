@@ -4,7 +4,7 @@ project(pool VERSION 0.1.0 LANGUAGES CXX)
 # CPPLOCATE
 include(FetchContent)
 SET(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs")
-FetchContent_Declare(cpplocate GIT_REPOSITORY https://github.com/cginternals/cpplocate.git GIT_TAG v2.3.0)
+FetchContent_Declare(cpplocate GIT_REPOSITORY https://github.com/cginternals/cpplocate.git GIT_TAG v2.2.0)
 FetchContent_GetProperties(cpplocate)
 if (NOT cpplocate_POPULATED)
 	FetchContent_Populate(cpplocate)
