@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.20)
 project(pool VERSION 0.1.0 LANGUAGES CXX)
 
 # CPPLOCATE
 include(FetchContent)
 SET(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs")
-FetchContent_Declare(cpplocate GIT_REPOSITORY https://github.com/cginternals/cpplocate.git GIT_TAG v2.2.0)
+FetchContent_Declare(cpplocate GIT_REPOSITORY https://github.com/cginternals/cpplocate.git GIT_TAG v2.3.0)
 FetchContent_GetProperties(cpplocate)
 if (NOT cpplocate_POPULATED)
 	FetchContent_Populate(cpplocate)
@@ -71,5 +71,10 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION ${INSTALL_PATH}/inclu
 add_subdirectory(test/external-test)
 
 enable_testing()
+add_test(NAME run_test COMMAND pool)
+add_test(NAME locate_test COMMAND pool --locate)
+cmake_path(NATIVE_PATH CMAKE_BINARY_DIR EXPECTED_DIR)
+string(REPLACE "\\" "\\\\" EXPECTED_DIR ${EXPECTED_DIR})
+set_tests_properties(locate_test PROPERTIES PASS_REGULAR_EXPRESSION ${EXPECTED_DIR})
 add_test(NAME basic_test COMMAND pool test ctest WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/test)
 add_test(NAME external_test COMMAND pool external-test/etest.pool WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test)
