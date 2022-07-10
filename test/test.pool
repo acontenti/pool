@@ -225,3 +225,8 @@ tryCatch({
 });
 
 assertFail({ qqqq.qqqq := 0; }, "This should have thrown an error");
+
+mod4 := import("mod4");
+mba := mod4.a.test();
+mbt := mod4.b.test;
+mbt();

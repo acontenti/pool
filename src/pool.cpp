@@ -44,10 +44,14 @@ shared_ptr<Module> PoolVMImpl::execute(const string &moduleName) noexcept(false)
 	if (startsWith(moduleName, ":")) {
 		filename = (fs::path(PoolVM::getSDKPath()) / "std" / moduleName.substr(1)).string();
 	}
+	auto file = fs::path(filename);
+	if (fs::exists(file) && fs::is_directory(file)) {
+		filename = (file / "__module__").string();
+	}
 	if (!endsWith(filename, PoolVM::EXT)) {
 		filename += PoolVM::EXT;
 	}
-	auto file = fs::path(filename);
+	file = fs::path(filename);
 	shared_ptr<Module> module;
 	if (fs::exists(file)) {
 		if (fs::is_regular_file(file)) {

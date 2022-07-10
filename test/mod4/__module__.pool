@@ -1,0 +1,4 @@
+exported.a := import("a");
+exported.b := import("b");
+
+"Initialized module ".+(__file__).println();
