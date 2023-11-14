@@ -29,17 +29,12 @@ namespace pool {
 			cerr << compile_error(msg, Location{point, point, shared_from_this()});
 		}
 
-		shared_ptr<pool::Module> execute() noexcept(false) override;
-
 		void compile() noexcept(false) override;
 	};
 
 	class PoolVMImpl : public PoolVM {
 	public:
-		shared_ptr<llvm::LLVMContext> llvm_context;
 		static shared_ptr<PoolVMImpl> instance;
-
-		shared_ptr<Module> execute(const string &moduleName) noexcept(false) override;
 
 		void compile(const string &module) noexcept(false) override;
 
@@ -47,6 +42,4 @@ namespace pool {
 			return instance;
 		}
 	};
-
-	void initializeStdLib();
 }

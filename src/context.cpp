@@ -1,9 +1,7 @@
+/*
+#include <util/errors.hpp>
 #include <memory>
 #include <sstream>
-#include <poolstd.hpp>
-#include <util/errors.hpp>
-#include <context.hpp>
-
 
 using namespace pool;
 
@@ -90,3 +88,4 @@ shared_ptr<Class> Context::findClass(const string &name) const {
 	}
 	return nullptr;
 }
+*/

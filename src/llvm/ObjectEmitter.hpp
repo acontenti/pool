@@ -35,13 +35,12 @@ namespace pool {
 			module->setDataLayout(dataLayout);
 			module->setTargetTriple(targetTriple);
 			module->dump();
-			auto &stdLib = LLVMNatives::get()->llvm_module;
 			// copy everything from stdLib to module
-			for (auto &global: stdLib->globals()) {
-				module->getOrInsertGlobal(global.getName(), global.getValueType());
+			for (auto &global: LLVMNatives::get()->getConstants()) {
+				module->getOrInsertGlobal(global->getName(), global->getValueType());
 			}
-			for (auto &function: stdLib->functions()) {
-				module->getOrInsertFunction(function.getName(), function.getFunctionType());
+			for (auto &function: LLVMNatives::get()->getFunctions()) {
+				module->getOrInsertFunction(function->getName(), function->getFunctionType());
 			}
 			std::error_code ec;
 			llvm::raw_fd_ostream dest(filename, ec, llvm::sys::fs::OF_None);

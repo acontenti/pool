@@ -5,8 +5,6 @@
 #include <string>
 #include <cstring>
 
-#define EXTERN extern "C" [[maybe_unused]]
-
 struct Object;
 struct Class;
 struct String;

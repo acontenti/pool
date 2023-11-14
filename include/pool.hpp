@@ -8,16 +8,12 @@
 using namespace std;
 
 namespace pool {
-	class Module;
-
 	class PoolInstance {
 	public:
 		const string path;
 		const string directory;
 
 		explicit PoolInstance(const string &path);
-
-		virtual shared_ptr<Module> execute() noexcept(false) = 0;
 
 		virtual void compile() noexcept(false) = 0;
 
@@ -31,8 +27,6 @@ namespace pool {
 			vector<string> args;
 		};
 		constexpr static const string_view EXT = ".pool";
-
-		virtual shared_ptr<Module> execute(const string &module) noexcept(false) = 0;
 
 		virtual void compile(const string &module) noexcept(false) = 0;
 

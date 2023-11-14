@@ -1,25 +1,11 @@
+/*
 #include "pool_private.hpp"
-#include <poolstd.hpp>
 #include <natives.hpp>
-#include <callable.hpp>
 #include <util/strings.hpp>
 #include <iostream>
 #include <utility>
 
 using namespace pool;
-
-shared_ptr<Class> pool::ClassClass = nullptr;
-shared_ptr<Class> pool::ObjectClass = nullptr;
-shared_ptr<Class> pool::SymbolClass = nullptr;
-shared_ptr<Class> pool::ModuleClass = nullptr;
-shared_ptr<Class> pool::BoolClass = nullptr;
-shared_ptr<Class> pool::StringClass = nullptr;
-shared_ptr<Class> pool::ArrayClass = nullptr;
-shared_ptr<Class> pool::FunctionClass = nullptr;
-shared_ptr<Class> pool::NothingClass = nullptr;
-shared_ptr<Object> pool::Null = nullptr;
-shared_ptr<Object> pool::True = nullptr;
-shared_ptr<Object> pool::False = nullptr;
 
 Object::Object(const shared_ptr<Context> &context, shared_ptr<Class> cls)
 		: context(context), cls(move(cls)), id(reinterpret_cast<intptr_t>(this)) {}
@@ -363,37 +349,7 @@ shared_ptr<Object> Array::newInstance(const shared_ptr<Context> &context, const 
 	return ArrayClass->newInstance(context, location, {}, values);
 }
 
-void initializeBaseObjects() {
-	ClassClass = Class::CREATOR(Context::create(Context::global), nullptr, Class::ClassData{Class::CREATOR, "Class", nullptr}); // ObjectClass is not yet created, so we pass nullptr as super
-	ObjectClass = Class::CREATOR(Context::create(Context::global), ClassClass, Class::ClassData{Object::CREATOR, "Object", nullptr}); // ObjectClass is the base class, so it has no super
-	const_pointer_cast<Class>(ClassClass->super) = ObjectClass; // Now ObjectClass exists, so we can assign it to ClassClass->super
-	SymbolClass = ObjectClass->extend(Symbol::CREATOR, "Symbol", nullptr, Location::UNKNOWN);
-	ModuleClass = ObjectClass->extend(Module::CREATOR, "Module", nullptr, Location::UNKNOWN);
-	BoolClass = ObjectClass->extend(Bool::CREATOR, "Bool", nullptr, Location::UNKNOWN);
-	StringClass = ObjectClass->extend(String::CREATOR, "String", nullptr, Location::UNKNOWN);
-	ArrayClass = ObjectClass->extend(Array::CREATOR, "Array", nullptr, Location::UNKNOWN);
-	FunctionClass = ObjectClass->extend(CodeFunction::CREATOR, "Function", nullptr, Location::UNKNOWN);
-	NothingClass = ObjectClass->extend(Nothing::CREATOR, "Nothing", nullptr, Location::UNKNOWN);
-	Null = NothingClass->newInstance(Context::global, Location::UNKNOWN, {}, nullptr);
-	True = BoolClass->newInstance(Context::global, Location::UNKNOWN, {}, true);
-	False = BoolClass->newInstance(Context::global, Location::UNKNOWN, {}, false);
-}
-
 void initializeContext() {
-	Context::global = Context::create(nullptr);
-	initializeBaseObjects();
-	Context::global->set("Object", ObjectClass, true);
-	Context::global->set("Class", ClassClass, true);
-	Context::global->set("Symbol", SymbolClass, true);
-	Context::global->set("Module", ModuleClass, true);
-	Context::global->set("Bool", BoolClass, true);
-	Context::global->set("String", StringClass, true);
-	Context::global->set("Array", ArrayClass, true);
-	Context::global->set("Function", FunctionClass, true);
-	Context::global->set("Nothing", NothingClass, true);
-	Context::global->set("null", Null, true);
-	Context::global->set("true", True, true);
-	Context::global->set("false", False, true);
 	Context::global->set("newClass", NativeFunction::newInstance({{"name", StringClass}, {"creator", SymbolClass}, {"super", ClassClass}, {"body", FunctionClass}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) -> shared_ptr<Object> {
 		try {
 			const auto &name = other[0]->as<String>()->value;
@@ -428,7 +384,4 @@ void initializeContext() {
 		}
 	}), true);
 }
-
-void pool::initializeStdLib() {
-	initializeContext();
-}
+*/

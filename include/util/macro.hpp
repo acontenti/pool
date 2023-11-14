@@ -25,3 +25,5 @@ namespace std {
 #define POOL_PUBLIC
 #endif
 #endif
+
+#define EXTERN extern "C" [[maybe_unused]]

@@ -1,4 +1,5 @@
 #pragma clang diagnostic push
+#pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
 #pragma clang diagnostic ignored "-Wunused-value"
 #pragma ide diagnostic ignored "cert-err58-cpp"
 
@@ -24,19 +25,16 @@
 #ifndef POOLSTDLIB
 namespace pool {
 	class LLVMNativesImpl : public LLVMNatives {
+		using installer_fun_t = function<void(shared_ptr<LLVMNativesImpl> &)>;
+
 		friend class LLVMNatives;
 
 		static shared_ptr<LLVMNativesImpl> instance;
-	public:
 		unordered_map<string, llvm::Value *> natives;
-
-		LLVMNativesImpl() {
-			llvm_context = make_shared<llvm::LLVMContext>();
-			llvm_module = make_unique<llvm::Module>(":std", *llvm_context);
-			llvm_module->setSourceFileName(":std");
-			initializeLLVMStdLib();
-		}
-
+		vector<installer_fun_t> installers;
+		unique_ptr<llvm::LLVMContext> llvm_context = make_unique<llvm::LLVMContext>();
+		unique_ptr<llvm::Module> llvm_module = make_unique<llvm::Module>(":std", *llvm_context);
+	public:
 		template<typename ...Params, typename = std::enable_if_t<(std::is_base_of_v<llvm::Type, std::remove_pointer_t<Params>> && ...)>>
 		void addFunction(const string &name, llvm::Type *returnType, Params... args) {
 			if (natives.find(name) != natives.end()) {
@@ -76,13 +74,33 @@ namespace pool {
 			return reinterpret_cast<llvm::Function *>(find(name));
 		}
 
+		vector<llvm::Function *> getFunctions() override {
+			vector<llvm::Function *> result;
+			for (const auto &[_, native]: natives) {
+				if (auto *function = llvm::dyn_cast<llvm::Function>(native)) {
+					result.push_back(function);
+				}
+			}
+			return result;
+		}
+
+		vector<llvm::GlobalVariable *> getConstants() override {
+			vector<llvm::GlobalVariable *> result;
+			for (const auto &[_, native]: natives) {
+				if (auto *constant = llvm::dyn_cast<llvm::GlobalVariable>(native)) {
+					result.push_back(constant);
+				}
+			}
+			return result;
+		}
+
 		struct Installer {
-			explicit Installer(const function<void(shared_ptr<LLVMNativesImpl> &)> &installer) {
-				installer(LLVMNativesImpl::instance);
+			explicit Installer(const installer_fun_t &installer) {
+				instance->installers.push_back(installer);
 			}
 		};
 
-		void initializeLLVMStdLib() {
+		void initialize(const pool::PoolVM::Settings settings) override {
 			::Context::global = new ::Context();
 			$ObjectClass = new ::Class("Object", nullptr, ::Context::global);
 			$ClassClass = new ::Class("Class", $ObjectClass, ::Context::global);
@@ -112,6 +130,16 @@ namespace pool {
 			addConstant("$False");
 			addConstant("$Null");
 			addFunction("$malloc", llvm::PointerType::getUnqual(*llvm_context), llvm::Type::getInt64Ty(*llvm_context));
+			for (const auto &installer: installers) {
+				installer(instance);
+			}
+			Context::global->set("__debug__", settings.debug ? $True : $False, true);
+			vector<Object *> arguments;
+			arguments.reserve(settings.args.size());
+			for (const auto &arg: settings.args) {
+				arguments.push_back(new String(arg.c_str(), Context::global));
+			}
+			Context::global->set("__args__", new Array(arguments.size(), arguments.data(), Context::global), true);
 		}
 	};
 

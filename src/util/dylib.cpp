@@ -1,5 +1,5 @@
 #include "dylib.hpp"
-#include <util/strings.hpp>
+#include "strings.hpp"
 #include <utility>
 
 #if defined(__linux__) || defined(__linux) || defined(linux) || defined(_LINUX)

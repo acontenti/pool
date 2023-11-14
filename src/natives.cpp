@@ -1,5 +1,4 @@
-#include <natives.hpp>
-#include <poolstd.hpp>
+/*
 #include <util/errors.hpp>
 #include "util/dylib.hpp"
 #include <ctgmath>
@@ -8,7 +7,7 @@
 
 using namespace pool;
 
-struct NativesImpl : public Natives {
+struct NativesImpl {
 	unordered_map<string, shared_ptr<any>> natives;
 
 	NativesImpl() {
@@ -579,27 +578,23 @@ struct NativesImpl : public Natives {
 		return natives.try_emplace(name, make_shared<any>(value)).second;
 	}
 
-	bool add(const string &name, const shared_ptr<Object> &value) override {
+	bool add(const string &name, const shared_ptr<Object> &value) {
 		return addValue(name, value);
 	}
 
-	bool add(const string &name, const Class::creator_t &value) override {
+	bool add(const string &name, const Class::creator_t &value) {
 		return addValue(name, value);
 	}
 
-	bool addFun(const string &name, const vector<Function::Param> &parameters, const NativeFunction::method_t &code) override {
+	bool addFun(const string &name, const vector<Function::Param> &parameters, const NativeFunction::method_t &code) {
 		return add(name, NativeFunction::newInstance(parameters, code));
 	}
 
-	any find(const string &name) override {
+	any find(const string &name) {
 		const auto &iterator = natives.find(name);
 		if (iterator != natives.end()) {
 			return *iterator->second;
 		} else return any();
 	}
 };
-
-POOL_PUBLIC Natives &Natives::get() {
-	static NativesImpl instance;
-	return instance;
-}
+*/

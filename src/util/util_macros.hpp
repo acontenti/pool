@@ -1,5 +1,5 @@
 #pragma once
-#define EXTERN extern "C" [[maybe_unused]]
+#include <util/macro.hpp>
 #ifdef _MSC_VER // Microsoft compilers
 #define VA_NARG(...)  INTERNAL_EXPAND_ARGS_PRIVATE(INTERNAL_ARGS_AUGMENTER(__VA_ARGS__))
 #define INTERNAL_ARGS_AUGMENTER(...) unused, __VA_ARGS__

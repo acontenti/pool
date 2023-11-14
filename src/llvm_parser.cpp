@@ -1,12 +1,11 @@
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "misc-no-recursion"
 
-#include "parser.hpp"
+#include "llvm_parser.hpp"
 #include "pool_private.hpp"
 #include <llvm_poolstd.hpp>
 #include "natives.hpp"
 #include "util/strings.hpp"
-#include "llvm_parser.hpp"
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/LLVMContext.h>
@@ -355,5 +354,10 @@ public:
 shared_ptr<pool::LLVMParser> pool::LLVMParser::create(const shared_ptr<PoolInstanceImpl> &poolInstance) {
 	return make_shared<LLVMParserImpl>(poolInstance);
 }
+
+LLVMParser::LLVMParser(const shared_ptr<PoolInstanceImpl> &poolInstance)
+		: poolInstance(poolInstance),
+		  llvm_context(make_unique<llvm::LLVMContext>()),
+		  module(make_unique<llvm::Module>(poolInstance->path, *this->llvm_context)) {}
 
 #pragma clang diagnostic pop

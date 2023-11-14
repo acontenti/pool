@@ -14,10 +14,7 @@ namespace pool {
 	protected:
 		const shared_ptr<PoolInstanceImpl> poolInstance;
 
-		explicit LLVMParser(const shared_ptr<PoolInstanceImpl> &poolInstance)
-				: poolInstance(poolInstance),
-				  llvm_context(make_unique<llvm::LLVMContext>()),
-				  module(make_unique<llvm::Module>(poolInstance->path, *this->llvm_context)) {};
+		explicit LLVMParser(const shared_ptr<PoolInstanceImpl> &poolInstance);
 	public:
 		unique_ptr<llvm::LLVMContext> llvm_context;
 		unique_ptr<llvm::Module> module;
