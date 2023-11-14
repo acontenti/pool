@@ -65,7 +65,7 @@ target_link_libraries(pool ${llvm_libs})
 
 # POOLSTDLIB
 add_library(poolstd SHARED)
-target_sources(poolstd PRIVATE src/llvm_natives.cpp src/llvm_poolstd.cpp)
+target_sources(poolstd PRIVATE src/natives.cpp src/poolstd.cpp)
 target_include_directories(poolstd PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(poolstd PUBLIC POOL_VERSION="${PROJECT_VERSION}" POOL_EXPORTS POOLSTDLIB)
 set_target_properties(

@@ -1,7 +1,7 @@
 #include "pool_private.hpp"
 #include <natives.hpp>
-#include "llvm_parser.hpp"
-#include "llvm/ObjectEmitter.hpp"
+#include "parser.hpp"
+#include "ObjectEmitter.hpp"
 #include "util/strings.hpp"
 #include <cpplocate/cpplocate.h>
 #include <filesystem>
@@ -26,7 +26,7 @@ void PoolInstanceImpl::compile() noexcept(false) {
 	parser = make_unique<PoolParser>(tokens.get());
 	parser->removeErrorListeners();
 	parser->addErrorListener(this);
-	const auto &llvmParser = LLVMParser::create(shared_from_this());
+	const auto &llvmParser = Parser::create(shared_from_this());
 	llvmParser->parseProgram(parser->program());
 	const auto &error = ObjectEmitter::emit(llvmParser->module, fs::path(path).replace_extension(".o").string());
 	if (!error.empty()) {
@@ -71,7 +71,7 @@ void PoolVMImpl::compile(const string &moduleName) noexcept(false) {
 POOL_PUBLIC void PoolVM::initialiaze(const Settings &settings) {
 	PoolVMImpl::instance = make_shared<PoolVMImpl>();
 	ObjectEmitter::initialize();
-	LLVMNatives::get()->initialize(settings);
+	Natives::get()->initialize(settings);
 }
 
 POOL_PUBLIC shared_ptr<PoolVM> PoolVM::get() {
