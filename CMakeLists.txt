@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 project(pool VERSION 0.2.0 LANGUAGES CXX)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # CPPLOCATE
 include(FetchContent)
 SET(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs")
@@ -13,23 +16,14 @@ endif ()
 find_package(cpplocate REQUIRED)
 
 # ANTLR4 RUNTIME
-set(ANTLR4_VERSION "4.10.1")
+set(ANTLR4_VERSION "4.13.1")
 add_compile_definitions(_HAS_STD_BYTE=0)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-if (ANTLR4_BASE_DIR)
-	# ANTLR4 runtime as external project - define:
-	# -DANTLR4_BASE_DIR=<project root path>
-	# -DANTLR4_LIB_NAME=<library file name without path>
-	set(ANTLR4_INCLUDE_DIRS ${ANTLR4_BASE_DIR}/runtime/src)
-	set(ANTLR4_LIB ${ANTLR4_BASE_DIR}/dist/${ANTLR4_LIB_NAME})
-else ()
-	# download and build ANTLR4 runtime in project
-	add_definitions(-DANTLR4CPP_STATIC)
-	set(ANTLR4_WITH_STATIC_CRT OFF)
-	set(ANTLR4_TAG "${ANTLR4_VERSION}")
-	include(ExternalAntlr4Cpp)
-	set(ANTLR4_LIB antlr4_static)
-endif ()
+add_definitions(-DANTLR4CPP_STATIC)
+set(ANTLR4_WITH_STATIC_CRT OFF)
+set(ANTLR4_TAG "${ANTLR4_VERSION}")
+include(ExternalAntlr4Cpp)
+set(ANTLR4_LIB antlr4_static)
 
 # ANTLR4 JAVA
 set(ANTLR_EXECUTABLE ${CMAKE_SOURCE_DIR}/antlr4/antlr-${ANTLR4_VERSION}-complete.jar)
@@ -40,10 +34,12 @@ antlr_target(PoolLexer PoolLexer.g4 LEXER OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/g
 antlr_target(PoolParser PoolParser.g4 PARSER OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/gen DEPENDS_ANTLR PoolLexer)
 
 # POOL
-include_directories(${ANTLR_PoolLexer_OUTPUT_DIR} ${ANTLR_PoolParser_OUTPUT_DIR} ${ANTLR4_INCLUDE_DIRS})
 file(GLOB_RECURSE POOL_SRC src/*.cpp)
-add_executable(pool ${POOL_SRC} ${ANTLR_PoolLexer_CXX_OUTPUTS} ${ANTLR_PoolParser_CXX_OUTPUTS})
+add_executable(pool)
+target_sources(pool PRIVATE ${POOL_SRC})
+target_sources(pool PRIVATE ${ANTLR_PoolLexer_CXX_OUTPUTS} ${ANTLR_PoolParser_CXX_OUTPUTS})
 target_include_directories(pool PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(pool PRIVATE ${ANTLR_PoolLexer_OUTPUT_DIR} ${ANTLR_PoolParser_OUTPUT_DIR} ${ANTLR4_INCLUDE_DIRS})
 target_compile_definitions(pool PUBLIC POOL_VERSION="${PROJECT_VERSION}" POOL_EXPORTS)
 set_target_properties(
 		pool PROPERTIES
