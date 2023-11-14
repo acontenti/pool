@@ -102,9 +102,6 @@ struct NativesImpl : public Natives {
 	}
 
 	void initializeObject() {
-		addFun("Object.toString", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
-			return String::newInstance(self->context, location, self->getRepr(location));
-		});
 		addFun("Object.getContextInfo", {{"this"}}, [](const shared_ptr<Object> &self, const vector<shared_ptr<Object>> &other, const Location &location) {
 			const auto &info = self->getContextInfo(location);
 			return String::newInstance(self->context, location, info);

@@ -38,7 +38,7 @@ fragment ESCAPE: '\\' ('"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't' | ('u' HEX
 
 STRING_LITERAL: '"' (~["\\\r\n] | ESCAPE)* '"';
 
-NATIVE_SYMBOL: '`' ID (DOT ID)* '`';
+NATIVE_SYMBOL: '$' [A-Za-z0-9$_]*;
 
 ID: ([A-Za-z] | SYMBOL) ([A-Za-z0-9] | SYMBOL)*;
 fragment SYMBOL: '_' | '!' | '%' | '&' | '*' | '+' | '-' | '/' | '<' | '>' | '=' | '^' | '|' | '~' | '?';

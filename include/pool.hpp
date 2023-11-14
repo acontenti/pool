@@ -15,9 +15,11 @@ namespace pool {
 		const string path;
 		const string directory;
 
-		explicit PoolInstance(string path);
+		explicit PoolInstance(const string &path);
 
 		virtual shared_ptr<Module> execute() noexcept(false) = 0;
+
+		virtual void compile() noexcept(false) = 0;
 
 		POOL_PUBLIC static shared_ptr<PoolInstance> load(const string &path);
 	};
@@ -31,6 +33,8 @@ namespace pool {
 		constexpr static const string_view EXT = ".pool";
 
 		virtual shared_ptr<Module> execute(const string &module) noexcept(false) = 0;
+
+		virtual void compile(const string &module) noexcept(false) = 0;
 
 		POOL_PUBLIC static void initialiaze(const Settings &settings);
 

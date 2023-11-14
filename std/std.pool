@@ -1,5 +1,7 @@
 Object..instanceOf ::= `Object.instanceOf`();
-Object..toString ::= `Object.toString`();
+Object..toString ::= (this) : {
+	this.getRepr();
+};
 Object..getContextInfo ::= `Object.getContextInfo`();
 Object..getClass ::= `Object.getClass`();
 Object..getRepr ::= `Object.getRepr`();

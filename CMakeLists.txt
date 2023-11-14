@@ -15,6 +15,11 @@ if (NOT cpplocate_POPULATED)
 endif ()
 find_package(cpplocate REQUIRED)
 
+# LLVM
+find_package(LLVM 17 REQUIRED CONFIG)
+message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+
 # ANTLR4 RUNTIME
 set(ANTLR4_VERSION "4.13.1")
 add_compile_definitions(_HAS_STD_BYTE=0)
@@ -40,7 +45,10 @@ target_sources(pool PRIVATE ${POOL_SRC})
 target_sources(pool PRIVATE ${ANTLR_PoolLexer_CXX_OUTPUTS} ${ANTLR_PoolParser_CXX_OUTPUTS})
 target_include_directories(pool PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(pool PRIVATE ${ANTLR_PoolLexer_OUTPUT_DIR} ${ANTLR_PoolParser_OUTPUT_DIR} ${ANTLR4_INCLUDE_DIRS})
+target_include_directories(pool PRIVATE ${LLVM_INCLUDE_DIRS})
 target_compile_definitions(pool PUBLIC POOL_VERSION="${PROJECT_VERSION}" POOL_EXPORTS)
+separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
+target_compile_definitions(pool PUBLIC ${LLVM_DEFINITIONS_LIST})
 set_target_properties(
 		pool PROPERTIES
 		ENABLE_EXPORTS ON
@@ -52,6 +60,21 @@ find_package(Threads REQUIRED)
 target_link_libraries(pool Threads::Threads)
 target_link_libraries(pool ${ANTLR4_LIB})
 target_link_libraries(pool cpplocate::cpplocate)
+llvm_map_components_to_libnames(llvm_libs support core irreader mc nativecodegen)
+target_link_libraries(pool ${llvm_libs})
+
+# POOLSTDLIB
+add_library(poolstd SHARED)
+target_sources(poolstd PRIVATE src/llvm_natives.cpp src/llvm_poolstd.cpp)
+target_include_directories(poolstd PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(poolstd PUBLIC POOL_VERSION="${PROJECT_VERSION}" POOL_EXPORTS POOLSTDLIB)
+set_target_properties(
+		poolstd PROPERTIES
+		ENABLE_EXPORTS ON
+		POSITION_INDEPENDENT_CODE ON
+		CXX_STANDARD 17
+		CXX_VISIBILITY_PRESET hidden
+)
 
 # COPY STD TO BINARY DIR
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/std/std.pool ${CMAKE_CURRENT_BINARY_DIR}/std/std.pool COPYONLY)

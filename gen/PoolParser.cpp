@@ -1,5 +1,5 @@
 
-// Generated from PoolParser.g4 by ANTLR 4.10.1
+// Generated from PoolParser.g4 by ANTLR 4.13.1
 
 
 
@@ -35,11 +35,20 @@ struct PoolParserStaticData final {
   std::unique_ptr<antlr4::atn::ATN> atn;
 };
 
-std::once_flag poolparserParserOnceFlag;
+::antlr4::internal::OnceFlag poolparserParserOnceFlag;
+#if ANTLR4_USE_THREAD_LOCAL_CACHE
+static thread_local
+#endif
 PoolParserStaticData *poolparserParserStaticData = nullptr;
 
 void poolparserParserInitialize() {
+#if ANTLR4_USE_THREAD_LOCAL_CACHE
+  if (poolparserParserStaticData != nullptr) {
+    return;
+  }
+#else
   assert(poolparserParserStaticData == nullptr);
+#endif
   auto staticData = std::make_unique<PoolParserStaticData>(
     std::vector<std::string>{
       "program", "statement", "expression", "assignment", "access", "call", 
@@ -216,17 +225,7 @@ PoolParser::ProgramContext* PoolParser::program() {
     _errHandler->sync(this);
     _la = _input->LA(1);
     while ((((_la & ~ 0x3fULL) == 0) &&
-      ((1ULL << _la) & ((1ULL << PoolParser::SEMI)
-      | (1ULL << PoolParser::LP)
-      | (1ULL << PoolParser::LB)
-      | (1ULL << PoolParser::LSB)
-      | (1ULL << PoolParser::DECIMAL_INTEGER_LITERAL)
-      | (1ULL << PoolParser::HEX_INTEGER_LITERAL)
-      | (1ULL << PoolParser::BIN_INTEGER_LITERAL)
-      | (1ULL << PoolParser::FLOAT_LITERAL)
-      | (1ULL << PoolParser::STRING_LITERAL)
-      | (1ULL << PoolParser::NATIVE_SYMBOL)
-      | (1ULL << PoolParser::ID))) != 0)) {
+      ((1ULL << _la) & 133169840) != 0)) {
       setState(32);
       statement();
       setState(37);
@@ -285,16 +284,7 @@ PoolParser::StatementContext* PoolParser::statement() {
 
     _la = _input->LA(1);
     if ((((_la & ~ 0x3fULL) == 0) &&
-      ((1ULL << _la) & ((1ULL << PoolParser::LP)
-      | (1ULL << PoolParser::LB)
-      | (1ULL << PoolParser::LSB)
-      | (1ULL << PoolParser::DECIMAL_INTEGER_LITERAL)
-      | (1ULL << PoolParser::HEX_INTEGER_LITERAL)
-      | (1ULL << PoolParser::BIN_INTEGER_LITERAL)
-      | (1ULL << PoolParser::FLOAT_LITERAL)
-      | (1ULL << PoolParser::STRING_LITERAL)
-      | (1ULL << PoolParser::NATIVE_SYMBOL)
-      | (1ULL << PoolParser::ID))) != 0)) {
+      ((1ULL << _la) & 133169824) != 0)) {
       setState(40);
       expression();
     }
@@ -764,17 +754,7 @@ PoolParser::ArgsContext* PoolParser::args() {
 
     _la = _input->LA(1);
     if ((((_la & ~ 0x3fULL) == 0) &&
-      ((1ULL << _la) & ((1ULL << PoolParser::LP)
-      | (1ULL << PoolParser::LB)
-      | (1ULL << PoolParser::LSB)
-      | (1ULL << PoolParser::DOTS)
-      | (1ULL << PoolParser::DECIMAL_INTEGER_LITERAL)
-      | (1ULL << PoolParser::HEX_INTEGER_LITERAL)
-      | (1ULL << PoolParser::BIN_INTEGER_LITERAL)
-      | (1ULL << PoolParser::FLOAT_LITERAL)
-      | (1ULL << PoolParser::STRING_LITERAL)
-      | (1ULL << PoolParser::NATIVE_SYMBOL)
-      | (1ULL << PoolParser::ID))) != 0)) {
+      ((1ULL << _la) & 133694112) != 0)) {
       setState(103);
       arg();
     }
@@ -1097,17 +1077,7 @@ PoolParser::BlockContext* PoolParser::block() {
     _errHandler->sync(this);
     _la = _input->LA(1);
     while ((((_la & ~ 0x3fULL) == 0) &&
-      ((1ULL << _la) & ((1ULL << PoolParser::SEMI)
-      | (1ULL << PoolParser::LP)
-      | (1ULL << PoolParser::LB)
-      | (1ULL << PoolParser::LSB)
-      | (1ULL << PoolParser::DECIMAL_INTEGER_LITERAL)
-      | (1ULL << PoolParser::HEX_INTEGER_LITERAL)
-      | (1ULL << PoolParser::BIN_INTEGER_LITERAL)
-      | (1ULL << PoolParser::FLOAT_LITERAL)
-      | (1ULL << PoolParser::STRING_LITERAL)
-      | (1ULL << PoolParser::NATIVE_SYMBOL)
-      | (1ULL << PoolParser::ID))) != 0)) {
+      ((1ULL << _la) & 133169840) != 0)) {
       setState(149);
       statement();
       setState(154);
@@ -1184,17 +1154,7 @@ PoolParser::ArrayContext* PoolParser::array() {
 
     _la = _input->LA(1);
     if ((((_la & ~ 0x3fULL) == 0) &&
-      ((1ULL << _la) & ((1ULL << PoolParser::LP)
-      | (1ULL << PoolParser::LB)
-      | (1ULL << PoolParser::LSB)
-      | (1ULL << PoolParser::DOTS)
-      | (1ULL << PoolParser::DECIMAL_INTEGER_LITERAL)
-      | (1ULL << PoolParser::HEX_INTEGER_LITERAL)
-      | (1ULL << PoolParser::BIN_INTEGER_LITERAL)
-      | (1ULL << PoolParser::FLOAT_LITERAL)
-      | (1ULL << PoolParser::STRING_LITERAL)
-      | (1ULL << PoolParser::NATIVE_SYMBOL)
-      | (1ULL << PoolParser::ID))) != 0)) {
+      ((1ULL << _la) & 133694112) != 0)) {
       setState(158);
       arg();
     }
@@ -1327,17 +1287,7 @@ PoolParser::FunContext* PoolParser::fun() {
     _errHandler->sync(this);
     _la = _input->LA(1);
     while ((((_la & ~ 0x3fULL) == 0) &&
-      ((1ULL << _la) & ((1ULL << PoolParser::SEMI)
-      | (1ULL << PoolParser::LP)
-      | (1ULL << PoolParser::LB)
-      | (1ULL << PoolParser::LSB)
-      | (1ULL << PoolParser::DECIMAL_INTEGER_LITERAL)
-      | (1ULL << PoolParser::HEX_INTEGER_LITERAL)
-      | (1ULL << PoolParser::BIN_INTEGER_LITERAL)
-      | (1ULL << PoolParser::FLOAT_LITERAL)
-      | (1ULL << PoolParser::STRING_LITERAL)
-      | (1ULL << PoolParser::NATIVE_SYMBOL)
-      | (1ULL << PoolParser::ID))) != 0)) {
+      ((1ULL << _la) & 133169840) != 0)) {
       setState(184);
       statement();
       setState(189);
@@ -1584,5 +1534,9 @@ bool PoolParser::callSempred(CallContext *_localctx, size_t predicateIndex) {
 }
 
 void PoolParser::initialize() {
-  std::call_once(poolparserParserOnceFlag, poolparserParserInitialize);
+#if ANTLR4_USE_THREAD_LOCAL_CACHE
+  poolparserParserInitialize();
+#else
+  ::antlr4::internal::call_once(poolparserParserOnceFlag, poolparserParserInitialize);
+#endif
 }

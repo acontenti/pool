@@ -19,7 +19,7 @@ namespace std {
 #define POOL_PUBLIC
 #endif
 #else
-#if __GNUC__ >= 6
+#if __GNUC__ >= 4
 #define POOL_PUBLIC __attribute__ ((visibility ("default")))
 #else
 #define POOL_PUBLIC

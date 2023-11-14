@@ -22,6 +22,8 @@
 
 #include <windows.h>
 #include <strsafe.h>
+#include <AtlBase.h>
+#include <atlconv.h>
 
 typedef HMODULE Handle;
 #endif
@@ -55,10 +57,11 @@ string getLastError() {
 					  ::LocalSize(lpDisplayBuf) / sizeof(TCHAR),
 					  TEXT("Failed with error %d: %s"),
 					  dw, lpMsgBuf);
-	string err_str((LPCTSTR) lpDisplayBuf);
+	wstring err_str((LPCTSTR) lpDisplayBuf);
+	CW2A cw2a(err_str.c_str());
 	::LocalFree(lpMsgBuf);
 	::LocalFree(lpDisplayBuf);
-	return err_str;
+	return string(cw2a);
 #endif
 }
 
@@ -82,7 +85,7 @@ struct DynamicLibrariesManager::Library {
 	string path;
 	Handle handle;
 
-	Library(string path, const Handle &handle) : path(move(path)), handle(handle) {}
+	Library(string path, const Handle &handle) : path(std::move(path)), handle(handle) {}
 
 	~Library() noexcept(false) {
 		if (!close(handle)) {
@@ -129,7 +132,8 @@ void DynamicLibrariesManager::load(const fs::path &path) {
 		throw runtime_error("'" + path.string() + "' is not a regular file");
 	string file = fs::canonical(path).string();
 #if ON_WINDOWS
-	Handle handle = LoadLibrary(file.c_str());
+	CA2W ca2w(file.c_str());
+	Handle handle = LoadLibrary(ca2w);
 #endif
 #if ON_LINUX || ON_MACOS
 	Handle handle = ::dlopen(file.c_str(), RTLD_NOW);

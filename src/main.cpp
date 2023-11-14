@@ -13,6 +13,7 @@ int main(int argc, char **argv) {
 	auto startTime = high_resolution_clock::now();
 	try {
 		vector<argagg::definition> options{
+				{"compile", vector<string>{"-c", "--compile"}, "compiles the program", 0},
 				{"debug", vector<string>{"-d", "--debug"}, "enables debug options", 0},
 				{"help", vector<string>{"-h", "--help"}, "shows this help", 0},
 				{"locate", vector<string>{"-l", "--locate"}, "shows executable location", 0},
@@ -20,14 +21,14 @@ int main(int argc, char **argv) {
 		argagg::parser argparser{options};
 		argagg::parser_results arguments = argparser.parse(argc, argv);
 		debug = arguments["debug"];
-		if (debug && !arguments["help"]) {
+		bool showHelp = arguments["help"] || arguments.pos.empty();
+		if (debug || showHelp) {
 			cerr << "pool " << PoolVM::getVersion() << endl;
 		}
 		if (arguments["locate"]) {
 			cerr << PoolVM::getSDKPath() << endl;
 			return EXIT_SUCCESS;
-		} else if (arguments["help"] || arguments.pos.empty()) {
-			cerr << "pool " << PoolVM::getVersion() << endl;
+		} else if (showHelp) {
 			cerr << "Usage: pool [options] file" << endl << argparser;
 			return EXIT_SUCCESS;
 		} else {
@@ -37,7 +38,11 @@ int main(int argc, char **argv) {
 				args.emplace_back(arguments.pos[i]);
 			}
 			PoolVM::initialiaze({debug, args});
-			PoolVM::get()->execute(filename);
+			if (arguments["compile"]) {
+				PoolVM::get()->compile(filename);
+			} else {
+				PoolVM::get()->execute(filename);
+			}
 			if (debug) {
 				auto executionTime = getExecutionTime(startTime, high_resolution_clock::now());
 				cerr << endl << termcolor::bright_green << "Execution successful" << termcolor::reset;
