@@ -127,6 +127,8 @@ namespace pool {
 
 		Class *extend(Class *newClass, Function *block) const;
 
+		Class * initialize(Function *block);
+
 		bool subclassOf(const Class *_cls) const;
 
 		bool superclassOf(const Class *_cls) const;

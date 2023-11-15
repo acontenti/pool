@@ -130,7 +130,7 @@ namespace pool {
 
 		llvm::Value *parseFunction(PoolParser::FunContext *ast, llvm::Value *contextObject) {
 			auto paramsAst = ast->param();
-			auto *mallocFunction = Natives::get()->findFunction("$malloc");
+			auto *mallocFunction = Natives::get()->findFunction("malloc");
 			auto *parameterType = llvm::StructType::create(*llvm_context, {
 					llvm::PointerType::getInt8PtrTy(*llvm_context),
 					llvm::PointerType::getUnqual(*llvm_context),
@@ -164,7 +164,7 @@ namespace pool {
 
 		pair<llvm::Value *, size_t> parseArgs(const vector<PoolParser::ArgContext *> &ast, llvm::Value *contextObject) {
 			if (!ast.empty()) {
-				auto *mallocFunction = Natives::get()->findFunction("$malloc");
+				auto *mallocFunction = Natives::get()->findFunction("malloc");
 				auto *arrayElementType = llvm::PointerType::getUnqual(*llvm_context);
 				auto *arrayType = llvm::ArrayType::get(arrayElementType, ast.size());
 				auto *array = builder.CreateCall(mallocFunction, {llvm::ConstantExpr::getSizeOf(arrayType)});

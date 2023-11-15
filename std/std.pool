@@ -1,8 +1,14 @@
 true ::= $True;
 false ::= $False;
 null ::= $Null;
+createClass ::= $Class_initialize;
+input ::= $input;
+throw ::= $throw;
+tryCatch ::= $tryCatch;
+loadLibrary ::= $loadLibrary;
+loadLibraryFile ::= $loadLibraryFile;
 
-Object ::= $Class_extendNative(null, $ObjectClass, {
+Object ::= createClass($ObjectClass, {
     getContextInfo ::= $Object_getContextInfo;
     getClass ::= $Object_getClass;
     getRepr ::= $Object_getRepr;
@@ -18,9 +24,8 @@ Object ::= $Class_extendNative(null, $ObjectClass, {
     set ::= $Object_set;
 };
 
-Class ::= $Class_extendNative(Object, $ClassClass, {
+Class ::= createClass($ClassClass, {
     extend ::= $Class_extend;
-    extendNative ::= $Class_extendNative;
     new ::= $Class_new;
     getSuper ::= $Class_getSuper;
     getRepr ::= $Class_getRepr;
@@ -28,7 +33,7 @@ Class ::= $Class_extendNative(Object, $ClassClass, {
     superclassOf ::= $Class_superclassOf;
 });
 
-Module ::= Object.extendNative($ModuleClass, {
+Module ::= Object.extend($ModuleClass, {
     getId ::= $Module_getId;
     inject ::= $Module_inject;
     extend ::= null;
@@ -37,7 +42,7 @@ Module ::= Object.extendNative($ModuleClass, {
     set ::= null;
 });
 
-Bool ::= Object.extendNative($BooleanClass, {
+Bool ::= Object.extend($BooleanClass, {
     getRepr ::= $Bool_getRepr;
     ! ::= $Bool_not;
     not ::= $Bool_not;
@@ -54,7 +59,7 @@ Bool ::= Object.extendNative($BooleanClass, {
     delete ::= null;
 };
 
-Array ::= Object.extendNative($ArrayClass, {
+Array ::= Object.extend($ArrayClass, {
     at ::= $Array_at;
     forEach ::= $Array_forEach;
     push ::= $Array_push;
@@ -92,7 +97,7 @@ Number ::= Object.extend("Number", {
     delete ::= null;
 });
 
-Integer ::= $newClass("Integer", $Integer_$new, Number, {
+Integer ::= Number.extend($IntegerClass, {
     | ::= $Integer_or;
     & ::= $Integer_and;
     ^ ::= $Integer_xor;
@@ -116,44 +121,47 @@ Integer ::= $newClass("Integer", $Integer_$new, Number, {
     delete ::= null;
 });
 
-Decimal ::= $newClass("Decimal", $Decimal_$new, Number, {
+Decimal ::= Number.extend($DecimalClass, {
     extend ::= null;
     new ::= null;
     delete ::= null;
 });
 
-String..+ ::= $String_plus;
-String..== ::= $String_eqeq;
-String..toString ::= $String_toString;
-String..getRepr ::= $String_getRepr;
-String..length ::= $String_length;
-String..extend ::= null;
-String..new ::= null;
-String..delete ::= null;
+String ::= Object.extend($StringClass, {
+    + ::= $String_plus;
+    == ::= $String_eqeq;
+    toString ::= $String_toString;
+    getRepr ::= $String_getRepr;
+    length ::= $String_length;
+    extend ::= null;
+    new ::= null;
+    delete ::= null;
+});
 
-Function..classmethod ::= $Function_classmethod;
-Function..staticmethod ::= $Function_staticmethod;
-Function..getRepr ::= $Function_getRepr;
-Function..whileDo ::= $Function_whileDo;
-Function..doWhile ::= $Function_doWhile;
-Function..return ::= $Function_return;
-Function..extend ::= null;
-Function..new ::= null;
+Function ::= Object.extend($FunctionClass, {
+    classmethod ::= $Function_classmethod;
+    staticmethod ::= $Function_staticmethod;
+    getRepr ::= $Function_getRepr;
+    whileDo ::= $Function_whileDo;
+    doWhile ::= $Function_doWhile;
+    return ::= $Function_return;
+    extend ::= null;
+    new ::= null;
+});
 
-Nothing..toString ::= (this) : {"null";};
-Nothing..getRepr ::= (this) : {"null";};
-Nothing..== ::= (this, other) : {
-    null.==(other);
-};
-Nothing..extend ::= null;
-Nothing..new ::= null;
-Nothing..delete ::= null;
-Nothing..get ::= null;
-Nothing..set ::= null;
+Nothing ::= Object.extend($NothingClass, {
+    toString ::= (this) : {"null";};
+    getRepr ::= (this) : {"null";};
+    == ::= (this, other) : {
+        null.==(other);
+    };
+    extend ::= null;
+    new ::= null;
+    delete ::= null;
+    get ::= null;
+    set ::= null;
+});
 
-input ::= $input;
-throw ::= $throw;
-tryCatch ::= $tryCatch;
 assert ::= (test: Bool, message: String) : {
     test.!().then({
         throw(message);
@@ -173,8 +181,6 @@ assertFail ::= (test: Function, message: String) : {
     });
     assert(thrown, message);
 };
-loadLibrary ::= $loadLibrary;
-loadLibraryFile ::= $loadLibraryFile;
 
 // Exported variables
 exported.Object ::= Object;

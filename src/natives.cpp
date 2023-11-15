@@ -100,11 +100,12 @@ namespace pool {
 		};
 
 		void initialize(const pool::PoolVM::Settings &settings) override {
+			// initialize classes
 			Context::global = new Context();
-			$ClassClass = static_cast<Class *>(Class::CREATOR(Context::global, new Class::ClassData{"Class", nullptr, Class::CREATOR}));
-			$ObjectClass = Class::create("Object", nullptr, Object::CREATOR, Context::global);
-			// $ClassClass->cls = $ClassClass; // Set manually because $ClassClass was not created yet when $ClassClass was created
-			$ClassClass->super = $ObjectClass; // Set manually because $ObjectClass was not created yet when $ClassClass was created
+			$ClassClass = static_cast<Class *>(Class::CREATOR(Context::global, new Class::ClassData{"Class", nullptr, Class::CREATOR})); // super is nullptr because $ObjectClass is not created yet
+			$ObjectClass = Class::create("Object", nullptr, Object::CREATOR, Context::global); // super is nullptr because $ObjectClass is the root class
+			$ClassClass->cls = nullptr; // $ClassClass must not have a class, otherwise there will be a circular dependency
+			$ClassClass->super = $ObjectClass; // set manually because $ObjectClass was not yet created
 			$BooleanClass = $ObjectClass->extend("Boolean", Bool::CREATOR);
 			$IntegerClass = $ObjectClass->extend("Integer", Integer::CREATOR);
 			$DecimalClass = $ObjectClass->extend("Decimal", Decimal::CREATOR);
@@ -116,6 +117,7 @@ namespace pool {
 			$True = static_cast<Bool *>($BooleanClass->newInstance(Context::global, new bool{true}));
 			$False = static_cast<Bool *>($BooleanClass->newInstance(Context::global, new bool{false}));
 			$Null = $NothingClass->newInstance(Context::global, $NothingClass);
+			// add native classes symbols
 			addConstant("$ObjectClass");
 			addConstant("$ClassClass");
 			addConstant("$BooleanClass");
@@ -129,7 +131,10 @@ namespace pool {
 			addConstant("$True");
 			addConstant("$False");
 			addConstant("$Null");
-			addFunction("$malloc", llvm::PointerType::getUnqual(*llvm_context), llvm::Type::getInt64Ty(*llvm_context));
+			// add native functions symbols
+			addFunction("malloc", llvm::PointerType::getUnqual(*llvm_context), llvm::Type::getInt64Ty(*llvm_context));
+			addFunction("free", llvm::Type::getVoidTy(*llvm_context), llvm::PointerType::getUnqual(*llvm_context));
+			// add native functions symbols from installers
 			for (const auto &installer: installers) {
 				installer(instance);
 			}
@@ -151,10 +156,6 @@ namespace pool {
 
 #endif
 
-// NATIVE FUNCTIONS: misc
-	POOL_PUBLIC EXTERN void *$malloc(long long int size) {
-		return malloc(size);
-	}
 // NATIVE FUNCTIONS: Object
 	NATIVE_FUN(String *, $Object_getContextInfo, Object *self) {
 		return self->getContextInfo();
@@ -202,11 +203,18 @@ namespace pool {
 		return *self == $Null ? other : self;
 	}
 // NATIVE FUNCTIONS: Class
-	NATIVE_FUN(Class *, $Class_extend, Class *self, String *name, Function *body) {
-		return self->extend(name->value, self->creator, body);
+	NATIVE_FUN(Class *, $Class_extend, Class *self, Object *param, Function *body) {
+		if (param->instanceOf($StringClass)) {
+			return self->extend(static_cast<String *>(param)->value, self->creator, body);
+		} else if (param->instanceOf($ClassClass)) {
+			return self->extend(static_cast<Class *>(param), body);
+		} else {
+			throw runtime_error("Invalid parameter type");
+		}
 	}
-	NATIVE_FUN(Class *, $Class_extendNative, Class *self, Class *cls, Function *body) {
-		return self->extend(cls, body);
+	NATIVE_FUN(Class *, $Class_initialize, Class *self, Function *body) {
+		self->initialize(body);
+		return self;
 	}
 	NATIVE_FUN(Object *, $Class_new, Class *self, Object **args, size_t argc) {
 		return self->newInstance(self->context, self, args, argc);

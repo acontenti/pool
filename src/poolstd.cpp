@@ -185,27 +185,26 @@ namespace pool {
 
 	Class *Class::extend(const char *className, creator_t _creator, Function *block) const {
 		auto *newClass = Class::create(className, this, _creator, context);
-		if (block) {
-			block->context->set("class", (Object *) newClass, true);
-			block->context->set("super", (Object *) this, true);
-			block->call(newClass, {}, 0);
-			for (const auto &[_name, value]: *block->context) {
-				newClass->context->set(_name, value.first, value.second);
-			}
-		}
-		return newClass;
+		return newClass->initialize(block);
 	}
 
 	Class *Class::extend(Class *newClass, Function *block) const {
+		newClass->super = this;
+		return newClass->initialize(block);
+	}
+
+	Class * Class::initialize(Function *block) {
 		if (block) {
-			block->context->set("class", (Object *) newClass, true);
-			block->context->set("super", (Object *) this, true);
-			block->call(newClass, {}, 0);
+			block->context->set("class", this, true);
+			if (super) {
+				block->context->set("super", (Object *) super, true);
+			}
+			block->call(this, {}, 0);
 			for (const auto &[_name, value]: *block->context) {
-				newClass->context->set(_name, value.first, value.second);
+				context->set(_name, value.first, value.second);
 			}
 		}
-		return static_cast<Class *>(newClass);
+		return this;
 	}
 
 	bool Class::subclassOf(const Class *_cls) const {
