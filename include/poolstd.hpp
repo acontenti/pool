@@ -6,10 +6,10 @@
 #include <cstring>
 
 namespace pool {
+	struct Context;
 	struct Object;
 	struct Class;
 	struct String;
-	struct Nothing;
 	struct Bool;
 	struct Integer;
 	struct Decimal;
@@ -29,7 +29,7 @@ namespace pool {
 	POOL_PUBLIC EXTERN Class *$NothingClass;
 	POOL_PUBLIC EXTERN Bool *$True;
 	POOL_PUBLIC EXTERN Bool *$False;
-	POOL_PUBLIC EXTERN Nothing *$Null;
+	POOL_PUBLIC EXTERN Object *$Null;
 
 	class POOL_PUBLIC Context {
 		std::unordered_map<std::string, std::pair<Object *, bool>> heap;
@@ -60,13 +60,15 @@ namespace pool {
 		POOL_PUBLIC static Context *global;
 	};
 
-	struct POOL_PUBLIC Object {
+	class POOL_PUBLIC Object {
+	public:
 		const char *id;
 		Class *cls;
 		Context *context;
-
+	protected:
 		Object(Class *cls, Context *context);
 
+	public:
 		[[nodiscard]] Class *getClass() const;
 
 		[[nodiscard]] std::string getDefaultRepr() const;
@@ -86,68 +88,121 @@ namespace pool {
 		[[nodiscard]] String *toString();
 
 		bool operator==(const Object *rhs) const;
+
+		static Object *CREATOR(Context *_context, void *data);
 	};
 
-	struct POOL_PUBLIC Class : public Object {
+	class POOL_PUBLIC Class : public Object {
+	public:
+		using creator_t = Object *(*)(Context *, void *data);
 		const char *name;
-		Class *super;
+		const Class *super;
+		creator_t creator;
+	private:
+		explicit Class(const char *name, const Class *super, creator_t creator, Context *context)
+				: Object($ClassClass, context), name(name), super(super), creator(creator) {}
 
-		explicit Class(const char *name, Class *super, Context *context)
-				: Object($ClassClass, context), name(name), super(super) {}
+	public:
+		struct ClassData {
+			const char *name;
+			const Class *super;
+			creator_t creator;
+		};
 
 		[[nodiscard]] Object *find(const std::string &id) const;
 
 		[[nodiscard]] Object *findInClass(const std::string &id) const;
 
-		Object *newInstance(Context *parent, Object **args, size_t argc) const;
+		Object *newInstance(Context *parent, void *data, Object **args, size_t argc) const;
 
-		Class *extend(String *className, Function *block) const;
+		Object *newInstance(Context *parent, void *data) const {
+			return newInstance(parent, data, nullptr, 0);
+		}
 
-		bool subclassOf(Class *_cls) const;
+		Class *extend(const char *className, creator_t _creator, Function *block) const;
 
-		bool superclassOf(Class *_cls) const;
+		Class *extend(const char *className, creator_t _creator) const {
+			return extend(className, _creator, nullptr);
+		}
+
+		Class *extend(Class *newClass, Function *block) const;
+
+		bool subclassOf(const Class *_cls) const;
+
+		bool superclassOf(const Class *_cls) const;
 
 		[[nodiscard]] String *getRepr();
 
 		bool operator==(const Class *rhs) const;
+
+		static Object *CREATOR(Context *_context, void *data);
+
+		static Class *create(const char *className, const Class *super, const creator_t &creator, Context *context);
 	};
 
-	struct POOL_PUBLIC Bool : public Object {
+	class POOL_PUBLIC Bool : public Object {
+	public:
 		bool value;
+	private:
+		explicit Bool(bool value, Context *context);
 
-		explicit Bool(bool value, Context *context) : Object($BooleanClass, context), value(value) {}
+	public:
+		static Object *CREATOR(Context *_context, void *data);
 	};
 
 	struct POOL_PUBLIC Integer : public Object {
+	public:
 		long long int value;
+	private:
+		explicit Integer(long long int value, Context *context);
 
-		explicit Integer(long long int value, Context *context) : Object($IntegerClass, context), value(value) {}
+	public:
+		static Object *CREATOR(Context *_context, void *data);
+
+		static Integer *create(long long int value, Context *context);
 	};
 
 	struct POOL_PUBLIC Decimal : public Object {
+	public:
 		long double value;
+	private:
+		explicit Decimal(long double value, Context *context);
 
-		explicit Decimal(long double value, Context *context) : Object($DecimalClass, context), value(value) {}
+	public:
+		static Object *CREATOR(Context *_context, void *data);
+
+		static Decimal *create(long double value, Context *context);
 	};
 
 	struct POOL_PUBLIC String : public Object {
+	public:
 		const char *value;
 		size_t length;
+	private:
+		explicit String(const char *value, Context *context);
 
-		explicit String(const char *value, Context *context) : Object($StringClass, context) {
-			this->value = strdup(value);
-			this->length = strlen(value);
-		}
+	public:
+		static Object *CREATOR(Context *_context, void *data);
+
+		static String *create(const char *value, Context *context);
 	};
 
 	struct POOL_PUBLIC Module : public Object {
-		typedef Object *(*function_t)(Object *);
-
+	public:
+		using function_t = Object *(*)(Object *);
 		const char *path;
 		function_t function;
+		struct ModuleData {
+			const char *path;
+			function_t function;
+		};
+	private:
+		explicit Module(const char *path, function_t function, Context *context);
 
-		explicit Module(const char *path, function_t function, Context *context)
-				: Object($ModuleClass, context), path(path), function(function) {}
+	public:
+		static Object *CREATOR(Context *_context, void *data);
+
+		static Module *create(const char *path, function_t function, Context *context);
 	};
 
 	struct POOL_PUBLIC Parameter {
@@ -157,29 +212,43 @@ namespace pool {
 	};
 
 	struct POOL_PUBLIC Function : public Object {
-		typedef Object *(*function_t)(Object *);
-
+	public:
+		using function_t = Object *(*)(Object *);
 		Parameter *parameters;
 		long long int parameterCount;
 		function_t function;
+		struct FunctionData {
+			Parameter *parameters;
+			long long int parameterCount;
+			function_t function;
+		};
+	private:
+		Function(Parameter *parameters, long long int parameterCount, function_t function, Context *context);
 
-		Function(Parameter *parameters, long long int parameterCount, function_t function, Context *context)
-				: Object($FunctionClass, context), parameters(parameters), parameterCount(parameterCount),
-				  function(function) {}
-
+	public:
 		Object *call(Object *self, Object **args, size_t n) const;
+
+		static Object *CREATOR(Context *_context, void *data);
+
+		static Function *create(Parameter *parameters, long long int parameterCount, function_t function, Context *context);
 	};
 
 	struct POOL_PUBLIC Array : public Object {
+	public:
 		long long int length;
 		Object **values;
-
+		struct ArrayData {
+			Object **values;
+			long long int length;
+		};
+	private:
 		explicit Array(long long int length, Object **values, Context *context);
 
+	public:
 		~Array();
-	};
 
-	struct POOL_PUBLIC Nothing : public Object {
-		explicit Nothing(Context *context) : Object($NothingClass, context) {}
+		static Object *CREATOR(Context *_context, void *data);
+
+		static Array *create(long long int length, Object **values, Context *context);
 	};
 }

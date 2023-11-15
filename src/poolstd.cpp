@@ -8,6 +8,13 @@
 #include <sstream>
 
 namespace pool {
+	template<typename T>
+	constexpr inline const T reconstruct(void *data) {
+		T _data = *static_cast<T *>(data);
+		delete static_cast<T *>(data);
+		return _data;
+	}
+
 	string generateObjectID() {
 		static std::random_device rd;
 		static std::mt19937 mt(rd());
@@ -29,7 +36,7 @@ namespace pool {
 	Class *$NothingClass = nullptr;
 	Bool *$True = nullptr;
 	Bool *$False = nullptr;
-	Nothing *$Null = nullptr;
+	Object *$Null = nullptr;
 
 	std::string Context::toString() const {
 		stringstream ss;
@@ -96,11 +103,11 @@ namespace pool {
 				}
 			}
 		}
-		return new String(getDefaultRepr().c_str(), context);
+		return String::create(getDefaultRepr().c_str(), context);
 	}
 
 	String *Object::getContextInfo() const {
-		return new String(context->toString().c_str(), context);
+		return String::create(context->toString().c_str(), context);
 	}
 
 	Function *Object::findMethod(const string &name) const {
@@ -143,6 +150,10 @@ namespace pool {
 		return strcmp(id, rhs->id) == 0;
 	}
 
+	Object *Object::CREATOR(Context *_context, void *data) {
+		return new Object(static_cast<Class *>(data), _context);
+	};
+
 	Object *Class::find(const string &id) const {
 		if (auto local = findInClass(id)) {
 			return local;
@@ -163,32 +174,45 @@ namespace pool {
 		return nullptr;
 	}
 
-	Object *Class::newInstance(Context *parent, Object **args, size_t argc) const {
-		auto *instance = new Object(const_cast<Class *>(this), parent);
-		if (auto method = findMethod("init")) {
+	Object *Class::newInstance(Context *parent, void *data, Object **args, size_t argc) const {
+		auto *instance = creator(parent, data);
+		instance->cls = const_cast<Class *>(this);
+		if (auto method = instance->findMethod("init")) {
 			method->call(instance, args, argc);
 		}
 		return instance;
 	}
 
-	Class *Class::extend(String *className, Function *block) const {
-		auto *newClass = new Class(strdup(className->value), const_cast<Class *>(this), context);
+	Class *Class::extend(const char *className, creator_t _creator, Function *block) const {
+		auto *newClass = Class::create(className, this, _creator, context);
 		if (block) {
 			block->context->set("class", (Object *) newClass, true);
 			block->context->set("super", (Object *) this, true);
 			block->call(newClass, {}, 0);
 			for (const auto &[_name, value]: *block->context) {
-				cls->context->set(_name, value.first, value.second);
+				newClass->context->set(_name, value.first, value.second);
 			}
 		}
 		return newClass;
 	}
 
-	bool Class::subclassOf(Class *_cls) const {
+	Class *Class::extend(Class *newClass, Function *block) const {
+		if (block) {
+			block->context->set("class", (Object *) newClass, true);
+			block->context->set("super", (Object *) this, true);
+			block->call(newClass, {}, 0);
+			for (const auto &[_name, value]: *block->context) {
+				newClass->context->set(_name, value.first, value.second);
+			}
+		}
+		return static_cast<Class *>(newClass);
+	}
+
+	bool Class::subclassOf(const Class *_cls) const {
 		return super && (*super == _cls || super->subclassOf(_cls));
 	}
 
-	bool Class::superclassOf(Class *_cls) const {
+	bool Class::superclassOf(const Class *_cls) const {
 		return _cls->super && (*this == _cls->super || superclassOf(_cls->super));
 	}
 
@@ -197,8 +221,72 @@ namespace pool {
 	}
 
 	String *Class::getRepr() {
-		return new String((getDefaultRepr() + "[" + name + "]").c_str(), context);
+		return String::create((getDefaultRepr() + "[" + name + "]").c_str(), context);
 	}
+
+	Object *Class::CREATOR(Context *_context, void *data) {
+		const auto &classData = reconstruct<ClassData>(data);
+		return new Class(classData.name, classData.super, classData.creator, _context);
+	};
+
+	Class *Class::create(const char *className, const Class *super, const creator_t &creator, Context *context) {
+		return static_cast<Class *>($ClassClass->newInstance(context, new ClassData{className, super, creator}));
+	}
+
+	Bool::Bool(bool value, Context *context) : Object($BooleanClass, context), value(value) {}
+
+	Object *Bool::CREATOR(Context *_context, void *data) {
+		return new Bool(reconstruct<bool>(data), _context);
+	};
+
+	Integer::Integer(long long int value, Context *context) : Object($IntegerClass, context), value(value) {}
+
+	Integer *Integer::create(long long int value, Context *context) {
+		return static_cast<Integer *>($IntegerClass->newInstance(context, new long long int(value)));
+	}
+
+	Object *Integer::CREATOR(Context *_context, void *data) {
+		return new Integer(reconstruct<long long int>(data), _context);
+	};
+
+	Decimal::Decimal(long double value, Context *context) : Object($DecimalClass, context), value(value) {}
+
+	Decimal *Decimal::create(long double value, Context *context) {
+		return static_cast<Decimal *>($DecimalClass->newInstance(context, new long double(value)));
+	}
+
+	Object *Decimal::CREATOR(Context *_context, void *data) {
+		return new Decimal(reconstruct<long double>(data), _context);
+	};
+
+	String::String(const char *value, Context *context) : Object($StringClass, context) {
+		this->value = strdup(value);
+		this->length = strlen(value);
+	}
+
+	String *String::create(const char *value, Context *context) {
+		return static_cast<String *>($StringClass->newInstance(context, (void *) value));
+	}
+
+	Object *String::CREATOR(Context *_context, void *data) {
+		return new String(static_cast<const char *>(data), _context);
+	}
+
+	Module::Module(const char *path, Module::function_t function, Context *context)
+			: Object($ModuleClass, context), path(path), function(function) {}
+
+	Module *Module::create(const char *path, Module::function_t function, Context *context) {
+		return static_cast<Module *>($ModuleClass->newInstance(context, new Module::ModuleData{path, function}));
+	}
+
+	Object *Module::CREATOR(Context *_context, void *data) {
+		const auto &moduleData = reconstruct<ModuleData>(data);
+		return new Module(moduleData.path, moduleData.function, _context);
+	};
+
+	Function::Function(Parameter *parameters, long long int parameterCount, Function::function_t function, Context *context)
+			: Object($FunctionClass, context), parameters(parameters), parameterCount(parameterCount),
+			  function(function) {}
 
 	Object *Function::call(Object *self, Object **other, size_t n) const {
 		vector<Object *> args;
@@ -208,7 +296,9 @@ namespace pool {
 			args.reserve(n + 1);
 			args.push_back(self);
 		}
-		args.insert(args.end(), other, other + n);
+		if (other && n) {
+			args.insert(args.end(), other, other + n);
+		}
 		Parameter *lastParameter = parameters + parameterCount - 1;
 		const auto hasRest = parameters != nullptr && lastParameter->rest;
 		if (hasRest) {
@@ -232,11 +322,20 @@ namespace pool {
 				context->set(param.name, value, true);
 			} else {
 				std::vector<Object *> rest{args.begin() + i, args.end()};
-				context->set(param.name, new Array((long long int) rest.size(), rest.data(), context), true);
+				context->set(param.name, Array::create((long long int) rest.size(), rest.data(), context), true);
 			}
 		}
 		return function((Object *) this);
 	}
+
+	Function *Function::create(Parameter *parameters, long long int parameterCount, Function::function_t function, Context *context) {
+		return static_cast<Function *>($FunctionClass->newInstance(context, new Function::FunctionData{parameters, parameterCount, function}));
+	}
+
+	Object *Function::CREATOR(Context *_context, void *data) {
+		const auto &functionData = reconstruct<FunctionData>(data);
+		return new Function(functionData.parameters, functionData.parameterCount, functionData.function, _context);
+	};
 
 	Array::Array(long long int length, Object **values, Context *context)
 			: Object($ArrayClass, context), length(length) {
@@ -249,5 +348,14 @@ namespace pool {
 	Array::~Array() {
 		delete[] values;
 	}
+
+	Array *Array::create(long long int length, Object **values, Context *context) {
+		return static_cast<Array *>($ArrayClass->newInstance(context, new Array::ArrayData{values, length}));
+	}
+
+	Object *Array::CREATOR(Context *_context, void *data) {
+		const auto &arrayData = reconstruct<ArrayData>(data);
+		return new Array(arrayData.length, arrayData.values, _context);
+	};
 }
 #pragma clang diagnostic pop

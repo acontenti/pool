@@ -101,20 +101,21 @@ namespace pool {
 
 		void initialize(const pool::PoolVM::Settings &settings) override {
 			Context::global = new Context();
-			$ObjectClass = new Class("Object", nullptr, Context::global);
-			$ClassClass = new Class("Class", $ObjectClass, Context::global);
-			$ObjectClass->cls = $ClassClass;
-			$BooleanClass = new Class("Boolean", $ObjectClass, Context::global);
-			$IntegerClass = new Class("Integer", $ObjectClass, Context::global);
-			$DecimalClass = new Class("Decimal", $ObjectClass, Context::global);
-			$StringClass = new Class("String", $ObjectClass, Context::global);
-			$ModuleClass = new Class("Module", $ObjectClass, Context::global);
-			$FunctionClass = new Class("Function", $ObjectClass, Context::global);
-			$ArrayClass = new Class("Array", $ObjectClass, Context::global);
-			$NothingClass = new Class("Nothing", $ObjectClass, Context::global);
-			$True = new Bool(true, Context::global);
-			$False = new Bool(false, Context::global);
-			$Null = new Nothing(Context::global);
+			$ClassClass = static_cast<Class *>(Class::CREATOR(Context::global, new Class::ClassData{"Class", nullptr, Class::CREATOR}));
+			$ObjectClass = Class::create("Object", nullptr, Object::CREATOR, Context::global);
+			// $ClassClass->cls = $ClassClass; // Set manually because $ClassClass was not created yet when $ClassClass was created
+			$ClassClass->super = $ObjectClass; // Set manually because $ObjectClass was not created yet when $ClassClass was created
+			$BooleanClass = $ObjectClass->extend("Boolean", Bool::CREATOR);
+			$IntegerClass = $ObjectClass->extend("Integer", Integer::CREATOR);
+			$DecimalClass = $ObjectClass->extend("Decimal", Decimal::CREATOR);
+			$StringClass = $ObjectClass->extend("String", String::CREATOR);
+			$ModuleClass = $ObjectClass->extend("Module", Module::CREATOR);
+			$FunctionClass = $ObjectClass->extend("Function", Function::CREATOR);
+			$ArrayClass = $ObjectClass->extend("Array", Array::CREATOR);
+			$NothingClass = $ObjectClass->extend("Nothing", Object::CREATOR);
+			$True = static_cast<Bool *>($BooleanClass->newInstance(Context::global, new bool{true}));
+			$False = static_cast<Bool *>($BooleanClass->newInstance(Context::global, new bool{false}));
+			$Null = $NothingClass->newInstance(Context::global, $NothingClass);
 			addConstant("$ObjectClass");
 			addConstant("$ClassClass");
 			addConstant("$BooleanClass");
@@ -136,9 +137,9 @@ namespace pool {
 			vector<Object *> arguments;
 			arguments.reserve(settings.args.size());
 			for (const auto &arg: settings.args) {
-				arguments.push_back(new String(arg.c_str(), Context::global));
+				arguments.push_back(String::create(arg.c_str(), Context::global));
 			}
-			Context::global->set("__args__", new Array((long long int) arguments.size(), arguments.data(), Context::global), true);
+			Context::global->set("__args__", Array::create((long long int) arguments.size(), arguments.data(), Context::global), true);
 		}
 	};
 
@@ -162,15 +163,15 @@ namespace pool {
 		return self->getClass();
 	}
 	NATIVE_FUN(String *, $Object_getRepr, Object *self) {
-		return new String(self->getDefaultRepr().c_str(), self->context);
+		return String::create(self->getDefaultRepr().c_str(), self->context);
 	}
-	NATIVE_FUN(Nothing *, $Object_print, Object *self) {
+	NATIVE_FUN(Object *, $Object_print, Object *self) {
 		String *pString = self->toString();
 		std::cout << pString->value;
 		delete pString;
 		return $Null;
 	}
-	NATIVE_FUN(Nothing *, $Object_println, Object *self) {
+	NATIVE_FUN(Object *, $Object_println, Object *self) {
 		String *pString = self->toString();
 		std::cout << pString->value << std::endl;
 		delete pString;
@@ -190,7 +191,7 @@ namespace pool {
 	NATIVE_FUN(Object *, $Object_set, Object *self, String *name, Object *value, bool constant) {
 		return self->context->set(name->value, value, constant);
 	}
-	NATIVE_FUN(Nothing *, $Object_del, Object *self, String *name) {
+	NATIVE_FUN(Object *, $Object_del, Object *self, String *name) {
 		self->context->del(name->value);
 		return $Null;
 	}
@@ -201,14 +202,14 @@ namespace pool {
 		return *self == $Null ? other : self;
 	}
 // NATIVE FUNCTIONS: Class
-	NATIVE_FUN(Class *, $Class_$new, const char *name, Class *super, Object *contextObject) {
-		return new Class(name, super, contextObject->context);
-	}
 	NATIVE_FUN(Class *, $Class_extend, Class *self, String *name, Function *body) {
-		return self->extend(name, body);
+		return self->extend(name->value, self->creator, body);
+	}
+	NATIVE_FUN(Class *, $Class_extendNative, Class *self, Class *cls, Function *body) {
+		return self->extend(cls, body);
 	}
 	NATIVE_FUN(Object *, $Class_new, Class *self, Object **args, size_t argc) {
-		return self->newInstance(self->context, args, argc);
+		return self->newInstance(self->context, self, args, argc);
 	}
 	NATIVE_FUN(Object *, $Class_getSuper, Class *self) {
 		return self->super ? (Object *) self->super : $Null;
@@ -223,24 +224,22 @@ namespace pool {
 		return self->superclassOf(other) ? $True : $False;
 	}
 // NATIVE FUNCTIONS: Boolean
-	NATIVE_FUN(Bool *, $Boolean_$new, bool value, Object *contextObject) {
-		return new Bool(value, contextObject->context);
-	}
+
 // NATIVE FUNCTIONS: Integer
 	NATIVE_FUN(Integer *, $Integer_$new, long long int value, Object *contextObject) {
-		return new Integer(value, contextObject->context);
+		return Integer::create(value, contextObject->context);
 	}
 // NATIVE FUNCTIONS: Decimal
 	NATIVE_FUN(Decimal *, $Decimal_$new, long double value, Object *contextObject) {
-		return new Decimal(value, contextObject->context);
+		return Decimal::create(value, contextObject->context);
 	}
 // NATIVE FUNCTIONS: String
 	NATIVE_FUN(String *, $String_$new, const char *value, Object *contextObject) {
-		return new String(value, contextObject->context);
+		return String::create(value, contextObject->context);
 	}
 // NATIVE FUNCTIONS: Function
 	NATIVE_FUN(Function *, $Function_$new, Parameter *parameters, long long int parameterCount, void *function, Object *contextObject) {
-		return new Function(parameters, parameterCount, (Function::function_t) function, contextObject->context);
+		return Function::create(parameters, parameterCount, (Function::function_t) function, contextObject->context);
 	}
 	NATIVE_FUN(Object *, $Function_call, Function *self, Object *caller, Object **args, size_t argc) {
 		if (self->instanceOf($FunctionClass)) {
@@ -251,11 +250,11 @@ namespace pool {
 	}
 // NATIVE FUNCTIONS: Array
 	NATIVE_FUN(Array *, $Array_$new, long long int valueCount, Object **values, Object *contextObject) {
-		return new Array(valueCount, values, contextObject->context);
+		return Array::create(valueCount, values, contextObject->context);
 	}
 // NATIVE FUNCTIONS: Module
 	NATIVE_FUN(Module *, $Module_$new, const char *name, void *function, Object *contextObject) {
-		return new Module(name, (Module::function_t) function, contextObject->context);
+		return Module::create(name, (Module::function_t) function, contextObject->context);
 	}
 	NATIVE_FUN(Object *, $Module_execute, Module *self) {
 		return self->function(self);

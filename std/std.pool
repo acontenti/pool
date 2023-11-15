@@ -1,62 +1,73 @@
-Object..instanceOf ::= `Object.instanceOf`();
-Object..toString ::= (this) : {
-	this.getRepr();
+true ::= $True;
+false ::= $False;
+null ::= $Null;
+
+Object ::= $Class_extendNative(null, $ObjectClass, {
+    getContextInfo ::= $Object_getContextInfo;
+    getClass ::= $Object_getClass;
+    getRepr ::= $Object_getRepr;
+    print ::= $Object_print;
+    println ::= $Object_println;
+    ?? ::= $Object_qq;
+    == ::= $Object_eqeq;
+    != ::= (this, other) : {
+        this.==(other).!();
+    };
+    get ::= $Object_get;
+    delete ::= $Object_delete;
+    set ::= $Object_set;
 };
-Object..getContextInfo ::= `Object.getContextInfo`();
-Object..getClass ::= `Object.getClass`();
-Object..getRepr ::= `Object.getRepr`();
-Object..print ::= `Object.print`();
-Object..println ::= `Object.println`();
-Object..?? ::= `Object.??`();
-Object..== ::= `Object.==`();
-Object..!= ::= (this, other) : {
-    this.==(other).!();
+
+Class ::= $Class_extendNative(Object, $ClassClass, {
+    extend ::= $Class_extend;
+    extendNative ::= $Class_extendNative;
+    new ::= $Class_new;
+    getSuper ::= $Class_getSuper;
+    getRepr ::= $Class_getRepr;
+    subclassOf ::= $Class_subclassOf;
+    superclassOf ::= $Class_superclassOf;
+});
+
+Module ::= Object.extendNative($ModuleClass, {
+    getId ::= $Module_getId;
+    inject ::= $Module_inject;
+    extend ::= null;
+    new ::= null;
+    delete ::= null;
+    set ::= null;
+});
+
+Bool ::= Object.extendNative($BooleanClass, {
+    getRepr ::= $Bool_getRepr;
+    ! ::= $Bool_not;
+    not ::= $Bool_not;
+    || ::= $Bool_oror;
+    && ::= $Bool_andand;
+    or ::= $Bool_oror;
+    and ::= $Bool_andand;
+    == ::= $Bool_eqeq;
+    then ::= $Bool_then;
+    thenElse ::= $Bool_thenElse;
+    ? ::= $Bool_q;
+    extend ::= null;
+    new ::= null;
+    delete ::= null;
 };
-Object..get ::= `Object.get`();
-Object..delete ::= `Object.delete`();
-Object..set ::= `Object.set`();
 
-Class..extend ::= `Class.extend`();
-Class..new ::= `Class.new`();
-Class..getSuper ::= `Class.getSuper`();
-Class..getRepr ::= `Class.getRepr`();
-Class..subclassOf ::= `Class.subclassOf`();
-Class..superclassOf ::= `Class.superclassOf`();
-
-Module..getId ::= `Module.getId`();
-Module..inject ::= `Module.inject`();
-Module..extend ::= null;
-Module..new ::= null;
-Module..delete ::= null;
-Module..set ::= null;
-
-Bool..getRepr ::= `Bool.getRepr`();
-Bool..! ::= `Bool.!`();
-Bool..not ::= `Bool.!`();
-Bool..|| ::= `Bool.||`();
-Bool..&& ::= `Bool.&&`();
-Bool..or ::= `Bool.||`();
-Bool..and ::= `Bool.&&`();
-Bool..== ::= `Bool.==`();
-Bool..then ::= `Bool.then`();
-Bool..thenElse ::= `Bool.thenElse`();
-Bool..? ::= `Bool.?`();
-Bool..extend ::= null;
-Bool..new ::= null;
-Bool..delete ::= null;
-
-Array..at ::= `Array.at`();
-Array..forEach ::= `Array.forEach`();
-Array..push ::= `Array.push`();
-Array..toString ::= `Array.toString`();
-Array..getRepr ::= `Array.getRepr`();
-Array..length ::= `Array.length`();
-Array..new ::= null;
-Array..delete ::= null;
+Array ::= Object.extendNative($ArrayClass, {
+    at ::= $Array_at;
+    forEach ::= $Array_forEach;
+    push ::= $Array_push;
+    toString ::= $Array_toString;
+    getRepr ::= $Array_getRepr;
+    length ::= $Array_length;
+    new ::= null;
+    delete ::= null;
+});
 
 Number ::= Object.extend("Number", {
-    == ::= `Number.==`();
-    < ::= `Number.<`();
+    == ::= $Number_eqeq;
+    < ::= $Number_lt;
     <= ::= (this, other: class) : {
         this.<(other).||(this.==(other));
     };
@@ -66,29 +77,28 @@ Number ::= Object.extend("Number", {
     >= ::= (this, other: class) : {
         this.<(other).!();
     };
-    + ::= `Number.+`();
-    - ::= `Number.-`();
-    * ::= `Number.*`();
-    / ::= `Number./`();
-    % ::= `Number.%`();
-    ** ::= `Number.**`();
-    pow ::= `Number.**`();
-    abs ::= `Number.abs`();
-    neg ::= `Number.neg`();
-    getRepr ::= `Number.getRepr`();
+    + ::= $Number_plus;
+    - ::= $Number_minus;
+    * ::= $Number_times;
+    / ::= $Number_div;
+    % ::= $Number_mod;
+    ** ::= $Number_pow;
+    pow ::= $Number_pow;
+    abs ::= $Number_abs;
+    neg ::= $Number_neg;
+    getRepr ::= $Number_getRepr;
     extend ::= null;
     new ::= null;
     delete ::= null;
 });
-exported.Number ::= Number;
 
-Integer ::= newClass("Integer", `Integer`, Number, {
-    | ::= `Integer.|`();
-    & ::= `Integer.&`();
-    ^ ::= `Integer.^`();
-    ~ ::= `Integer.~`();
-    << ::= `Integer.<<`();
-    >> ::= `Integer.>>`();
+Integer ::= $newClass("Integer", $Integer_$new, Number, {
+    | ::= $Integer_or;
+    & ::= $Integer_and;
+    ^ ::= $Integer_xor;
+    ~ ::= $Integer_inv;
+    << ::= $Integer_lshift;
+    >> ::= $Integer_rshift;
     to ::= (this, end: class) : {
         i := this;
         array := [];
@@ -105,30 +115,28 @@ Integer ::= newClass("Integer", `Integer`, Number, {
     new ::= null;
     delete ::= null;
 });
-exported.Integer ::= Integer;
 
-Decimal ::= newClass("Decimal", `Decimal`, Number, {
+Decimal ::= $newClass("Decimal", $Decimal_$new, Number, {
     extend ::= null;
     new ::= null;
     delete ::= null;
 });
-exported.Decimal ::= Decimal;
 
-String..+ ::= `String.+`();
-String..== ::= `String.==`();
-String..toString ::= `String.toString`();
-String..getRepr ::= `String.getRepr`();
-String..length ::= `String.length`();
+String..+ ::= $String_plus;
+String..== ::= $String_eqeq;
+String..toString ::= $String_toString;
+String..getRepr ::= $String_getRepr;
+String..length ::= $String_length;
 String..extend ::= null;
 String..new ::= null;
 String..delete ::= null;
 
-Function..classmethod ::= `Function.classmethod`();
-Function..staticmethod ::= `Function.staticmethod`();
-Function..getRepr ::= `Function.getRepr`();
-Function..whileDo ::= `Function.whileDo`();
-Function..doWhile ::= `Function.doWhile`();
-Function..return ::= `Function.return`();
+Function..classmethod ::= $Function_classmethod;
+Function..staticmethod ::= $Function_staticmethod;
+Function..getRepr ::= $Function_getRepr;
+Function..whileDo ::= $Function_whileDo;
+Function..doWhile ::= $Function_doWhile;
+Function..return ::= $Function_return;
 Function..extend ::= null;
 Function..new ::= null;
 
@@ -143,20 +151,20 @@ Nothing..delete ::= null;
 Nothing..get ::= null;
 Nothing..set ::= null;
 
-exported.input ::= `input`();
-exported.throw ::= `throw`();
-exported.tryCatch ::= `tryCatch`();
-exported.assert ::= (test: Bool, message: String) : {
+input ::= $input;
+throw ::= $throw;
+tryCatch ::= $tryCatch;
+assert ::= (test: Bool, message: String) : {
     test.!().then({
         throw(message);
     });
 };
-exported.assertNot ::= (test: Bool, message: String) : {
+assertNot ::= (test: Bool, message: String) : {
     test.then({
         throw(message);
     });
 };
-exported.assertFail ::= (test: Function, message: String) : {
+assertFail ::= (test: Function, message: String) : {
     thrown := false;
     tryCatch({
         test();
@@ -165,5 +173,29 @@ exported.assertFail ::= (test: Function, message: String) : {
     });
     assert(thrown, message);
 };
-exported.loadLibrary ::= `loadLibrary`();
-exported.loadLibraryFile ::= `loadLibraryFile`();
+loadLibrary ::= $loadLibrary;
+loadLibraryFile ::= $loadLibraryFile;
+
+// Exported variables
+exported.Object ::= Object;
+exported.Class ::= Class;
+exported.Boolean ::= Boolean;
+exported.Number ::= Number;
+exported.Integer ::= Integer;
+exported.Decimal ::= Decimal;
+exported.String ::= String;
+exported.Module ::= Module;
+exported.Function ::= Function;
+exported.Array ::= Array;
+exported.Nothing ::= Nothing;
+exported.true ::= true;
+exported.false ::= false;
+exported.null ::= null;
+exported.input ::= input;
+exported.throw ::= throw;
+exported.tryCatch ::= tryCatch;
+exported.assert ::= assert;
+exported.assertNot ::= assertNot;
+exported.assertFail ::= assertFail;
+exported.loadLibrary ::= loadLibrary;
+exported.loadLibraryFile ::= loadLibraryFile;
