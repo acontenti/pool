@@ -156,6 +156,29 @@ namespace pool {
 
 #endif
 
+// NATIVE FUNCTIONS: misc
+	NATIVE_FUN(String *, $input, Object *self) {
+		string value;
+		std::getline(cin, value);
+		return String::create(value.c_str(), self->context);
+	}
+	NATIVE_FUN(Object *, $exit, Object *self, Integer *code) {
+		exit(code->value);
+	}
+	NATIVE_FUN(Object *, $throw, Object *self, String *message) {
+		throw throw_error(message->value, Location::UNKNOWN);
+	}
+	NATIVE_FUN(Object *, $tryCatch, Object *self, Function *tryBlock, Function *catchBlock) {
+		try {
+			return tryBlock->call(self);
+		} catch (const throw_error &error) {
+			if (catchBlock->parameterCount == 1) {
+				return catchBlock->call(self, String::create(error.what(), self->context));
+			} else {
+				return catchBlock->call(self);
+			}
+		}
+	}
 // NATIVE FUNCTIONS: Object
 	NATIVE_FUN(String *, $Object_getContextInfo, Object *self) {
 		return self->getContextInfo();
@@ -263,6 +286,9 @@ namespace pool {
 // NATIVE FUNCTIONS: Module
 	NATIVE_FUN(Module *, $Module_$new, const char *name, void *function, Object *contextObject) {
 		return Module::create(name, (Module::function_t) function, contextObject->context);
+	}
+	NATIVE_FUN(Object **, $Array_$expand, Array *self) {
+		return self->values;
 	}
 	NATIVE_FUN(Object *, $Module_execute, Module *self) {
 		return self->function(self);

@@ -146,7 +146,7 @@ namespace pool {
 					auto *id = parseIdentifier(param->type, contextObject);
 					type = reinterpret_cast<llvm::Constant *>(id);
 				} else {
-					type = Natives::get()->findConstant("$ObjectClass");
+					type = reinterpret_cast<llvm::Constant *>(Natives::get()->find("$ObjectClass"));
 				}
 				auto *parameterValue = llvm::ConstantStruct::get(parameterType, {
 						builder.CreateGlobalStringPtr(param->name->getText()),
@@ -162,32 +162,58 @@ namespace pool {
 			return classNew;
 		}
 
-		pair<llvm::Value *, size_t> parseArgs(const vector<PoolParser::ArgContext *> &ast, llvm::Value *contextObject) {
+		pair<llvm::Value *, llvm::Value*> parseArgs(const vector<PoolParser::ArgContext *> &ast, llvm::Value *contextObject) {
 			if (!ast.empty()) {
 				auto *mallocFunction = Natives::get()->findFunction("malloc");
-				auto *arrayElementType = llvm::PointerType::getUnqual(*llvm_context);
-				auto *arrayType = llvm::ArrayType::get(arrayElementType, ast.size());
-				auto *array = builder.CreateCall(mallocFunction, {llvm::ConstantExpr::getSizeOf(arrayType)});
-				size_t i = 0;
+				auto *arrayExpanderFunction = Natives::get()->findFunction("$Array_$expand");
+				auto *arrayLengthFunction = Natives::get()->findFunction("$Array_length");
+				// calculate the size of the array (it must take into account the expansion of the arguments)
+				auto *sizeType = llvm::Type::getInt64Ty(*llvm_context);
+				auto *sizeCounter = builder.CreateAlloca(sizeType);
+				builder.CreateStore(builder.getInt64(0), sizeCounter);
+				vector<llvm::Value *> sizes;
 				for (const auto &arg: ast) {
+					llvm::Value *inc;
 					auto *value = parseCall(arg->call(), contextObject);
 					if (arg->DOTS()) {
-						//result.emplace_back(Expansion::create(ptr)); TODO: implement
+						inc = builder.CreateCall(arrayLengthFunction, {value});
+					} else {
+						inc = builder.getInt64(1);
 					}
-					auto *ptr = builder.CreateGEP(arrayElementType, array, {builder.getInt64(i++)});
-					builder.CreateStore(value, ptr);
+					sizes.push_back(inc);
+					builder.CreateStore(builder.CreateAdd(builder.CreateLoad(sizeType, sizeCounter), inc), sizeCounter);
 				}
-				return {array, ast.size()};
+				auto *arrayElementType = llvm::PointerType::getUnqual(*llvm_context);
+				auto *mallocSize = builder.CreateMul(builder.CreateLoad(sizeType, sizeCounter), llvm::ConstantExpr::getSizeOf(arrayElementType));
+				auto *array = builder.CreateCall(mallocFunction, {mallocSize});
+				auto *i = builder.CreateAlloca(sizeType);
+				builder.CreateStore(builder.getInt64(0), i);
+				auto sizesIter = sizes.begin();
+				for (const auto &arg: ast) {
+					auto *value = parseCall(arg->call(), contextObject);
+					auto *size = *sizesIter++;
+					if (arg->DOTS()) {
+						auto *expValues = builder.CreateCall(arrayExpanderFunction, {value});
+						auto *expPtr = builder.CreateBitCast(expValues, arrayElementType->getPointerTo());
+						auto *destPtr = builder.CreateGEP(arrayElementType, array, {builder.CreateLoad(sizeType, i)});
+						builder.CreateMemCpy(destPtr, llvm::MaybeAlign(8), expPtr, llvm::MaybeAlign(8), size);
+					} else {
+						auto *ptr = builder.CreateGEP(arrayElementType, array, {builder.CreateLoad(sizeType, i)});
+						builder.CreateStore(value, ptr);
+					}
+					builder.CreateStore(builder.CreateAdd(builder.CreateLoad(sizeType, i), size), i);
+				}
+				return {array, builder.CreateLoad(sizeType, sizeCounter)};
 			} else {
 				auto *nullptrValue = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(*llvm_context));
-				return {nullptrValue, 0};
+				return {nullptrValue, builder.getInt64(0)};
 			}
 		}
 
 		llvm::Value *parseArray(PoolParser::ArrayContext *ast, llvm::Value *contextObject) {
 			const auto &[args, size] = parseArgs(ast->arg(), contextObject);
 			auto *classNewFunction = Natives::get()->findFunction("$Array_$new");
-			auto *classNew = builder.CreateCall(classNewFunction, {builder.getInt64(size), args, contextObject});
+			auto *classNew = builder.CreateCall(classNewFunction, {size, args, contextObject});
 			return classNew;
 		}
 
@@ -195,7 +221,7 @@ namespace pool {
 			if (const auto &exp = ast->expression()) {
 				return parseExpression(exp, contextObject);
 			} else {
-				return Natives::get()->findConstant("$Null");
+				return Natives::get()->find("$Null");
 			}
 		}
 
@@ -239,55 +265,8 @@ namespace pool {
 					const auto &caller = parseCall(ast->callee, contextObject);
 					const auto &[args, size] = parseArgs(ast->a->arg(), contextObject);
 					auto *callFunction = Natives::get()->findFunction("$Function_call");
-					auto *call = builder.CreateCall(callFunction, {caller, args, builder.getInt64(size)});
+					auto *call = builder.CreateCall(callFunction, {caller, args, size});
 					return call;
-/*
-				 // check if the caller is of class $FunctionClass
-				 auto *instanceOfFunction = LLVMNatives::get()->findFunction("$Object_instanceOf");
-				 auto *functionClass = LLVMNatives::get()->findConstant("$FunctionClass");
-				 auto *instanceOf = builder.CreateCall(instanceOfFunction, {caller, functionClass});
-				 // check if instanceOf result equals to ptr $True
-				 auto *trueValue = LLVMNatives::get()->findConstant("$True");
-				 auto *cmp = builder.CreateICmpEQ(instanceOf, trueValue);
-				 // create the basic block for the if statement
-				 auto *ifBlock = llvm::BasicBlock::Create(*llvm_context, "if", builder.GetInsertBlock()->getParent());
-				 // create the basic block for the else statement
-				 auto *elseBlock = llvm::BasicBlock::Create(*llvm_context, "else", builder.GetInsertBlock()->getParent());
-				 // create the basic block for the merge statement
-				 auto *mergeBlock = llvm::BasicBlock::Create(*llvm_context, "merge", builder.GetInsertBlock()->getParent());
-				 // create the if statement
-				 builder.CreateCondBr(cmp, ifBlock, elseBlock);
-				 // emit if block
-				 builder.SetInsertPoint(ifBlock);
-				 // invoke the function
-				 auto *callFunction = LLVMNatives::get()->findFunction("$Function_call");
-				 llvm::Value *call;
-				 if (!args.empty()) {
-				 	auto *arrayElementType = llvm::PointerType::getUnqual(*llvm_context);
-				 	auto *arrayType = llvm::ArrayType::get(arrayElementType, args.size());
-				 	auto *array = builder.CreateAlloca(arrayType);
-				 	for (size_t i = 0; i < args.size(); i++) {
-				 		auto *value = builder.CreateGEP(arrayElementType, array, {builder.getInt64(i)});
-				 		builder.CreateStore(args[i], value);
-				 	}
-				 	call = builder.CreateCall(callFunction, {caller, array, builder.getInt64(args.size())});
-				 } else {
-				 	auto *nullptrValue = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(*llvm_context));
-				 	call = builder.CreateCall(callFunction, {caller, nullptrValue, builder.getInt64(0)});
-				 }
-				 builder.CreateBr(mergeBlock);
-				 // emit else block
-				 builder.SetInsertPoint(elseBlock);
-				 // return $Null
-				 auto *nullValue = LLVMNatives::get()->findConstant("$Null");
-				 builder.CreateBr(mergeBlock);
-				 // emit merge block
-				 builder.SetInsertPoint(mergeBlock);
-				 auto *phi = builder.CreatePHI(call->getType(), 2);
-				 phi->addIncoming(call, ifBlock);
-				 phi->addIncoming(nullValue, elseBlock);
-				 return phi;
-*/
 				}
 				case PoolParser::CallContext::IA:
 				case PoolParser::CallContext::ILA: {
@@ -296,7 +275,7 @@ namespace pool {
 					if (ast->a) {
 						const auto &[args, size] = parseArgs(ast->a->arg(), contextObject);
 						auto *callFunction = Natives::get()->findFunction("$Function_call");
-						auto *call = builder.CreateCall(callFunction, {identifier, args, builder.getInt64(size)});
+						auto *call = builder.CreateCall(callFunction, {identifier, args, size});
 						return call;
 					} else {
 						return identifier;
@@ -320,7 +299,7 @@ namespace pool {
 				if (const auto &exp = statement->expression()) {
 					result = parseExpression(exp, ctxArg);
 				} else {
-					result = Natives::get()->findConstant("$Null");
+					result = Natives::get()->find("$Null");
 				}
 			}
 			builder.CreateRet(result);

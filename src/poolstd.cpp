@@ -97,11 +97,7 @@ namespace pool {
 
 	String *Object::getRepr() {
 		if (auto method = findMethod("getRepr")) {
-			if (Object *result = method->call(this, {}, 0)) {
-				if (result->instanceOf($StringClass)) {
-					return (String *) result;
-				}
-			}
+			return method->callCheck<String>(this, $StringClass);
 		}
 		return String::create(getDefaultRepr().c_str(), context);
 	}
@@ -137,11 +133,7 @@ namespace pool {
 
 	String *Object::toString() {
 		if (auto *method = findMethod("toString")) {
-			if (Object *result = method->call(this, {}, 0)) {
-				if (result->instanceOf($StringClass)) {
-					return (String *) result;
-				}
-			}
+			return method->callCheck<String>(this, $StringClass);
 		}
 		return getRepr();
 	}
@@ -177,8 +169,8 @@ namespace pool {
 	Object *Class::newInstance(Context *parent, void *data, Object **args, size_t argc) const {
 		auto *instance = creator(parent, data);
 		instance->cls = const_cast<Class *>(this);
-		if (auto method = instance->findMethod("init")) {
-			method->call(instance, args, argc);
+		if (auto *init = instance->findMethod("init")) {
+			init->call(instance, args, argc);
 		}
 		return instance;
 	}
@@ -199,7 +191,7 @@ namespace pool {
 			if (super) {
 				block->context->set("super", (Object *) super, true);
 			}
-			block->call(this, {}, 0);
+			block->call(this);
 			for (const auto &[_name, value]: *block->context) {
 				context->set(_name, value.first, value.second);
 			}

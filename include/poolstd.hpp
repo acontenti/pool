@@ -127,7 +127,7 @@ namespace pool {
 
 		Class *extend(Class *newClass, Function *block) const;
 
-		Class * initialize(Function *block);
+		Class *initialize(Function *block);
 
 		bool subclassOf(const Class *_cls) const;
 
@@ -229,6 +229,26 @@ namespace pool {
 
 	public:
 		Object *call(Object *self, Object **args, size_t n) const;
+
+		template<typename ...Args>
+		constexpr inline Object *call(Object *self, Args... args) const {
+			static_assert(((std::is_pointer_v<Args> && std::is_base_of_v<Object, std::remove_pointer_t<Args>>) && ...), "All arguments must be pointers to Object or subclasses of Object");
+			if constexpr (sizeof...(args) == 0) {
+				return call(self, {}, 0);
+			} else {
+				return call(self, new Object *[sizeof...(args)]{args...}, sizeof...(args));
+			}
+		}
+
+		template<class R, typename ...Args, typename = typename std::enable_if<std::is_base_of<Object, R>::value>::type>
+		inline R *callCheck(Object *self, Class* returnType, Args... args) const {
+			if (Object *result = call(self, args...)) {
+				if (result->instanceOf(returnType)) {
+					return static_cast<R *>(result);
+				}
+			}
+			return nullptr;
+		}
 
 		static Object *CREATOR(Context *_context, void *data);
 

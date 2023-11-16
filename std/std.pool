@@ -3,6 +3,7 @@ false ::= $False;
 null ::= $Null;
 createClass ::= $Class_initialize;
 input ::= $input;
+exit ::= $exit;
 throw ::= $throw;
 tryCatch ::= $tryCatch;
 loadLibrary ::= $loadLibrary;
